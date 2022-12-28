@@ -17,8 +17,8 @@ class PromptLayer(object):
 
     def __call__(self, *args, **kwargs):
         from promptlayer.utils import get_api_key
-        # response = object.__getattribute__(self, "_obj")(*args, **kwargs)
-        response = None
+        tag = kwargs.pop("pl_tag", None)
+        response = object.__getattribute__(self, "_obj")(*args, **kwargs)
         requests.post("https://api.promptlayer.com/track",
             headers = {
                 "Authorization": f"Bearer {get_api_key()}"
@@ -27,6 +27,7 @@ class PromptLayer(object):
                 "function_name": object.__getattribute__(self, "_function_name"),
                 "args": args,
                 "kwargs": kwargs,
+                "tag":tag,
                 "response": response
             }
         )     

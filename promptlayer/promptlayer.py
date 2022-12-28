@@ -1,5 +1,5 @@
 import requests
-
+import time
 
 class PromptLayer(object):
     __slots__ = ["_obj", "__weakref__", "_function_name"]
@@ -22,9 +22,10 @@ class PromptLayer(object):
 
     def __call__(self, *args, **kwargs):
         from promptlayer.utils import get_api_key
-
         tag = kwargs.pop("pl_tag", None)
+        request_start_time = time.time()
         response = object.__getattribute__(self, "_obj")(*args, **kwargs)
+        request_end_time = time.time()
         requests.post(
             "https://api.promptlayer.com/track",
             headers={"Authorization": f"Bearer {get_api_key()}"},
@@ -34,6 +35,8 @@ class PromptLayer(object):
                 "kwargs": kwargs,
                 "tag": tag,
                 "response": response,
+                "request_start_time": request_start_time,
+                "request_end_time": request_end_time,
             },
         )
         return response

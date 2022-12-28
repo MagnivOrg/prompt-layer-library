@@ -22,7 +22,7 @@ class PromptLayer(object):
 
     def __call__(self, *args, **kwargs):
         from promptlayer.utils import get_api_key
-        tag = kwargs.pop("pl_tag", None)
+        tag = kwargs.pop("pl_tags", None)
         request_start_time = time.time()
         response = object.__getattribute__(self, "_obj")(*args, **kwargs)
         request_end_time = time.time()
@@ -33,7 +33,7 @@ class PromptLayer(object):
                 "function_name": object.__getattribute__(self, "_function_name"),
                 "args": args,
                 "kwargs": kwargs,
-                "tag": tag,
+                "tags": tag,
                 "response": response,
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,

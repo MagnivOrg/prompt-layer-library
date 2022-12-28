@@ -28,7 +28,6 @@ class PromptLayer(object):
         request_end_time = time.time()
         requests.post(
             "https://api.promptlayer.com/track",
-            headers={"Authorization": f"Bearer {get_api_key()}"},
             data={
                 "function_name": object.__getattribute__(self, "_function_name"),
                 "args": args,
@@ -37,6 +36,7 @@ class PromptLayer(object):
                 "response": response,
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
+                "api_key": get_api_key(),
             },
         )
         return response

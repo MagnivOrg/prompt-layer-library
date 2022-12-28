@@ -27,7 +27,7 @@ class PromptLayer(object):
         response = object.__getattribute__(self, "_obj")(*args, **kwargs)
         request_end_time = time.time()
         requests.post(
-            "https://api.promptlayer.com/track",
+            "https://api.promptlayer.com/track-request",
             data={
                 "function_name": object.__getattribute__(self, "_function_name"),
                 "args": args,

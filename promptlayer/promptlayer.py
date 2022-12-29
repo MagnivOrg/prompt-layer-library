@@ -1,5 +1,5 @@
 import requests
-import time
+import datetime
 
 class PromptLayer(object):
     __slots__ = ["_obj", "__weakref__", "_function_name"]
@@ -23,20 +23,22 @@ class PromptLayer(object):
     def __call__(self, *args, **kwargs):
         from promptlayer.utils import get_api_key
         tag = kwargs.pop("pl_tags", None)
-        request_start_time = time.time()
+        request_start_time = datetime.datetime.now().timestamp()
         response = object.__getattribute__(self, "_obj")(*args, **kwargs)
-        request_end_time = time.time()
-        requests.post(
-            "https://api.promptlayer.com/track-request",
-            data={
+        request_end_time = datetime.datetime.now().timestamp()
+        request_response = requests.post(
+            "http://127.0.0.1:5000/track-request",
+            json={
                 "function_name": object.__getattribute__(self, "_function_name"),
                 "args": args,
                 "kwargs": kwargs,
                 "tags": tag,
-                "response": response,
+                "request_response": response,
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
                 "api_key": get_api_key(),
             },
         )
+        if request_response.status_code != 200:
+            raise Exception(f"Error while tracking request: {request_response.json().get('message')}")
         return response

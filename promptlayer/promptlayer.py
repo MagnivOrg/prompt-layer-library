@@ -23,9 +23,9 @@ class PromptLayer(object):
     def __call__(self, *args, **kwargs):
         from promptlayer.utils import get_api_key
         tag = kwargs.pop("pl_tags", None)
-        request_start_time = datetime.datetime.utcnow().timestamp()
+        request_start_time = datetime.datetime.now().timestamp()
         response = object.__getattribute__(self, "_obj")(*args, **kwargs)
-        request_end_time = datetime.datetime.utcnow().timestamp()
+        request_end_time = datetime.datetime.now().timestamp()
         request_response = requests.post(
             "https://api.promptlayer.com/track-request",
             json={

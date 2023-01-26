@@ -16,6 +16,8 @@
 
 PromptLayer records all your OpenAI API requests, allowing you to search and explore request history in the PromptLayer dashboard.
 
+This repo contains the Python wrapper library for PromptLayer.
+
 ## Quickstart ⚡
 
 ### Install PromptLayer

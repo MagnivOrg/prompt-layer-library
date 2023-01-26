@@ -4,7 +4,7 @@ setup(
     name="promptlayer",
     description="PromptLayer is a package to keep track of your GPT models training",
     author_email="hello@magniv.io",
-    url="https://www.magniv.io",
+    url="https://www.promptlayer.com",
     project_urls={"Documentation": "https://magniv.notion.site/Prompt-Layer-Docs-db0e6f50cacf4564a6d09824ba17a629",},
     version="0.1.3",
     py_modules=["promptlayer"],

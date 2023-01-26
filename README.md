@@ -89,4 +89,4 @@ request_response = requests.post(
 
 ## Contributing
 
-We welcome contributions to our open source project, including new features, infrastructure improvements, and better documentation. For more information, contact @jzone3 or @Jped.
+We welcome contributions to our open source project, including new features, infrastructure improvements, and better documentation. For more information or any questions, contact us at [hello@magniv.io](mailto:hello@magniv.io).

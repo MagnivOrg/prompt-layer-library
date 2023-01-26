@@ -5,7 +5,7 @@
 **The first platform built for <span style="background-color: rgb(219, 234, 254);">prompt engineers</span>**
 
 <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.8+-blue?style=for-the-badge&logo=python&logoColor=white"></a>
-<a href="https://magniv.notion.site/Prompt-Layer-Docs-db0e6f50cacf4564a6d09824ba17a629"><img alt="Docs" src="https://custom-icon-badges.herokuapp.com/badge/docs-PL-blue.svg?logo=cake&style=for-the-badge&logoColor=white"></a>
+<a href="https://magniv.notion.site/Prompt-Layer-Docs-db0e6f50cacf4564a6d09824ba17a629"><img alt="Docs" src="https://custom-icon-badges.herokuapp.com/badge/docs-PL-green.svg?logo=cake&style=for-the-badge&logoColor=white"></a>
 <a href="https://www.loom.com/share/723cbdb43439458fb607e910faa13294"><img alt="Demo with Loom" src="https://img.shields.io/badge/Demo-loom-552586.svg?logo=loom&style=for-the-badge&labelColor=gray"></a>
 
 ---  
@@ -44,18 +44,19 @@ openai = promptlayer.openai
 
 <aside>
 💡 Your OpenAI API Key is **never** sent to our servers. All OpenAI requests are made locally from your machine, PromptLayer just logs the request.
-
 </aside>
 
-There is only one difference… PromptLayer allows you to add tags through the `pl_tags` argument. This allows you to track and group requests in the dashboard. 
+### Adding PromptLayer tags: `pl_tags`
 
-************Tags are not required but we recommend them!************
+PromptLayer allows you to add tags through the `pl_tags` argument. This allows you to track and group requests in the dashboard. 
+
+*Tags are not required but we recommend them!*
 
 ```python
 openai.Completion.create(
-					engine="text-ada-001", 
-					prompt="My name is", 
-					pl_tags=["name-guessing", "pipeline-2"]
+  engine="text-ada-001", 
+  prompt="My name is", 
+  pl_tags=["name-guessing", "pipeline-2"]
 )
 ```
 
@@ -70,18 +71,16 @@ Here is an example request below:
 ```jsx
 import requests
 request_response = requests.post(
-    "https://api.promptlayer.com/track-request",
-    json={
-        "function_name": "openai.Completion.create",
-        "args": [],
-        "kwargs": {"engine": "text-ada-001", "prompt": "My name is"},
-        "tags": ["hello", "world"],
-        "request_response": {"id": "cmpl-6TEeJCRVlqQSQqhD8CYKd1HdCcFxM", "object": "text_completion", "created": 1672425843, "model": "text-ada-001", "choices": [{"text": " advocacy\"\n\nMy name is advocacy.", "index": 0, "logprobs": None, "finish_reason": "stop"}]},
-        "request_start_time": 1673987077.463504,
-        "request_end_time": 1673987077.463504,
-        "api_key": "pl_<YOUR API KEY>",
-    },
+  "https://api.promptlayer.com/track-request",
+  json={
+    "function_name": "openai.Completion.create",
+    "args": [],
+    "kwargs": {"engine": "text-ada-001", "prompt": "My name is"},
+    "tags": ["hello", "world"],
+    "request_response": {"id": "cmpl-6TEeJCRVlqQSQqhD8CYKd1HdCcFxM", "object": "text_completion", "created": 1672425843, "model": "text-ada-001", "choices": [{"text": " advocacy\"\n\nMy name is advocacy.", "index": 0, "logprobs": None, "finish_reason": "stop"}]},
+    "request_start_time": 1673987077.463504,
+    "request_end_time": 1673987077.463504,
+    "api_key": "pl_<YOUR API KEY>",
+  },
 )
 ```
-
-*Remember, when using Javascript, timestamps are 1000x bigger than those in Python (what we expect). You will need to divide whatever the JS timestamp by 1000.*

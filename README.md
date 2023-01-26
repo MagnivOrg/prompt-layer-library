@@ -18,6 +18,12 @@ PromptLayer records all your OpenAI API requests, allowing you to search and exp
 
 ## Quickstart ⚡
 
+### Install PromptLayer
+
+```bash
+pip install promptlayer
+```
+
 ### Installing PromptLayer Locally
 
 Use `pip install .` to install locally.
@@ -27,10 +33,6 @@ Use `pip install .` to install locally.
 To get started, create an account by clicking “*Log in*” on [PromptLayer](https://promptlayer.com/). Once logged in, click the button to create an API key and save this in a secure location ([Guide to Using Env Vars](https://towardsdatascience.com/the-quick-guide-to-using-environment-variables-in-python-d4ec9291619e)).
 
 Once you have that all set up, [install PromptLayer using](https://pypi.org/project/promptlayer/) `pip`.
-
-```bash
-pip install promptlayer
-```
 
 In the Python file where you use OpenAI APIs, add the following. This allows us to keep track of your requests without needing any other code changes.
 
@@ -84,3 +86,7 @@ request_response = requests.post(
   },
 )
 ```
+
+## Contributing
+
+We welcome contributions to our open source project, including new features, infrastructure improvements, and better documentation. For more information, contact @jzone3 or @Jped.

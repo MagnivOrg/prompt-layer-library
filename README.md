@@ -20,7 +20,7 @@ PromptLayer records all your OpenAI API requests, allowing you to search and exp
 
 ### Installing PromptLayer Locally
 
-Use `pip install .` and update the API URL (in `promptlayer.py`) to install locally.
+Use `pip install .` to install locally.
 
 ### Using PromptLayer
 

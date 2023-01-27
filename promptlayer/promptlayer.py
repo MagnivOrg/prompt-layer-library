@@ -13,7 +13,7 @@ class PromptLayerBase(object):
             object.__setattr__(self, "_function_name", f"langchain.{obj.__repr_name__()}")
 
     def __getattr__(self, name):
-        return PromptLayer(
+        return PromptLayerBase(
             getattr(object.__getattribute__(self, "_obj"), name),
             function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
             provider_type=object.__getattribute__(self, "_provider_type"),

@@ -1,9 +1,10 @@
-from promptlayer.promptlayer import PromptLayer
+from promptlayer.promptlayer import PromptLayerBase
+import promptlayer.langchain as langchain
 import openai
 import os
 
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
-openai = PromptLayer(openai, function_name="openai")
+openai = PromptLayerBase(openai, function_name="openai")
 
 
 __all__ = [

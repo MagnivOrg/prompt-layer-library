@@ -9,6 +9,7 @@ class PromptLayerBase(object):
         object.__setattr__(self, "_function_name", function_name)
         object.__setattr__(self, "_provider_type", provider_type)
         object.__setattr__(self, "pl_tags", pl_tags)
+        object.__setattr__(self, "_identifying_params", _identifying_params)
         if provider_type == "langchain":
             if hasattr(obj, "_identifying_params"):
                 _identifying_params.update(obj._identifying_params)

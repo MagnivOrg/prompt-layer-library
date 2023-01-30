@@ -65,6 +65,8 @@ class PromptLayerBase(object):
                         "api_key": get_api_key(),
                     },
                 )
+                if request_response.status_code != 200:
+                    raise Exception(f"Error while tracking request: {request_response.json().get('message')}")
         else:
             request_response = requests.post(
                 "https://api.promptlayer.com/track-request",

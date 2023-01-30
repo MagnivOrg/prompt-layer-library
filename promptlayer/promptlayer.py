@@ -4,16 +4,15 @@ import datetime
 class PromptLayerBase(object):
     __slots__ = ["_obj", "__weakref__", "_function_name", "_provider_type", "_identifying_params", "pl_tags"]
 
-    def __init__(self, obj, function_name="", provider_type="openai", pl_tags=None):
+    def __init__(self, obj, function_name="", provider_type="openai", pl_tags=None, _identifying_params={}):
         object.__setattr__(self, "_obj", obj)
         object.__setattr__(self, "_function_name", function_name)
         object.__setattr__(self, "_provider_type", provider_type)
         object.__setattr__(self, "pl_tags", pl_tags)
         if provider_type == "langchain":
             if hasattr(obj, "_identifying_params"):
-                object.__setattr__(self, "_identifying_params", obj._identifying_params)
-            else:
-                object.__setattr__(self, "_identifying_params", {})
+                _identifying_params.update(obj._identifying_params)
+            object.__setattr__(self, "_identifying_params", _identifying_params)
             if hasattr(obj, "__repr_name__"):
                 object.__setattr__(self, "_function_name", f"{object.__getattribute__(self, '_function_name')}.{obj.__repr_name__()}")
 
@@ -23,6 +22,7 @@ class PromptLayerBase(object):
             function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
             provider_type=object.__getattribute__(self, "_provider_type"),
             pl_tags=object.__getattribute__(self, "pl_tags"),
+            _identifying_params=object.__getattribute__(self, "_identifying_params"),
         )
 
     def __delattr__(self, name):

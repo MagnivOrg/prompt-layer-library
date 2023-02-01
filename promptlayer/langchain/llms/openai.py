@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from langchain.schema import LLMResult
 import datetime
 
-class PromptLayerOpenAI(OpenAI, BaseModel):
+class OpenAI(OpenAI, BaseModel):
     pl_tags: Optional[List[str]]
 
     def _generate(self, prompts: List[str], stop: Optional[List[str]] = None

@@ -1,4 +1,5 @@
 import datetime
+import types
 
 class PromptLayerBase(object):
     __slots__ = ["_obj", "__weakref__", "_function_name", "_provider_type"]
@@ -27,6 +28,8 @@ class PromptLayerBase(object):
         request_start_time = datetime.datetime.now().timestamp()
         response = object.__getattribute__(self, "_obj")(*args, **kwargs)
         request_end_time = datetime.datetime.now().timestamp()
+        if isinstance(response, types.GeneratorType):
+            return response
         promptlayer_api_request(
             object.__getattribute__(self, "_function_name"),
             object.__getattribute__(self, "_provider_type"),

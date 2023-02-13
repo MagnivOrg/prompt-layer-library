@@ -23,13 +23,21 @@ class PromptLayerBase(object):
         setattr(object.__getattribute__(self, "_obj"), name, value)
 
     def __call__(self, *args, **kwargs):
-        from promptlayer.utils import get_api_key, promptlayer_api_request
+        from promptlayer.utils import get_api_key, promptlayer_api_request, OpenAIGeneratorProxy
         tags = kwargs.pop("pl_tags", None)
         request_start_time = datetime.datetime.now().timestamp()
         response = object.__getattribute__(self, "_obj")(*args, **kwargs)
         request_end_time = datetime.datetime.now().timestamp()
         if isinstance(response, types.GeneratorType):
-            return response
+            return OpenAIGeneratorProxy(response, {
+                "function_name": object.__getattribute__(self, "_function_name"),
+                "provider_type": object.__getattribute__(self, "_provider_type"),
+                "args": args,
+                "kwargs": kwargs,
+                "tags": tags,
+                "request_start_time": request_start_time,
+                "request_end_time": request_end_time,
+            })
         promptlayer_api_request(
             object.__getattribute__(self, "_function_name"),
             object.__getattribute__(self, "_provider_type"),

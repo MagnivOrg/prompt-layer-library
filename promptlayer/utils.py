@@ -1,5 +1,6 @@
 import promptlayer
 import requests
+import sys
 
 def get_api_key():
     # raise an error if the api key is not set
@@ -11,23 +12,26 @@ def get_api_key():
         return promptlayer.api_key
 
 def promptlayer_api_request(function_name, provider_type, args, kwargs, tags, response, request_start_time, request_end_time, api_key):
-    request_response = requests.post(
-        "https://api.promptlayer.com/track-request",
-        json={
-            "function_name": function_name,
-            "provider_type": provider_type,
-            "args": args,
-            "kwargs": kwargs,
-            "tags": tags,
-            "request_response": response,
-            "request_start_time": request_start_time,
-            "request_end_time": request_end_time,
-            "api_key": api_key,
-        },
-    )
-    if request_response.status_code != 200:
-        raise Exception(f"Error while tracking request: {request_response.json().get('message')}")
-
+    try:
+        request_response = requests.post(
+            "https://api.promptlayer.com/track-request",
+            json={
+                "function_name": function_name,
+                "provider_type": provider_type,
+                "args": args,
+                "kwargs": kwargs,
+                "tags": tags,
+                "request_response": response,
+                "request_start_time": request_start_time,
+                "request_end_time": request_end_time,
+                "api_key": api_key,
+            },
+        )
+        if request_response.status_code != 200:
+            print(f"WARNING: While logging your request PromptLayer had the following error: {request_response.json().get('message')}", file=sys.stderr)
+    except  Exception as e:
+        print(f"WARNING: While logging your request PromptLayer had the following error: {e}", file=sys.stderr)
+    
 class OpenAIGeneratorProxy:
     def __init__(self, generator, api_request_arguments):
         self.generator = generator

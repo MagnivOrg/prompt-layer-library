@@ -32,7 +32,6 @@ class OpenAI(OpenAI, BaseModel):
     async def _agenerate(
         self, prompts: List[str], stop: Optional[List[str]] = None
     ) -> LLMResult:
-        print("calling async")
         from promptlayer.utils import get_api_key, promptlayer_api_request
         request_start_time = datetime.datetime.now().timestamp()
         generated_responses = await super()._agenerate(prompts, stop)

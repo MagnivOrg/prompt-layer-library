@@ -36,9 +36,9 @@ def promptlayer_api_request(function_name, provider_type, args, kwargs, tags, re
         print(f"WARNING: While logging your request PromptLayer had the following error: {e}", file=sys.stderr)
 
 def promptlayer_get_prompt(prompt_name, api_key):
-    request_response = requests.get(
+    request_response = requests.post(
             "https://api.promptlayer.com/library-get-prompt-template",
-            params={
+            json={
                 "prompt_name": prompt_name,
                 "api_key": api_key,
             },

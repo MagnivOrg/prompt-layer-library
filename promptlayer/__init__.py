@@ -1,5 +1,6 @@
 from promptlayer.promptlayer import PromptLayerBase
 import promptlayer.langchain as langchain
+import promptlayer.prompts as prompts
 import openai
 import os
 

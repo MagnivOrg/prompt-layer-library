@@ -1,5 +1,5 @@
 import datetime
-import types
+import inspect
 
 class PromptLayerBase(object):
     __slots__ = ["_obj", "__weakref__", "_function_name", "_provider_type"]
@@ -23,30 +23,36 @@ class PromptLayerBase(object):
         setattr(object.__getattribute__(self, "_obj"), name, value)
 
     def __call__(self, *args, **kwargs):
-        from promptlayer.utils import get_api_key, promptlayer_api_request, OpenAIGeneratorProxy
+        from promptlayer.utils import get_api_key, promptlayer_api_handler
         tags = kwargs.pop("pl_tags", None)
         request_start_time = datetime.datetime.now().timestamp()
-        response = object.__getattribute__(self, "_obj")(*args, **kwargs)
+        function_object = object.__getattribute__(self, "_obj")
+        if inspect.iscoroutinefunction(function_object):
+            async def async_wrapper(*args, **kwargs):
+                response = await function_object(*args, **kwargs)
+                request_end_time = datetime.datetime.now().timestamp()
+                return promptlayer_api_handler(
+                    object.__getattribute__(self, "_function_name"),
+                    object.__getattribute__(self, "_provider_type"),
+                    args,
+                    kwargs,
+                    tags,
+                    response,
+                    request_start_time,
+                    request_end_time,
+                    get_api_key(),
+                )
+            return async_wrapper(*args, **kwargs)
+        response = function_object(*args, **kwargs)
         request_end_time = datetime.datetime.now().timestamp()
-        if isinstance(response, types.GeneratorType):
-            return OpenAIGeneratorProxy(response, {
-                "function_name": object.__getattribute__(self, "_function_name"),
-                "provider_type": object.__getattribute__(self, "_provider_type"),
-                "args": args,
-                "kwargs": kwargs,
-                "tags": tags,
-                "request_start_time": request_start_time,
-                "request_end_time": request_end_time,
-            })
-        promptlayer_api_request(
-            object.__getattribute__(self, "_function_name"),
-            object.__getattribute__(self, "_provider_type"),
-            args,
-            kwargs,
-            tags,
-            response,
-            request_start_time,
-            request_end_time,
-            get_api_key(),
+        return promptlayer_api_handler(
+                    object.__getattribute__(self, "_function_name"),
+                    object.__getattribute__(self, "_provider_type"),
+                    args,
+                    kwargs,
+                    tags,
+                    response,
+                    request_start_time,
+                    request_end_time,
+                    get_api_key(),
         )
-        return response

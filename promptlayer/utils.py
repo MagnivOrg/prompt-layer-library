@@ -151,7 +151,6 @@ class OpenAIGeneratorProxy:
 
     async def __anext__(self):
         result = await self.generator.__anext__()
-        self.results.append(result)
         return self._abstracted_next(result)
 
     def __next__(self):

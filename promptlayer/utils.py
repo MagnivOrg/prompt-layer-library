@@ -42,7 +42,7 @@ def promptlayer_api_handler(
             },
         )
     else:
-        return promptlayer_api_request(
+        promptlayer_api_request(
             function_name,
             provider_type,
             args,
@@ -53,6 +53,7 @@ def promptlayer_api_handler(
             request_end_time,
             api_key,
         )
+        return response
 
 
 def promptlayer_api_request(

@@ -1,3 +1,4 @@
+from copy import deepcopy
 import promptlayer
 import requests
 import sys
@@ -180,6 +181,6 @@ class OpenAIGeneratorProxy:
         response = ""
         for result in self.results:
             response = f"{response}{result.choices[0].text}"
-        final_result = self.results[-1]
+        final_result = deepcopy(self.results[-1])
         final_result.choices[0].text = response
         return final_result

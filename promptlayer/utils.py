@@ -136,7 +136,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
             raise Exception(
                 f"PromptLayer had the following error while publishing your prompt: {request_response}"
             )
-    return request_response.json()
+    return True
 
 
 class OpenAIGeneratorProxy:

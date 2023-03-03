@@ -101,41 +101,51 @@ def promptlayer_api_request(
 
 
 def promptlayer_get_prompt(prompt_name, api_key):
-    request_response = requests.post(
-        "https://api.promptlayer.com/library-get-prompt-template",
-        json={"prompt_name": prompt_name, "api_key": api_key,},
-    )
-    if request_response.status_code != 200:
-        if hasattr(request_response, "json"):
-            raise Exception(
-                f"PromptLayer had the following error while getting your prompt: {request_response.json().get('message')}"
-            )
-        else:
-            raise Exception(
-                f"PromptLayer had the following error while getting your prompt: {request_response}"
-            )
+    try:
+        request_response = requests.post(
+            "https://api.promptlayer.com/library-get-prompt-template",
+            json={"prompt_name": prompt_name, "api_key": api_key,},
+        )
+        if request_response.status_code != 200:
+            if hasattr(request_response, "json"):
+                raise Exception(
+                    f"PromptLayer had the following error while getting your prompt: {request_response.json().get('message')}"
+                )
+            else:
+                raise Exception(
+                    f"PromptLayer had the following error while getting your prompt: {request_response}"
+                )
+    except Exception as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting your prompt: {e}"
+        )
     return request_response.json()
 
 
 def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
-    request_response = requests.post(
-        "https://api.promptlayer.com/library-publish-prompt-template",
-        json={
-            "prompt_name": prompt_name,
-            "prompt_template": prompt_template,
-            "tags": tags,
-            "api_key": api_key,
-        },
-    )
-    if request_response.status_code != 200:
-        if hasattr(request_response, "json"):
-            raise Exception(
-                f"PromptLayer had the following error while publishing your prompt: {request_response.json().get('message')}"
-            )
-        else:
-            raise Exception(
-                f"PromptLayer had the following error while publishing your prompt: {request_response}"
-            )
+    try:
+        request_response = requests.post(
+            "https://api.promptlayer.com/library-publish-prompt-template",
+            json={
+                "prompt_name": prompt_name,
+                "prompt_template": prompt_template,
+                "tags": tags,
+                "api_key": api_key,
+            },
+        )
+        if request_response.status_code != 200:
+            if hasattr(request_response, "json"):
+                raise Exception(
+                    f"PromptLayer had the following error while publishing your prompt: {request_response.json().get('message')}"
+                )
+            else:
+                raise Exception(
+                    f"PromptLayer had the following error while publishing your prompt: {request_response}"
+                )
+    except Exception as e:
+        raise Exception(
+            f"PromptLayer had the following error while publishing your prompt: {e}"
+        )
     return True
 
 

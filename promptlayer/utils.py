@@ -138,6 +138,42 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
             )
     return request_response.json()
 
+def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
+    request_response = requests.post(
+        "https://api.promptlayer.com/library-track-prompt",
+        json={
+            "request_id": request_id,
+            "prompt_name": prompt_name,
+            "prompt_input_variables": input_variables,
+            "api_key": api_key,
+        },
+    )
+    if request_response.status_code != 200:
+        if hasattr(request_response, "json"):
+            raise Exception(
+                f"PromptLayer had the following error while tracking your prompt: {request_response.json().get('message')}"
+            )
+        else:
+            raise Exception(
+                f"PromptLayer had the following error while tracking your prompt: {request_response}"
+            )
+    return True
+
+def promptlayer_track_metadata(request_id, metadata, api_key):
+    request_response = requests.post(
+        "https://api.promptlayer.com/library-track-metadata",
+        json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
+    )
+    if request_response.status_code != 200:
+        if hasattr(request_response, "json"):
+            raise Exception(
+                f"PromptLayer had the following error while tracking your metadata: {request_response.json().get('message')}"
+            )
+        else:
+            raise Exception(
+                f"PromptLayer had the following error while tracking your metadata: {request_response}"
+            )
+    return True
 
 class OpenAIGeneratorProxy:
     def __init__(self, generator, api_request_arguments):

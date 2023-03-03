@@ -136,7 +136,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
             raise Exception(
                 f"PromptLayer had the following error while publishing your prompt: {request_response}"
             )
-    return request_response.json()
+    return True
 
 def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
     request_response = requests.post(

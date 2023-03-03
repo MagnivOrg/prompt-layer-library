@@ -139,40 +139,62 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
     return True
 
 def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
-    request_response = requests.post(
-        "https://api.promptlayer.com/library-track-prompt",
-        json={
-            "request_id": request_id,
-            "prompt_name": prompt_name,
-            "prompt_input_variables": input_variables,
-            "api_key": api_key,
-        },
-    )
-    if request_response.status_code != 200:
-        if hasattr(request_response, "json"):
-            raise Exception(
-                f"PromptLayer had the following error while tracking your prompt: {request_response.json().get('message')}"
-            )
-        else:
-            raise Exception(
-                f"PromptLayer had the following error while tracking your prompt: {request_response}"
-            )
+    try:
+        request_response = requests.post(
+            "https://api.promptlayer.com/library-track-prompt",
+            json={
+                "request_id": request_id,
+                "prompt_name": prompt_name,
+                "prompt_input_variables": input_variables,
+                "api_key": api_key,
+            },
+        )
+        if request_response.status_code != 200:
+            if hasattr(request_response, "json"):
+                print(
+                    f"WARNING: While tracking your prompt PromptLayer had the following error: {request_response.json().get('message')}",
+                    file=sys.stderr,
+                )
+                return False
+            else:
+                print(
+                    f"WARNING: While tracking your prompt PromptLayer had the following error: {request_response}",
+                    file=sys.stderr,
+                )
+                return False
+    except Exception as e:
+        print(
+            f"WARNING: While tracking your prompt PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return False
     return True
 
 def promptlayer_track_metadata(request_id, metadata, api_key):
-    request_response = requests.post(
-        "https://api.promptlayer.com/library-track-metadata",
-        json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
-    )
-    if request_response.status_code != 200:
-        if hasattr(request_response, "json"):
-            raise Exception(
-                f"PromptLayer had the following error while tracking your metadata: {request_response.json().get('message')}"
-            )
-        else:
-            raise Exception(
-                f"PromptLayer had the following error while tracking your metadata: {request_response}"
-            )
+    try:
+        request_response = requests.post(
+            "https://api.promptlayer.com/library-track-metadata",
+            json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
+        )
+        if request_response.status_code != 200:
+            if hasattr(request_response, "json"):
+                print(
+                    f"WARNING: While tracking your metadata PromptLayer had the following error: {request_response.json().get('message')}",
+                    file=sys.stderr,
+                )
+                return False
+            else:
+                print(
+                    f"WARNING: While tracking your metadata PromptLayer had the following error: {request_response}",
+                    file=sys.stderr,
+                )
+                return False
+    except Exception as e:
+        print(
+            f"WARNING: While tracking your metadata PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return False
     return True
 
 class OpenAIGeneratorProxy:

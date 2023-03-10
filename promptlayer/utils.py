@@ -25,6 +25,7 @@ def promptlayer_api_handler(
     request_start_time,
     request_end_time,
     api_key,
+    return_pl_id=False,
 ):
     if isinstance(response, types.GeneratorType) or isinstance(
         response, types.AsyncGeneratorType
@@ -39,10 +40,11 @@ def promptlayer_api_handler(
                 "tags": tags,
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
+                "return_pl_id": return_pl_id,
             },
         )
     else:
-        promptlayer_api_request(
+        request_id = promptlayer_api_request(
             function_name,
             provider_type,
             args,
@@ -52,7 +54,10 @@ def promptlayer_api_handler(
             request_start_time,
             request_end_time,
             api_key,
+            return_pl_id=return_pl_id,
         )
+        if return_pl_id:
+            return response, request_id
         return response
 
 
@@ -66,6 +71,7 @@ def promptlayer_api_request(
     request_start_time,
     request_end_time,
     api_key,
+    return_pl_id=False,
 ):
     try:
         request_response = requests.post(
@@ -98,6 +104,8 @@ def promptlayer_api_request(
             f"WARNING: While logging your request PromptLayer had the following error: {e}",
             file=sys.stderr,
         )
+    if return_pl_id:
+        return request_response.json().get("request_id")
 
 
 def promptlayer_get_prompt(prompt_name, api_key):
@@ -223,7 +231,7 @@ class OpenAIGeneratorProxy:
             result.choices[0].finish_reason == "stop"
             or result.choices[0].finish_reason == "length"
         ):
-            promptlayer_api_request(
+            request_id = promptlayer_api_request(
                 self.api_request_arugments["function_name"],
                 self.api_request_arugments["provider_type"],
                 self.api_request_arugments["args"],
@@ -233,7 +241,13 @@ class OpenAIGeneratorProxy:
                 self.api_request_arugments["request_start_time"],
                 self.api_request_arugments["request_end_time"],
                 get_api_key(),
+                return_pl_id=self.api_request_arugments["return_pl_id"],
+
             )
+            if self.api_request_arugments["return_pl_id"]:
+                return result, request_id
+        if self.api_request_arugments["return_pl_id"]:
+            return result, None
         return result
 
     def cleaned_result(self):

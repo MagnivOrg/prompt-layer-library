@@ -205,6 +205,33 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
         return False
     return True
 
+def promptlayer_track_score(request_id, score, api_key):
+    try:
+        request_response = requests.post(
+            "https://api.promptlayer.com/library-track-score",
+            json={"request_id": request_id, "score": score, "api_key": api_key,},
+        )
+        if request_response.status_code != 200:
+            if hasattr(request_response, "json"):
+                print(
+                    f"WARNING: While tracking your score PromptLayer had the following error: {request_response.json().get('message')}",
+                    file=sys.stderr,
+                )
+                return False
+            else:
+                print(
+                    f"WARNING: While tracking your score PromptLayer had the following error: {request_response}",
+                    file=sys.stderr,
+                )
+                return False
+    except Exception as e:
+        print(
+            f"WARNING: While tracking your score PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return False
+    return True
+
 class OpenAIGeneratorProxy:
     def __init__(self, generator, api_request_arguments):
         self.generator = generator

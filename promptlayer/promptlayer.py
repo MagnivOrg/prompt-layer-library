@@ -25,6 +25,7 @@ class PromptLayerBase(object):
     def __call__(self, *args, **kwargs):
         from promptlayer.utils import get_api_key, promptlayer_api_handler
         tags = kwargs.pop("pl_tags", None)
+        return_pl_id = kwargs.pop("return_pl_id", False) 
         request_start_time = datetime.datetime.now().timestamp()
         function_object = object.__getattribute__(self, "_obj")
         if inspect.iscoroutinefunction(function_object):
@@ -41,6 +42,7 @@ class PromptLayerBase(object):
                     request_start_time,
                     request_end_time,
                     get_api_key(),
+                    return_pl_id=return_pl_id,
                 )
             return async_wrapper(*args, **kwargs)
         response = function_object(*args, **kwargs)
@@ -55,4 +57,5 @@ class PromptLayerBase(object):
                     request_start_time,
                     request_end_time,
                     get_api_key(),
+                    return_pl_id=return_pl_id,
         )

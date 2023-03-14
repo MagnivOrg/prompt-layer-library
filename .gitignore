@@ -128,5 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+.test/
 plvenv
 test.py

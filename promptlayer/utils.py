@@ -73,6 +73,8 @@ def promptlayer_api_request(
     api_key,
     return_pl_id=False,
 ):
+    if type(response) != dict and hasattr(response, "to_dict_recursive"):
+        response = response.to_dict_recursive()
     try:
         request_response = requests.post(
             "https://api.promptlayer.com/track-request",

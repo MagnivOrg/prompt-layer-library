@@ -15,6 +15,7 @@ def assert_network_call(post, stderr, callback, **kwargs):
     callback(**kwargs)
     if not kwargs.get('stream'):
         post.assert_called_once()
+    print(stderr.getvalue())
     assert ERROR_STR not in stderr.getvalue()
 
 
@@ -24,6 +25,7 @@ async def assert_async_network_call(post, stderr, callback, **kwargs):
     await callback(**kwargs)
     if not kwargs.get('stream'):
         post.assert_called_once()
+    print(stderr.getvalue())
     assert ERROR_STR not in stderr.getvalue()
 
 

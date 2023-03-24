@@ -1,5 +1,7 @@
 import datetime
 import inspect
+from promptlayer.utils import get_api_key, promptlayer_api_handler, run_in_thread_async
+
 
 class PromptLayerBase(object):
     __slots__ = ["_obj", "__weakref__", "_function_name", "_provider_type"]
@@ -23,18 +25,20 @@ class PromptLayerBase(object):
         setattr(object.__getattribute__(self, "_obj"), name, value)
 
     def __call__(self, *args, **kwargs):
-        from promptlayer.utils import get_api_key, promptlayer_api_handler
         tags = kwargs.pop("pl_tags", None)
         if tags is not None and not isinstance(tags, list):
             raise Exception("pl_tags must be a list of strings.")
-        return_pl_id = kwargs.pop("return_pl_id", False) 
+        return_pl_id = kwargs.pop("return_pl_id", False)
         request_start_time = datetime.datetime.now().timestamp()
         function_object = object.__getattribute__(self, "_obj")
         if inspect.iscoroutinefunction(function_object):
+
             async def async_wrapper(*args, **kwargs):
                 response = await function_object(*args, **kwargs)
                 request_end_time = datetime.datetime.now().timestamp()
-                return promptlayer_api_handler(
+                return await run_in_thread_async(
+                    None,
+                    promptlayer_api_handler,
                     object.__getattribute__(self, "_function_name"),
                     object.__getattribute__(self, "_provider_type"),
                     args,
@@ -46,18 +50,19 @@ class PromptLayerBase(object):
                     get_api_key(),
                     return_pl_id=return_pl_id,
                 )
+
             return async_wrapper(*args, **kwargs)
         response = function_object(*args, **kwargs)
         request_end_time = datetime.datetime.now().timestamp()
         return promptlayer_api_handler(
-                    object.__getattribute__(self, "_function_name"),
-                    object.__getattribute__(self, "_provider_type"),
-                    args,
-                    kwargs,
-                    tags,
-                    response,
-                    request_start_time,
-                    request_end_time,
-                    get_api_key(),
-                    return_pl_id=return_pl_id,
+            object.__getattribute__(self, "_function_name"),
+            object.__getattribute__(self, "_provider_type"),
+            args,
+            kwargs,
+            tags,
+            response,
+            request_start_time,
+            request_end_time,
+            get_api_key(),
+            return_pl_id=return_pl_id,
         )

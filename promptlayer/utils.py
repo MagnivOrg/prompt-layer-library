@@ -1,4 +1,7 @@
+import asyncio
+import contextvars
 from copy import deepcopy
+import functools
 import promptlayer
 import requests
 import sys
@@ -158,6 +161,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
         )
     return True
 
+
 def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
     try:
         request_response = requests.post(
@@ -190,6 +194,7 @@ def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
         return False
     return True
 
+
 def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
@@ -217,6 +222,7 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
         return False
     return True
 
+
 def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
@@ -243,6 +249,7 @@ def promptlayer_track_score(request_id, score, api_key):
         )
         return False
     return True
+
 
 class OpenAIGeneratorProxy:
     def __init__(self, generator, api_request_arguments):
@@ -281,7 +288,6 @@ class OpenAIGeneratorProxy:
                 self.api_request_arugments["request_end_time"],
                 get_api_key(),
                 return_pl_id=self.api_request_arugments["return_pl_id"],
-
             )
             if self.api_request_arugments["return_pl_id"]:
                 return result, request_id
@@ -296,3 +302,12 @@ class OpenAIGeneratorProxy:
         final_result = deepcopy(self.results[-1])
         final_result.choices[0].text = response
         return final_result
+
+
+async def run_in_thread_async(executor, func, *args, **kwargs):
+    """https://github.com/python/cpython/blob/main/Lib/asyncio/threads.py"""
+    loop = asyncio.get_running_loop()
+    ctx = contextvars.copy_context()
+    func_call = functools.partial(ctx.run, func, *args, **kwargs)
+    res = await loop.run_in_executor(executor, func_call)
+    return res

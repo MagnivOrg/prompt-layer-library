@@ -296,12 +296,26 @@ class OpenAIGeneratorProxy:
         return result
 
     def cleaned_result(self):
-        response = ""
-        for result in self.results:
-            response = f"{response}{result.choices[0].text}"
-        final_result = deepcopy(self.results[-1])
-        final_result.choices[0].text = response
-        return final_result
+        if hasattr(self.results[0].choices[0], "text"):  # this is regular completion
+            response = ""
+            for result in self.results:
+                response = f"{response}{result.choices[0].text}"
+            final_result = deepcopy(self.results[-1])
+            final_result.choices[0].text = response
+            return final_result
+        elif hasattr(self.results[0].choices[0], "delta"):  # this is completion with delta
+            response = {"message": {"role": "", "content": ""}}
+            for result in self.results:
+                if hasattr(result.choices[0].delta, "role"):
+                    response["message"]["role"] = result.choices[0].delta.role
+                if hasattr(result.choices[0].delta, "content"):
+                    response["message"][
+                        "content"
+                    ] = f"{response['message']['content']}{result.choices[0].delta.content}"
+            final_result = deepcopy(self.results[-1])
+            final_result.choices[0] = response
+            return final_result
+        return ""
 
 
 async def run_in_thread_async(executor, func, *args, **kwargs):

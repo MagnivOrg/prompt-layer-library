@@ -148,6 +148,34 @@ def promptlayer_api_request(
         return request_response.json().get("request_id")
 
 
+def promptlayer_api_request_async(
+    function_name,
+    provider_type,
+    args,
+    kwargs,
+    tags,
+    response,
+    request_start_time,
+    request_end_time,
+    api_key,
+    return_pl_id=False,
+):
+    return run_in_thread_async(
+        None,
+        promptlayer_api_request,
+        function_name,
+        provider_type,
+        args,
+        kwargs,
+        tags,
+        response,
+        request_start_time,
+        request_end_time,
+        api_key,
+        return_pl_id=return_pl_id,
+    )
+
+
 def promptlayer_get_prompt(prompt_name, api_key):
     try:
         request_response = requests.post(

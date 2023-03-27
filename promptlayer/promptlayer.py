@@ -1,6 +1,10 @@
 import datetime
 import inspect
-from promptlayer.utils import get_api_key, promptlayer_api_handler, run_in_thread_async
+from promptlayer.utils import (
+    get_api_key,
+    promptlayer_api_handler,
+    promptlayer_api_handler_async,
+)
 
 
 class PromptLayerBase(object):
@@ -36,9 +40,7 @@ class PromptLayerBase(object):
             async def async_wrapper(*args, **kwargs):
                 response = await function_object(*args, **kwargs)
                 request_end_time = datetime.datetime.now().timestamp()
-                return await run_in_thread_async(
-                    None,
-                    promptlayer_api_handler,
+                return await promptlayer_api_handler_async(
                     object.__getattribute__(self, "_function_name"),
                     object.__getattribute__(self, "_provider_type"),
                     args,

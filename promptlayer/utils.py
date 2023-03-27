@@ -64,6 +64,34 @@ def promptlayer_api_handler(
         return response
 
 
+async def promptlayer_api_handler_asyc(
+    function_name,
+    provider_type,
+    args,
+    kwargs,
+    tags,
+    response,
+    request_start_time,
+    request_end_time,
+    api_key,
+    return_pl_id=False,
+):
+    return await run_in_thread_async(
+        None,
+        promptlayer_api_handler,
+        object.__getattribute__(self, "_function_name"),
+        object.__getattribute__(self, "_provider_type"),
+        args,
+        kwargs,
+        tags,
+        response,
+        request_start_time,
+        request_end_time,
+        get_api_key(),
+        return_pl_id=return_pl_id,
+    )
+
+
 def promptlayer_api_request(
     function_name,
     provider_type,
@@ -303,7 +331,9 @@ class OpenAIGeneratorProxy:
             final_result = deepcopy(self.results[-1])
             final_result.choices[0].text = response
             return final_result
-        elif hasattr(self.results[0].choices[0], "delta"):  # this is completion with delta
+        elif hasattr(
+            self.results[0].choices[0], "delta"
+        ):  # this is completion with delta
             response = {"message": {"role": "", "content": ""}}
             for result in self.results:
                 if hasattr(result.choices[0].delta, "role"):

@@ -71,7 +71,7 @@ def promptlayer_api_handler(
         return response
 
 
-async def promptlayer_api_handler_asyc(
+async def promptlayer_api_handler_async(
     function_name,
     provider_type,
     args,

@@ -86,8 +86,8 @@ async def promptlayer_api_handler_async(
     return await run_in_thread_async(
         None,
         promptlayer_api_handler,
-        object.__getattribute__(self, "_function_name"),
-        object.__getattribute__(self, "_provider_type"),
+        function_name,
+        provider_type,
         args,
         kwargs,
         tags,

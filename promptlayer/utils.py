@@ -1,11 +1,17 @@
 import asyncio
 import contextvars
-from copy import deepcopy
 import functools
-import promptlayer
-import requests
+import os
 import sys
 import types
+from copy import deepcopy
+
+import requests
+
+import promptlayer
+
+URL_API_PROMPTLAYER = os.environ.setdefault(
+    "URL_API_PROMPTLAYER", "https://api.promptlayer.com")
 
 
 def get_api_key():
@@ -80,7 +86,7 @@ def promptlayer_api_request(
         response = response.to_dict_recursive()
     try:
         request_response = requests.post(
-            "https://api.promptlayer.com/track-request",
+            f"{URL_API_PROMPTLAYER}/track-request",
             json={
                 "function_name": function_name,
                 "provider_type": provider_type,
@@ -116,8 +122,8 @@ def promptlayer_api_request(
 def promptlayer_get_prompt(prompt_name, api_key):
     try:
         request_response = requests.post(
-            "https://api.promptlayer.com/library-get-prompt-template",
-            json={"prompt_name": prompt_name, "api_key": api_key,},
+            f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
+            json={"prompt_name": prompt_name, "api_key": api_key, },
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -138,7 +144,7 @@ def promptlayer_get_prompt(prompt_name, api_key):
 def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
     try:
         request_response = requests.post(
-            "https://api.promptlayer.com/library-publish-prompt-template",
+            f"{URL_API_PROMPTLAYER}/library-publish-prompt-template",
             json={
                 "prompt_name": prompt_name,
                 "prompt_template": prompt_template,
@@ -165,7 +171,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
 def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
     try:
         request_response = requests.post(
-            "https://api.promptlayer.com/library-track-prompt",
+            f"{URL_API_PROMPTLAYER}/library-track-prompt",
             json={
                 "request_id": request_id,
                 "prompt_name": prompt_name,
@@ -198,8 +204,9 @@ def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
 def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
-            "https://api.promptlayer.com/library-track-metadata",
-            json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
+            f"{URL_API_PROMPTLAYER}/library-track-metadata",
+            json={"request_id": request_id,
+                  "metadata": metadata, "api_key": api_key, },
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -226,8 +233,9 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
 def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
-            "https://api.promptlayer.com/library-track-score",
-            json={"request_id": request_id, "score": score, "api_key": api_key,},
+            f"{URL_API_PROMPTLAYER}/library-track-score",
+            json={"request_id": request_id,
+                  "score": score, "api_key": api_key, },
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -303,7 +311,8 @@ class OpenAIGeneratorProxy:
             final_result = deepcopy(self.results[-1])
             final_result.choices[0].text = response
             return final_result
-        elif hasattr(self.results[0].choices[0], "delta"):  # this is completion with delta
+        # this is completion with delta
+        elif hasattr(self.results[0].choices[0], "delta"):
             response = {"message": {"role": "", "content": ""}}
             for result in self.results:
                 if hasattr(result.choices[0].delta, "role"):

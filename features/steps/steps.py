@@ -29,9 +29,9 @@ async def assert_async_network_call(post, stderr, callback, **kwargs):
     assert ERROR_STR not in stderr.getvalue()
 
 
-@given('the human message "hi my name is jared"')
-def step_impl(context):
-    context.human_message = HumanMessage(content="hi my name is jared")
+@given('the human message "{message}"')
+def step_impl(context, message):
+    context.human_message = HumanMessage(content=message)
 
 
 def langchain_chat_openai(context):

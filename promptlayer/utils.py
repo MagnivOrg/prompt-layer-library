@@ -119,11 +119,16 @@ def promptlayer_api_request(
         return request_response.json().get("request_id")
 
 
-def promptlayer_get_prompt(prompt_name, api_key):
+def promptlayer_get_prompt(prompt_name, api_key, version=None):
+    """
+    Get a prompt from the PromptLayer library
+    version: version of the prompt to get, None for latest
+    """
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
-            json={"prompt_name": prompt_name, "api_key": api_key, },
+            json={"prompt_name": prompt_name,
+                  "api_key": api_key, 'version': version},
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):

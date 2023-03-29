@@ -11,7 +11,8 @@ import requests
 import promptlayer
 
 URL_API_PROMPTLAYER = os.environ.setdefault(
-    "URL_API_PROMPTLAYER", "https://api.promptlayer.com")
+    "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
+)
 
 
 def get_api_key():
@@ -70,6 +71,34 @@ def promptlayer_api_handler(
         return response
 
 
+async def promptlayer_api_handler_async(
+    function_name,
+    provider_type,
+    args,
+    kwargs,
+    tags,
+    response,
+    request_start_time,
+    request_end_time,
+    api_key,
+    return_pl_id=False,
+):
+    return await run_in_thread_async(
+        None,
+        promptlayer_api_handler,
+        function_name,
+        provider_type,
+        args,
+        kwargs,
+        tags,
+        response,
+        request_start_time,
+        request_end_time,
+        get_api_key(),
+        return_pl_id=return_pl_id,
+    )
+
+
 def promptlayer_api_request(
     function_name,
     provider_type,
@@ -117,6 +146,34 @@ def promptlayer_api_request(
         )
     if return_pl_id:
         return request_response.json().get("request_id")
+
+
+def promptlayer_api_request_async(
+    function_name,
+    provider_type,
+    args,
+    kwargs,
+    tags,
+    response,
+    request_start_time,
+    request_end_time,
+    api_key,
+    return_pl_id=False,
+):
+    return run_in_thread_async(
+        None,
+        promptlayer_api_request,
+        function_name,
+        provider_type,
+        args,
+        kwargs,
+        tags,
+        response,
+        request_start_time,
+        request_end_time,
+        api_key,
+        return_pl_id=return_pl_id,
+    )
 
 
 def promptlayer_get_prompt(prompt_name, api_key, version=None):
@@ -316,8 +373,9 @@ class OpenAIGeneratorProxy:
             final_result = deepcopy(self.results[-1])
             final_result.choices[0].text = response
             return final_result
-        # this is completion with delta
-        elif hasattr(self.results[0].choices[0], "delta"):
+        elif hasattr(
+            self.results[0].choices[0], "delta"
+        ):  # this is completion with delta
             response = {"message": {"role": "", "content": ""}}
             for result in self.results:
                 if hasattr(result.choices[0].delta, "role"):

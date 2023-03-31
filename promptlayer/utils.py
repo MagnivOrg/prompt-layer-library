@@ -176,11 +176,16 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(prompt_name, api_key):
+def promptlayer_get_prompt(prompt_name, api_key, version=None):
+    """
+    Get a prompt from the PromptLayer library
+    version: version of the prompt to get, None for latest
+    """
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
-            json={"prompt_name": prompt_name, "api_key": api_key,},
+            json={"prompt_name": prompt_name,
+                  "api_key": api_key, 'version': version},
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -262,7 +267,8 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-metadata",
-            json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
+            json={"request_id": request_id,
+                  "metadata": metadata, "api_key": api_key, },
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -290,7 +296,8 @@ def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-score",
-            json={"request_id": request_id, "score": score, "api_key": api_key,},
+            json={"request_id": request_id,
+                  "score": score, "api_key": api_key, },
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):

@@ -1,9 +1,9 @@
 from promptlayer.utils import get_api_key, promptlayer_track_prompt, promptlayer_track_metadata, promptlayer_track_score
 
-def prompt(request_id, prompt_name, prompt_input_variables):
+def prompt(request_id, prompt_name, prompt_input_variables, version=None):
     if not isinstance(prompt_input_variables, dict):
         raise Exception("Please provide a dictionary of input variables.")
-    return promptlayer_track_prompt(request_id, prompt_name, prompt_input_variables, get_api_key())
+    return promptlayer_track_prompt(request_id, prompt_name, prompt_input_variables, get_api_key(), version)
 
 
 def metadata(request_id, metadata):

@@ -230,7 +230,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
     return True
 
 
-def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
+def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, version):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-prompt",
@@ -239,6 +239,7 @@ def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key):
                 "prompt_name": prompt_name,
                 "prompt_input_variables": input_variables,
                 "api_key": api_key,
+                "version": version,
             },
         )
         if request_response.status_code != 200:

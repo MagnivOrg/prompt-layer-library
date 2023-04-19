@@ -1,8 +1,6 @@
-<div align="center">
-
 # 🍰 Promptlytics Client
 
-**Opensource Prompt Observability build on Frappe Framework.</span>**
+**Open source Prompt Observability built on Frappe Framework.**
 
 ### Install Promptlyticscl
 
@@ -10,33 +8,33 @@
 pip install promptlyticscl
 ```
 
-### Installing PromptLayer Locally
+### Installing Promptlytics Locally
 
 Use `pip install .` to install locally.
 
-### Using PromptLayer
+### Using Promptlytics
 
-To get started, create an account by clicking “*Log in*” on [PromptLayer](https://promptlayer.com/). Once logged in, click the button to create an API key and save this in a secure location ([Guide to Using Env Vars](https://towardsdatascience.com/the-quick-guide-to-using-environment-variables-in-python-d4ec9291619e)).
+To get started, create an account by clicking “*Log in*” on [Promptlytics](https://promptlytics.com/). Once logged in, click the button to create an API key and save this in a secure location ([Guide to Using Env Vars](https://towardsdatascience.com/the-quick-guide-to-using-environment-variables-in-python-d4ec9291619e)).
 
-Once you have that all set up, [install PromptLayer using](https://pypi.org/project/promptlayer/) `pip`.
+Once you have that all set up, [install Promptlytics using](https://pypi.org/project/promptlytics/) `pip`.
 
 In the Python file where you use OpenAI APIs, add the following. This allows us to keep track of your requests without needing any other code changes.
 
 ```python
-import promptlayer
-promptlayer.api_key = "<YOUR PromptLayer API KEY pl_xxxxxx>"
-openai = promptlayer.openai
+import promptlytics
+promptlytics.api_key = "<YOUR Promptlytics API KEY pl_xxxxxx>"
+openai = promptlytics.openai
 ```
 
 **You can then use `openai` as you would if you had imported it directly.**
 
 <aside>
-💡 Your OpenAI API Key is **never** sent to our servers. All OpenAI requests are made locally from your machine, PromptLayer just logs the request.
+💡 Your OpenAI API Key is **never** sent to our servers. All OpenAI requests are made locally from your machine, Promptlytics just logs the request.
 </aside>
 
-### Adding PromptLayer tags: `pl_tags`
+### Adding Promptlytics tags: `pl_tags`
 
-PromptLayer allows you to add tags through the `pl_tags` argument. This allows you to track and group requests in the dashboard. 
+Promptlytics allows you to add tags through the `pl_tags` argument. This allows you to track and group requests in the dashboard. 
 
 *Tags are not required but we recommend them!*
 
@@ -48,18 +46,18 @@ openai.Completion.create(
 )
 ```
 
-After making your first few requests, you should be able to see them in the PromptLayer dashboard!
+After making your first few requests, you should be able to see them in the Promptlytics dashboard!
 
 ## Using the REST API
 
-This Python library is a wrapper over PromptLayer's REST API. If you use another language, like Javascript, just interact directly with the API. 
+This Python library is a wrapper over Promptlytics's REST API. If you use another language, like Javascript, just interact directly with the API. 
 
 Here is an example request below:
 
 ```jsx
 import requests
 request_response = requests.post(
-  "https://api.promptlayer.com/track-request",
+  "https://api.promptlytics.com/track-request",
   json={
     "function_name": "openai.Completion.create",
     "args": [],
@@ -75,4 +73,4 @@ request_response = requests.post(
 
 ## Contributing
 
-We welcome contributions to our open source project, including new features, infrastructure improvements, and better documentation. For more information or any questions, contact us at [hello@magniv.io](mailto:hello@magniv.io).
+We welcome contributions to our open source project, including new features, infrastructure improvements, and better documentation. For more information or any questions, contact us at [chinmay@hybrowlabs.com](mailto:chinmay@hybrowlabs.com).

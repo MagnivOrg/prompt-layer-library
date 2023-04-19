@@ -21,7 +21,7 @@ Once you have that all set up, [install Promptlytics using](https://pypi.org/pro
 In the Python file where you use OpenAI APIs, add the following. This allows us to keep track of your requests without needing any other code changes.
 
 ```python
-import promptlytics
+import promptlyticscl promptlytics
 promptlytics.api_key = "<YOUR Promptlytics API KEY pl_xxxxxx>"
 openai = promptlytics.openai
 ```
@@ -57,7 +57,7 @@ Here is an example request below:
 ```jsx
 import requests
 request_response = requests.post(
-  "https://api.promptlytics.com/track-request",
+  "https://API_URL/api/method/promptlytics.api.track",
   json={
     "function_name": "openai.Completion.create",
     "args": [],

@@ -1,29 +1,13 @@
 <div align="center">
 
-# 🍰 PromptLayer
+# 🍰 Promptlytics Client
 
-**The first platform built for <span style="background-color: rgb(219, 234, 254);">prompt engineers</span>**
+**Opensource Prompt Observability build on Frappe Framework.</span>**
 
-<a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.8+-blue?style=for-the-badge&logo=python&logoColor=white"></a>
-<a href="https://magniv.notion.site/Prompt-Layer-Docs-db0e6f50cacf4564a6d09824ba17a629"><img alt="Docs" src="https://custom-icon-badges.herokuapp.com/badge/docs-PL-green.svg?logo=cake&style=for-the-badge&logoColor=white"></a>
-<a href="https://www.loom.com/share/723cbdb43439458fb607e910faa13294"><img alt="Demo with Loom" src="https://img.shields.io/badge/Demo-loom-552586.svg?logo=loom&style=for-the-badge&labelColor=gray"></a>
-
----  
-
-<div align="left">
-
-[PromptLayer](https://promptlayer.com/) is the first platform that allows you to track, manage, and share your GPT prompt engineering. PromptLayer acts a middleware between your code and OpenAI’s python library. 
-
-PromptLayer records all your OpenAI API requests, allowing you to search and explore request history in the PromptLayer dashboard.
-
-This repo contains the Python wrapper library for PromptLayer.
-
-## Quickstart ⚡
-
-### Install PromptLayer
+### Install Promptlyticscl
 
 ```bash
-pip install promptlayer
+pip install promptlyticscl
 ```
 
 ### Installing PromptLayer Locally

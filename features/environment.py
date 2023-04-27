@@ -1,8 +1,8 @@
 import os
 
 import openai
-from langchain.chat_models import PromptLayerChatOpenAI
-from langchain.llms import PromptLayerOpenAIChat
+from promptlayer.langchain.chat_models import PromptLayerChatOpenAI
+from promptlayer.langchain.llms import PromptLayerOpenAIChat
 
 import promptlayer
 

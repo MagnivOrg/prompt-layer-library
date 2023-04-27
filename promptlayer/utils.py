@@ -5,15 +5,22 @@ import os
 import sys
 import types
 from copy import deepcopy
+from promptlayer.config import API_KEY, API_SECRET, URL_API_PROMPTLAYER
 
 import requests
 
 import promptlayer
 
-URL_API_PROMPTLAYER = os.environ.setdefault(
-    "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
-)
+frappe_access_key = f'token {API_KEY}:{API_SECRET}'
 
+# URL_API_PROMPTLAYER = os.environ.setdefault(
+#     "URL_API_PROMPTLAYER", "http://prompt.localhost:8000/api/method/promptlytics.api"
+# )
+
+headers = {
+  'Authorization': frappe_access_key,
+  'Content-Type': 'application/json'
+}
 
 def get_api_key():
     # raise an error if the api key is not set
@@ -115,7 +122,8 @@ def promptlayer_api_request(
         response = response.to_dict_recursive()
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/track-request",
+            f"{URL_API_PROMPTLAYER}.track",
+            headers=headers,
             json={
                 "function_name": function_name,
                 "provider_type": provider_type,
@@ -176,16 +184,17 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(prompt_name, api_key, version=None):
+def promptlayer_get_prompt(prompt_name, version=None):
     """
     Get a prompt from the PromptLayer library
     version: version of the prompt to get, None for latest
     """
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
+            f"{URL_API_PROMPTLAYER}.library_get_prompt_template",
+            headers=headers,
             json={"prompt_name": prompt_name,
-                  "api_key": api_key, 'version': version},
+                'version': version},
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -203,15 +212,15 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
     return request_response.json()
 
 
-def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
+def promptlayer_publish_prompt(prompt_name, prompt_template, tags=None):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-publish-prompt-template",
+            f"{URL_API_PROMPTLAYER}.library_publish_prompt_template",
+            headers=headers,
             json={
                 "prompt_name": prompt_name,
                 "prompt_template": prompt_template,
                 "tags": tags,
-                "api_key": api_key,
             },
         )
         if request_response.status_code != 200:
@@ -233,7 +242,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
 def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, version):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-track-prompt",
+            f"{URL_API_PROMPTLAYER}.library_track_prompt",
             json={
                 "request_id": request_id,
                 "prompt_name": prompt_name,
@@ -267,7 +276,7 @@ def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, 
 def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-track-metadata",
+            f"{URL_API_PROMPTLAYER}.library_track_metadata",
             json={"request_id": request_id,
                   "metadata": metadata, "api_key": api_key, },
         )
@@ -296,7 +305,7 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
 def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-track-score",
+            f"{URL_API_PROMPTLAYER}.library_track_score",
             json={"request_id": request_id,
                   "score": score, "api_key": api_key, },
         )

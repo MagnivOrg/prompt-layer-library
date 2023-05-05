@@ -13,23 +13,11 @@ import promptlayer
 
 frappe_access_key = f'token {API_KEY}:{API_SECRET}'
 
-# URL_API_PROMPTLAYER = os.environ.setdefault(
-#     "URL_API_PROMPTLAYER", "http://prompt.localhost:8000/api/method/promptlytics.api"
-# )
 
 headers = {
   'Authorization': frappe_access_key,
   'Content-Type': 'application/json'
 }
-
-def get_api_key():
-    # raise an error if the api key is not set
-    if promptlayer.api_key is None:
-        raise Exception(
-            "Please set your PROMPTLAYER_API_KEY environment variable or set API KEY in code using 'promptlayer.api_key = <your_api_key>' "
-        )
-    else:
-        return promptlayer.api_key
 
 
 def promptlayer_api_handler(
@@ -41,7 +29,6 @@ def promptlayer_api_handler(
     response,
     request_start_time,
     request_end_time,
-    api_key,
     return_pl_id=False,
 ):
     if isinstance(response, types.GeneratorType) or isinstance(
@@ -70,7 +57,6 @@ def promptlayer_api_handler(
             response,
             request_start_time,
             request_end_time,
-            api_key,
             return_pl_id=return_pl_id,
         )
         if return_pl_id:
@@ -87,7 +73,6 @@ async def promptlayer_api_handler_async(
     response,
     request_start_time,
     request_end_time,
-    api_key,
     return_pl_id=False,
 ):
     return await run_in_thread_async(
@@ -101,7 +86,6 @@ async def promptlayer_api_handler_async(
         response,
         request_start_time,
         request_end_time,
-        get_api_key(),
         return_pl_id=return_pl_id,
     )
 
@@ -115,7 +99,6 @@ def promptlayer_api_request(
     response,
     request_start_time,
     request_end_time,
-    api_key,
     return_pl_id=False,
 ):
     if type(response) != dict and hasattr(response, "to_dict_recursive"):
@@ -133,7 +116,6 @@ def promptlayer_api_request(
                 "request_response": response,
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
-                "api_key": api_key,
             },
         )
         if request_response.status_code != 200:
@@ -165,7 +147,6 @@ def promptlayer_api_request_async(
     response,
     request_start_time,
     request_end_time,
-    api_key,
     return_pl_id=False,
 ):
     return run_in_thread_async(
@@ -179,7 +160,6 @@ def promptlayer_api_request_async(
         response,
         request_start_time,
         request_end_time,
-        api_key,
         return_pl_id=return_pl_id,
     )
 
@@ -239,7 +219,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags=None):
     return True
 
 
-def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, version):
+def promptlayer_track_prompt(request_id, prompt_name, input_variables, version):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}.library_track_prompt",
@@ -247,7 +227,6 @@ def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, 
                 "request_id": request_id,
                 "prompt_name": prompt_name,
                 "prompt_input_variables": input_variables,
-                "api_key": api_key,
                 "version": version,
             },
         )
@@ -273,12 +252,12 @@ def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, 
     return True
 
 
-def promptlayer_track_metadata(request_id, metadata, api_key):
+def promptlayer_track_metadata(request_id, metadata):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}.library_track_metadata",
             json={"request_id": request_id,
-                  "metadata": metadata, "api_key": api_key, },
+                  "metadata": metadata},
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -302,12 +281,12 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     return True
 
 
-def promptlayer_track_score(request_id, score, api_key):
+def promptlayer_track_score(request_id, score):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}.library_track_score",
             json={"request_id": request_id,
-                  "score": score, "api_key": api_key, },
+                  "score": score},
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -366,7 +345,6 @@ class OpenAIGeneratorProxy:
                 self.cleaned_result(),
                 self.api_request_arugments["request_start_time"],
                 self.api_request_arugments["request_end_time"],
-                get_api_key(),
                 return_pl_id=self.api_request_arugments["return_pl_id"],
             )
             if self.api_request_arugments["return_pl_id"]:

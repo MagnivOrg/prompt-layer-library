@@ -10,6 +10,5 @@ openai = PromptLayerBase(openai, function_name="openai")
 
 
 __all__ = [
-    "api_key",
     "openai",
 ]

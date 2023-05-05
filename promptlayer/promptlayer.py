@@ -1,7 +1,6 @@
 import datetime
 import inspect
 from promptlayer.utils import (
-    get_api_key,
     promptlayer_api_handler,
     promptlayer_api_handler_async,
 )
@@ -49,7 +48,6 @@ class PromptLayerBase(object):
                     response,
                     request_start_time,
                     request_end_time,
-                    get_api_key(),
                     return_pl_id=return_pl_id,
                 )
 
@@ -65,6 +63,5 @@ class PromptLayerBase(object):
             response,
             request_start_time,
             request_end_time,
-            get_api_key(),
             return_pl_id=return_pl_id,
         )

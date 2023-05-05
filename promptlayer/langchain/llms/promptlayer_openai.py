@@ -36,7 +36,7 @@ class PromptLayerOpenAI(OpenAI):
         self, prompts: List[str], stop: Optional[List[str]] = None
     ) -> LLMResult:
         """Call OpenAI generate and then call PromptLayer API to log the request."""
-        from promptlayer.utils import get_api_key, promptlayer_api_request
+        from promptlayer.utils import promptlayer_api_request
 
         request_start_time = datetime.datetime.now().timestamp()
         generated_responses = super()._generate(prompts, stop)
@@ -57,7 +57,6 @@ class PromptLayerOpenAI(OpenAI):
                 resp,
                 request_start_time,
                 request_end_time,
-                get_api_key(),
                 return_pl_id=self.return_pl_id,
             )
             if self.return_pl_id:
@@ -71,7 +70,7 @@ class PromptLayerOpenAI(OpenAI):
     async def _agenerate(
         self, prompts: List[str], stop: Optional[List[str]] = None
     ) -> LLMResult:
-        from promptlayer.utils import get_api_key, promptlayer_api_request_async
+        from promptlayer.utils import promptlayer_api_request_async
 
         request_start_time = datetime.datetime.now().timestamp()
         generated_responses = await super()._agenerate(prompts, stop)
@@ -92,7 +91,6 @@ class PromptLayerOpenAI(OpenAI):
                 resp,
                 request_start_time,
                 request_end_time,
-                get_api_key(),
                 return_pl_id=self.return_pl_id,
             )
             if self.return_pl_id:
@@ -134,7 +132,7 @@ class PromptLayerOpenAIChat(OpenAIChat):
         self, prompts: List[str], stop: Optional[List[str]] = None
     ) -> LLMResult:
         """Call OpenAI generate and then call PromptLayer API to log the request."""
-        from promptlayer.utils import get_api_key, promptlayer_api_request
+        from promptlayer.utils import promptlayer_api_request
 
         request_start_time = datetime.datetime.now().timestamp()
         generated_responses = super()._generate(prompts, stop)
@@ -155,7 +153,6 @@ class PromptLayerOpenAIChat(OpenAIChat):
                 resp,
                 request_start_time,
                 request_end_time,
-                get_api_key(),
                 return_pl_id=self.return_pl_id,
             )
             if self.return_pl_id:
@@ -169,7 +166,7 @@ class PromptLayerOpenAIChat(OpenAIChat):
     async def _agenerate(
         self, prompts: List[str], stop: Optional[List[str]] = None
     ) -> LLMResult:
-        from promptlayer.utils import get_api_key, promptlayer_api_request_async
+        from promptlayer.utils import promptlayer_api_request_async
 
         request_start_time = datetime.datetime.now().timestamp()
         generated_responses = await super()._agenerate(prompts, stop)
@@ -190,7 +187,6 @@ class PromptLayerOpenAIChat(OpenAIChat):
                 resp,
                 request_start_time,
                 request_end_time,
-                get_api_key(),
                 return_pl_id=self.return_pl_id,
             )
             if self.return_pl_id:

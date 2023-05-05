@@ -36,7 +36,7 @@ class PromptLayerChatOpenAI(ChatOpenAI):
         self, messages: List[BaseMessage], stop: Optional[List[str]] = None
     ) -> ChatResult:
         """Call ChatOpenAI generate and then call PromptLayer API to log the request."""
-        from promptlayer.utils import get_api_key, promptlayer_api_request
+        from promptlayer.utils import promptlayer_api_request
 
         request_start_time = datetime.datetime.now().timestamp()
         generated_responses = super()._generate(messages, stop)
@@ -55,7 +55,6 @@ class PromptLayerChatOpenAI(ChatOpenAI):
                 response_dict,
                 request_start_time,
                 request_end_time,
-                get_api_key(),
                 return_pl_id=self.return_pl_id,
             )
             if self.return_pl_id:
@@ -70,7 +69,7 @@ class PromptLayerChatOpenAI(ChatOpenAI):
         self, messages: List[BaseMessage], stop: Optional[List[str]] = None
     ) -> ChatResult:
         """Call ChatOpenAI agenerate and then call PromptLayer to log."""
-        from promptlayer.utils import get_api_key, promptlayer_api_request_async
+        from promptlayer.utils import promptlayer_api_request_async
 
         request_start_time = datetime.datetime.now().timestamp()
         generated_responses = await super()._agenerate(messages, stop)
@@ -89,7 +88,6 @@ class PromptLayerChatOpenAI(ChatOpenAI):
                 response_dict,
                 request_start_time,
                 request_end_time,
-                get_api_key(),
                 return_pl_id=self.return_pl_id,
             )
             if self.return_pl_id:

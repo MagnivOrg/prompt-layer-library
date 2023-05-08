@@ -1,4 +1,7 @@
-from promptlayer.utils import get_api_key, promptlayer_track_prompt, promptlayer_track_metadata, promptlayer_track_score
+from promptlayer.utils import (get_api_key, promptlayer_track_metadata,
+                               promptlayer_track_prompt,
+                               promptlayer_track_score)
+
 
 def prompt(request_id, prompt_name, prompt_input_variables, version=None):
     if not isinstance(prompt_input_variables, dict):
@@ -9,7 +12,12 @@ def prompt(request_id, prompt_name, prompt_input_variables, version=None):
 def metadata(request_id, metadata):
     if not isinstance(metadata, dict):
         raise Exception("Please provide a dictionary of metadata.")
+    for key, value in metadata.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            raise Exception(
+                "Please provide a dictionary of metadata with key value pair of strings.")
     return promptlayer_track_metadata(request_id, metadata, get_api_key())
+
 
 def score(request_id, score):
     if not isinstance(score, int):

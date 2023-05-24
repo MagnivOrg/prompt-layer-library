@@ -11,11 +11,11 @@ from promptlayer.promptlayer import PromptLayerBase
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
 openai = PromptLayerBase(openai, function_name="openai")
 
-anthropic_client = PromptLayerBase(
+anthropic = PromptLayerBase(
     anthropic.Client(""),
     function_name="anthropic",
     provider_type="anthropic",
 )
 
 
-__all__ = ["api_key", "openai", "anthropic_client"]
+__all__ = ["api_key", "openai", "anthropic"]

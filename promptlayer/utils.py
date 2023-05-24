@@ -40,7 +40,7 @@ def promptlayer_api_handler(
     if isinstance(response, types.GeneratorType) or isinstance(
         response, types.AsyncGeneratorType
     ):
-        return OpenAIGeneratorProxy(
+        return GeneratorProxy(
             response,
             {
                 "function_name": function_name,
@@ -184,8 +184,7 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
-            json={"prompt_name": prompt_name,
-                  "api_key": api_key, 'version': version},
+            json={"prompt_name": prompt_name, "api_key": api_key, "version": version},
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -230,7 +229,9 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
     return True
 
 
-def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, version):
+def promptlayer_track_prompt(
+    request_id, prompt_name, input_variables, api_key, version
+):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-prompt",
@@ -268,8 +269,11 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-metadata",
-            json={"request_id": request_id,
-                  "metadata": metadata, "api_key": api_key, },
+            json={
+                "request_id": request_id,
+                "metadata": metadata,
+                "api_key": api_key,
+            },
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -297,8 +301,11 @@ def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-score",
-            json={"request_id": request_id,
-                  "score": score, "api_key": api_key, },
+            json={
+                "request_id": request_id,
+                "score": score,
+                "api_key": api_key,
+            },
         )
         if request_response.status_code != 200:
             if hasattr(request_response, "json"):
@@ -322,7 +329,7 @@ def promptlayer_track_score(request_id, score, api_key):
     return True
 
 
-class OpenAIGeneratorProxy:
+class GeneratorProxy:
     def __init__(self, generator, api_request_arguments):
         self.generator = generator
         self.results = []
@@ -344,10 +351,13 @@ class OpenAIGeneratorProxy:
 
     def _abstracted_next(self, result):
         self.results.append(result)
-        if (
+        provider_type = self.api_request_arugments["provider_type"]
+        end_anthropic = provider_type == "anthropic" and result.get("stop")
+        end_openai = provider_type == "openai" and (
             result.choices[0].finish_reason == "stop"
             or result.choices[0].finish_reason == "length"
-        ):
+        )
+        if end_anthropic or end_openai:
             request_id = promptlayer_api_request(
                 self.api_request_arugments["function_name"],
                 self.api_request_arugments["provider_type"],
@@ -367,6 +377,10 @@ class OpenAIGeneratorProxy:
         return result
 
     def cleaned_result(self):
+        provider_type = self.api_request_arugments["provider_type"]
+        if provider_type == "anthropic":
+            final_result = deepcopy(self.results[-1])
+            return final_result
         if hasattr(self.results[0].choices[0], "text"):  # this is regular completion
             response = ""
             for result in self.results:

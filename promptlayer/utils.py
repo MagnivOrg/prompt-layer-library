@@ -36,6 +36,7 @@ def promptlayer_api_handler(
     request_end_time,
     api_key,
     return_pl_id=False,
+    metadata=None,
 ):
     if isinstance(response, types.GeneratorType) or isinstance(
         response, types.AsyncGeneratorType
@@ -51,6 +52,7 @@ def promptlayer_api_handler(
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
                 "return_pl_id": return_pl_id,
+                "metadata": metadata,
             },
         )
     else:
@@ -65,6 +67,7 @@ def promptlayer_api_handler(
             request_end_time,
             api_key,
             return_pl_id=return_pl_id,
+            metadata=metadata,
         )
         if return_pl_id:
             return response, request_id
@@ -82,6 +85,7 @@ async def promptlayer_api_handler_async(
     request_end_time,
     api_key,
     return_pl_id=False,
+    metadata=None,
 ):
     return await run_in_thread_async(
         None,
@@ -96,6 +100,7 @@ async def promptlayer_api_handler_async(
         request_end_time,
         get_api_key(),
         return_pl_id=return_pl_id,
+        metadata=metadata,
     )
 
 
@@ -110,6 +115,7 @@ def promptlayer_api_request(
     request_end_time,
     api_key,
     return_pl_id=False,
+    metadata=None,
 ):
     if type(response) != dict and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
@@ -126,6 +132,7 @@ def promptlayer_api_request(
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
                 "api_key": api_key,
+                "metadata": metadata,
             },
         )
         if request_response.status_code != 200:
@@ -159,6 +166,7 @@ def promptlayer_api_request_async(
     request_end_time,
     api_key,
     return_pl_id=False,
+    metadata=None,
 ):
     return run_in_thread_async(
         None,
@@ -173,6 +181,7 @@ def promptlayer_api_request_async(
         request_end_time,
         api_key,
         return_pl_id=return_pl_id,
+        metadata=metadata,
     )
 
 
@@ -369,6 +378,7 @@ class GeneratorProxy:
                 self.api_request_arugments["request_end_time"],
                 get_api_key(),
                 return_pl_id=self.api_request_arugments["return_pl_id"],
+                metadata=self.api_request_arugments["metadata"],
             )
             if self.api_request_arugments["return_pl_id"]:
                 return result, request_id

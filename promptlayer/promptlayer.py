@@ -1,5 +1,6 @@
 import datetime
 import inspect
+
 from promptlayer.utils import (
     get_api_key,
     promptlayer_api_handler,
@@ -35,6 +36,12 @@ class PromptLayerBase(object):
         return_pl_id = kwargs.pop("return_pl_id", False)
         request_start_time = datetime.datetime.now().timestamp()
         function_object = object.__getattribute__(self, "_obj")
+        if "Client" in function_object.__name__:
+            return PromptLayerBase(
+                function_object(*args, **kwargs),
+                function_name=object.__getattribute__(self, "_function_name"),
+                provider_type=object.__getattribute__(self, "_provider_type"),
+            )
         if inspect.iscoroutinefunction(function_object):
 
             async def async_wrapper(*args, **kwargs):

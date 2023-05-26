@@ -1,6 +1,6 @@
 import os
+import sys
 
-import anthropic
 import openai
 
 import promptlayer.langchain as langchain
@@ -11,11 +11,20 @@ from promptlayer.promptlayer import PromptLayerBase
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
 openai = PromptLayerBase(openai, function_name="openai")
 
-anthropic_client = PromptLayerBase(
-    anthropic.Client(""),
-    function_name="anthropic",
-    provider_type="anthropic",
-)
+anthropic_client = None
+try:
+    import anthropic
 
+    anthropic_client = PromptLayerBase(
+        anthropic.Client,
+        function_name="anthropic",
+        provider_type="anthropic",
+    )
+except ImportError:
+    print(
+        "Anthropic client not found. Install with `pip install anthropic`.",
+        file=sys.stderr,
+    )
+    pass
 
 __all__ = ["api_key", "openai", "anthropic_client"]

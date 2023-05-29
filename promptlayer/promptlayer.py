@@ -17,11 +17,14 @@ class PromptLayerBase(object):
         object.__setattr__(self, "_provider_type", provider_type)
 
     def __getattr__(self, name):
-        return PromptLayerBase(
-            getattr(object.__getattribute__(self, "_obj"), name),
-            function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
-            provider_type=object.__getattribute__(self, "_provider_type"),
-        )
+        attr = getattr(object.__getattribute__(self, "_obj"), name)
+        if inspect.isclass(attr) or inspect.isfunction(attr) or inspect.ismethod(attr):
+            return PromptLayerBase(
+                attr,
+                function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
+                provider_type=object.__getattribute__(self, "_provider_type"),
+            )
+        return attr
 
     def __delattr__(self, name):
         delattr(object.__getattribute__(self, "_obj"), name)

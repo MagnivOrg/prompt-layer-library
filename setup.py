@@ -23,5 +23,5 @@ setup(
     version="0.1.83",
     py_modules=["promptlayer"],
     packages=find_packages(),
-    install_requires=["requests", "openai", "langchain", "anthropic"],
+    install_requires=["requests", "langchain"],
 )

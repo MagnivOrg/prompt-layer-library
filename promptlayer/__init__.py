@@ -1,30 +1,38 @@
 import os
 import sys
 
-import openai
-
 import promptlayer.langchain as langchain
 import promptlayer.prompts as prompts
 import promptlayer.track as track
 from promptlayer.promptlayer import PromptLayerBase
 
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
-openai = PromptLayerBase(openai, function_name="openai")
 
-anthropic_client = None
+openai = None
 try:
-    import anthropic
+    import openai as openai_module
 
-    anthropic_client = PromptLayerBase(
-        anthropic.Client,
+    openai = PromptLayerBase(openai_module, function_name="openai")
+except ImportError:
+    print(
+        "OpenAI module not found. Install with `pip install openai`.", file=sys.stderr
+    )
+    pass
+
+anthropic = None
+try:
+    import anthropic as anthropic_module
+
+    anthropic = PromptLayerBase(
+        anthropic_module,
         function_name="anthropic",
         provider_type="anthropic",
     )
 except ImportError:
     print(
-        "Anthropic client not found. Install with `pip install anthropic`.",
+        "Anthropic module not found. Install with `pip install anthropic`.",
         file=sys.stderr,
     )
     pass
 
-__all__ = ["api_key", "openai", "anthropic_client"]
+__all__ = ["api_key", "openai", "anthropic"]

@@ -36,7 +36,7 @@ class PromptLayerBase(object):
         return_pl_id = kwargs.pop("return_pl_id", False)
         request_start_time = datetime.datetime.now().timestamp()
         function_object = object.__getattribute__(self, "_obj")
-        if "Client" in function_object.__name__:
+        if inspect.isclass(function_object):
             return PromptLayerBase(
                 function_object(*args, **kwargs),
                 function_name=object.__getattribute__(self, "_function_name"),

@@ -8,19 +8,15 @@ from promptlayer.promptlayer import PromptLayerBase
 
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
 
-openai = None
-try:
+
+def get_openai():
     import openai as openai_module
 
     openai = PromptLayerBase(openai_module, function_name="openai")
-except ImportError:
-    print(
-        "OpenAI module not found. Install with `pip install openai`.", file=sys.stderr
-    )
-    pass
+    return openai
 
-anthropic = None
-try:
+
+def get_anthropic():
     import anthropic as anthropic_module
 
     anthropic = PromptLayerBase(
@@ -28,11 +24,7 @@ try:
         function_name="anthropic",
         provider_type="anthropic",
     )
-except ImportError:
-    print(
-        "Anthropic module not found. Install with `pip install anthropic`.",
-        file=sys.stderr,
-    )
-    pass
+    return anthropic
 
-__all__ = ["api_key", "openai", "anthropic"]
+
+__all__ = ["api_key", "get_openai", "get_anthropic"]

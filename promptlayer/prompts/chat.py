@@ -1,6 +1,7 @@
 import json
 
 from langchain import prompts
+import copy
 
 CHAT_PROMPTLAYER_LANGCHAIN = "chat_promptlayer_langchain"
 ROLE_SYSTEM = "system"
@@ -23,7 +24,7 @@ def to_dict(prompt_template: prompts.ChatPromptTemplate):
 
 
 def to_prompt(prompt_dict: dict):
-    prompt_dict_copy = prompt_dict.copy()
+    prompt_dict_copy = copy.deepcopy(prompt_dict)
     try:
         messages = []
         prompt_dict_copy.pop("_type")

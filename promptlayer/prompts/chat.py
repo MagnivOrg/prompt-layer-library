@@ -23,10 +23,11 @@ def to_dict(prompt_template: prompts.ChatPromptTemplate):
 
 
 def to_prompt(prompt_dict: dict):
+    prompt_dict_copy = prompt_dict.copy()
     try:
         messages = []
-        prompt_dict.pop("_type")
-        for message in prompt_dict.pop("messages"):
+        prompt_dict_copy.pop("_type")
+        for message in prompt_dict_copy.pop("messages"):
             role = message.pop("role")
             prompt = message.pop("prompt")
             prompt.pop("_type")
@@ -38,7 +39,9 @@ def to_prompt(prompt_dict: dict):
             elif role == ROLE_USER:
                 message = prompts.HumanMessagePromptTemplate(prompt=prompt, **message)
             messages.append(message)
-        prompt_template = prompts.ChatPromptTemplate(messages=messages, **prompt_dict)
+        prompt_template = prompts.ChatPromptTemplate(
+            messages=messages, **prompt_dict_copy
+        )
         return prompt_template
     except Exception as e:
         print(e)

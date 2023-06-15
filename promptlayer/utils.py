@@ -110,6 +110,7 @@ def promptlayer_api_request(
     request_end_time,
     api_key,
     return_pl_id=False,
+    metadata=None,
 ):
     if type(response) != dict and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
@@ -125,6 +126,7 @@ def promptlayer_api_request(
                 "request_response": response,
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
+                "metadata": metadata,
                 "api_key": api_key,
             },
         )

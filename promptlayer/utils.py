@@ -393,14 +393,14 @@ class GeneratorProxy:
         elif hasattr(
             self.results[0].choices[0], "delta"
         ):  # this is completion with delta
-            response = {"message": {"role": "", "content": ""}}
+            response = {"role": "", "content": ""}
             for result in self.results:
                 if hasattr(result.choices[0].delta, "role"):
-                    response["message"]["role"] = result.choices[0].delta.role
+                    response["role"] = result.choices[0].delta.role
                 if hasattr(result.choices[0].delta, "content"):
-                    response["message"][
+                    response[
                         "content"
-                    ] = f"{response['message']['content']}{result.choices[0].delta.content}"
+                    ] = f"{response['content']}{result.choices[0].delta.content}"
             final_result = deepcopy(self.results[-1])
             final_result.choices[0] = response
             return final_result

@@ -16,7 +16,6 @@ def __getattr__(name: Union[Literal["openai"], Literal["anthropic"]]):
         return openai
     elif name == "anthropic":
         import anthropic as anthropic_module
-
         anthropic = PromptLayerBase(
             anthropic_module,
             function_name="anthropic",

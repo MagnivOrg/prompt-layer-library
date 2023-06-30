@@ -25,13 +25,14 @@ def get_prompt(prompt_name, langchain=False, version=None):
     else:
         return prompt["prompt_template"]
 
-def run_prompt(prompt_name, langchain=False, tags=[], version=None, engine=''):
+def run_prompt(prompt_name, langchain=False, tags=[], version=None, engine='', model=''):
     prompt = get_prompt(prompt_name, langchain=False, version=None)
     obj = {
         'prompt_name': prompt_name,
         'version': version,
         'tags': tags,
-        'engine': engine
+        'engine': engine,
+        'model': model
     }
     # Get the current time in seconds since the epoch
     run_prompt_registry(prompt, obj)

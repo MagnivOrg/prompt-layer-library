@@ -1,11 +1,11 @@
 from langchain import PromptTemplate, prompts
 from langchain.prompts.loading import load_prompt_from_config
-
 from promptlayer.prompts.chat import CHAT_PROMPTLAYER_LANGCHAIN, to_dict, to_prompt
 from promptlayer.utils import (
     get_api_key,
     promptlayer_get_prompt,
     promptlayer_publish_prompt,
+    run_prompt_registry
 )
 
 
@@ -25,6 +25,16 @@ def get_prompt(prompt_name, langchain=False, version=None):
     else:
         return prompt["prompt_template"]
 
+def run_prompt(prompt_name, langchain=False, tags=[], version=None, engine=''):
+    prompt = get_prompt(prompt_name, langchain=False, version=None)
+    obj = {
+        'prompt_name': prompt_name,
+        'version': version,
+        'tags': tags,
+        'engine': engine
+    }
+    # Get the current time in seconds since the epoch
+    run_prompt_registry(prompt, obj)
 
 def publish_prompt(prompt_name, tags=[], prompt_template=None):
     api_key = get_api_key()

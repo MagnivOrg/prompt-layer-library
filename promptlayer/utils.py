@@ -5,8 +5,9 @@ import os
 import sys
 import types
 from copy import deepcopy
-
 import requests
+import time
+import openai
 
 import promptlayer
 
@@ -23,6 +24,99 @@ def get_api_key():
         )
     else:
         return promptlayer.api_key
+
+def run_prompt_registry(prompt, obj):
+
+    current_time = time.time()
+    # Update the request_start_time and request_end_time with the current time
+    request_start_time = current_time
+    request_end_time = current_time
+    if "messages" in prompt:
+        # get the system message
+        template = prompt['messages'][0]['prompt']['template']
+        # get user message 
+        message = prompt['messages'][1]['prompt']['template']
+
+        # generate new ChatCompletionPrompt
+        completion = openai.ChatCompletion.create(
+            model=obj['engine'],
+            messages=[
+                {"role": "system", "content": template},
+                {"role": "user", "content": message}
+            ]
+        )
+
+        # print(completion['choices'][0]['message']['content'])
+        request_response = requests.post(
+        "https://api.promptlayer.com/rest/track-request",
+            json={
+                "function_name": "openai.ChatCompletion.create",
+                "kwargs": {"engine": obj['engine'], "messages": [
+                {
+                    "content": template,
+                    "role": "system"
+                },
+                {
+                    "content": message,
+                    "role": "user"
+                }
+                ]},
+                "tags": ["hello", "world"],
+                "request_response": completion,
+                "request_start_time": request_start_time,
+                "request_end_time": request_end_time,
+                # "prompt_id": prompt_name,
+                "prompt_input_variables": "",
+                "prompt_version": obj['version'],
+                "api_key": promptlayer.api_key,
+            },
+        )
+        # get the id of the request
+        requestID = request_response.json()['request_id']
+    else:
+        # this will load chat completion
+        # get user message 
+        message = prompt['template']
+
+        #generate a new Completion prompt
+        completion = openai.Completion.create(
+            model=obj['engine'],
+            prompt=message,
+            max_tokens=7,
+            temperature=0
+        )
+        #generate a new track with the answer of the completion
+        request_response = requests.post(
+        "https://api.promptlayer.com/rest/track-request",
+            json={
+                "function_name": "openai.Completion.create",
+                "kwargs": {"engine": obj['engine'], "prompt": message},
+                "tags": obj['tags'],
+                "request_response": completion,
+                "request_start_time": request_start_time,
+                "request_end_time": request_end_time,
+                # "prompt_id": prompt_name,
+                "prompt_input_variables": "",
+                "prompt_version": obj['version'],
+                "api_key": promptlayer.api_key,
+            },
+        )
+        # get the id of the track
+        requestID = request_response.json()['request_id']
+
+    # make the relation with the registry
+    response = requests.post(
+        "https://api.promptlayer.com/rest/track-prompt",
+        
+        json={
+            "prompt_name": obj['prompt_name'],
+            "api_key": promptlayer.api_key,
+            # "prompt_input_variables": {"variable1": "value1", "variable2": "value2"},
+            "request_id": requestID,
+            "version": obj['version']
+        },
+    )
+    print('ok')
 
 
 def promptlayer_api_handler(
@@ -203,6 +297,11 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
             f"PromptLayer had the following error while getting your prompt: {e}"
         )
     return request_response.json()
+
+def run_promptlayer(prompt_name, api_key, openai_key):
+
+    # Continue with the rest of your code
+    return
 
 
 def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):

@@ -28,6 +28,7 @@ def get_api_key():
 def run_prompt_registry(prompt, obj):
 
     current_time = time.time()
+    print(obj)
     # Update the request_start_time and request_end_time with the current time
     request_start_time = current_time
     request_end_time = current_time

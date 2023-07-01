@@ -33,7 +33,6 @@ def run_prompt_registry(prompt, obj):
     request_start_time = current_time
     request_end_time = current_time
     if (obj['model'] == 'openai'):
-    
         if "messages" in prompt:
             # get the system message
             template = prompt['messages'][0]['prompt']['template']

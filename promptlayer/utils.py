@@ -25,107 +25,94 @@ def get_api_key():
     else:
         return promptlayer.api_key
 
-def run_prompt_registry(prompt, obj):
 
+def run_prompt_registry(prompt_name, version, tags, variables, engine, model, api_key):
     current_time = time.time()
-    print(obj)
+
+    response = requests.get(
+        "https://api.promptlayer.com/rest/get-prompt-template",
+        headers={"X-API-KEY": api_key},
+        params={"prompt_name": prompt_name, "version": version},
+    )
+    prompt = response.json()["prompt_template"]
+    prompt_id = response.json()["id"]
     # Update the request_start_time and request_end_time with the current time
     request_start_time = current_time
     request_end_time = current_time
-    if (obj['model'] == 'openai'):
-        if "messages" in prompt:
-            # get the system message
-            template = prompt['messages'][0]['prompt']['template']
-            # get user message 
-            message = prompt['messages'][1]['prompt']['template']
 
-            # generate new ChatCompletionPrompt
+    if model == "openai":
+        if "messages" in prompt:
+            # Get the system message
+            template = prompt["messages"][0]["prompt"]["template"]
+            # Get user message
+            message = prompt["messages"][1]["prompt"]["template"]
+
+            # Generate new ChatCompletionPrompt
             completion = openai.ChatCompletion.create(
-                model=obj['engine'],
+                model=engine,
                 messages=[
                     {"role": "system", "content": template},
-                    {"role": "user", "content": message}
-                ]
+                    {"role": "user", "content": message},
+                ],
             )
-
-            # print(completion['choices'][0]['message']['content'])
-            request_response = requests.post(
-            "https://api.promptlayer.com/rest/track-request",
-                json={
-                    "function_name": "openai.ChatCompletion.create",
-                    "kwargs": {"engine": obj['engine'], "messages": [
-                    {
-                        "content": template,
-                        "role": "system"
-                    },
-                    {
-                        "content": message,
-                        "role": "user"
-                    }
-                    ]},
-                    "tags": obj['tags'],
-                    "request_response": completion,
-                    "request_start_time": request_start_time,
-                    "request_end_time": request_end_time,
-                    # "prompt_id": prompt_name,
-                    "prompt_input_variables": "",
-                    "prompt_version": obj['version'],
-                    "api_key": promptlayer.api_key,
-                },
-            )
-            # get the id of the request
-            requestID = request_response.json()['request_id']
+            # print(completion)
+            function_name = "openai.ChatCompletion.create"
+            kwargs = {
+                "engine": engine,
+                "messages": [
+                    {"content": template, "role": "system"},
+                    {"content": message, "role": "user"},
+                ],
+            }
         else:
-            # this will load chat completion
-            # get user message 
-            message = prompt['template']
+            # This will load chat completion
+            message = prompt["template"]
 
-            #generate a new Completion prompt
+            # Generate a new Completion prompt
             completion = openai.Completion.create(
-                model=obj['engine'],
-                prompt=message,
-                max_tokens=7,
-                temperature=0
+                model=engine, prompt=message, max_tokens=7, temperature=0
             )
-            #generate a new track with the answer of the completion
-            request_response = requests.post(
+            function_name = "openai.Completion.create"
+            kwargs = {"engine": engine, "prompt": message}
+
+        # Track the request
+        request_response = requests.post(
             "https://api.promptlayer.com/rest/track-request",
-                json={
-                    "function_name": "openai.Completion.create",
-                    "kwargs": {"engine": obj['engine'], "prompt": message},
-                    "tags": obj['tags'],
-                    "request_response": completion,
-                    "request_start_time": request_start_time,
-                    "request_end_time": request_end_time,
-                    # "prompt_id": prompt_name,
-                    "prompt_input_variables": "",
-                    "prompt_version": obj['version'],
-                    "api_key": promptlayer.api_key,
-                },
-            )
-            # get the id of the track
-            requestID = request_response.json()['request_id']
+            json={
+                "function_name": function_name,
+                "kwargs": kwargs,
+                "tags": tags,
+                "request_response": completion,
+                "prompt_id": prompt_id,
+                "request_start_time": request_start_time,
+                "request_end_time": request_end_time,
+                "prompt_input_variables": variables,
+                "prompt_version": version,
+                "api_key": promptlayer.api_key,
+            },
+        )
+        # Get the id of the request
+        requestID = request_response.json()["request_id"]
     else:
         if "messages" in prompt:
-            message = prompt['messages'][1]['prompt']['template']
+            message = prompt["messages"][1]["prompt"]["template"]
         else:
-            message = prompt['template']
+            message = prompt["template"]
 
         anthropic = promptlayer.anthropic
         promptlayer.api_key = os.environ.get("PROMPTLAYER_API_KEY")
-        anthropic_client = anthropic.Client(
-            os.environ.get("ANTHROPIC_API_KEY")   
-        )
+        anthropic_client = anthropic.Client(os.environ.get("ANTHROPIC_API_KEY"))
 
         response = anthropic_client.completion(
             prompt=f"{anthropic.HUMAN_PROMPT} {message}{anthropic.AI_PROMPT}",
             stop_sequences=[anthropic.HUMAN_PROMPT],
             model="claude-v1-100k",
             max_tokens_to_sample=100,
-            pl_tags=obj['tags'],
+            pl_tags=tags,
             return_pl_id=True,
         )
         return
+
 
 def promptlayer_api_handler(
     function_name,

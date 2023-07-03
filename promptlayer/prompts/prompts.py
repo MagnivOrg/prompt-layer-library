@@ -5,7 +5,7 @@ from promptlayer.utils import (
     get_api_key,
     promptlayer_get_prompt,
     promptlayer_publish_prompt,
-    run_prompt_registry
+    run_prompt_registry,
 )
 
 
@@ -25,17 +25,18 @@ def get_prompt(prompt_name, langchain=False, version=None):
     else:
         return prompt["prompt_template"]
 
-def run_prompt(prompt_name, langchain=False, tags=[], version=None, engine='', model=''):
-    prompt = get_prompt(prompt_name, langchain=False, version=None)
-    obj = {
-        'prompt_name': prompt_name,
-        'version': version,
-        'tags': tags,
-        'engine': engine,
-        'model': model
-    }
+
+def run_prompt(prompt_name, variables=[], tags=[], version=None, engine="", model=""):
+    """
+    Get a prompt template from PromptLayer and run it to see their results.
+    version: The version of the prompt to get. If not specified, the latest version will be returned.
+    """
+    api_key = get_api_key()
+    if engine == "" or engine is None or model == "" or model is None:
+        return "Error: Engine and model values are required."
     # Get the current time in seconds since the epoch
-    run_prompt_registry(prompt, obj)
+    run_prompt_registry(prompt_name, version, tags, variables, engine, model, api_key)
+
 
 def publish_prompt(prompt_name, tags=[], prompt_template=None):
     api_key = get_api_key()

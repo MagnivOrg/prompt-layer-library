@@ -5,9 +5,8 @@ import os
 import sys
 import types
 from copy import deepcopy
-
 import requests
-
+import time
 import promptlayer
 
 URL_API_PROMPTLAYER = os.environ.setdefault(
@@ -23,6 +22,95 @@ def get_api_key():
         )
     else:
         return promptlayer.api_key
+
+
+def run_prompt_registry(prompt_name, version, tags, variables, engine, model, api_key):
+    response = promptlayer_get_prompt(prompt_name, api_key, version)
+    prompt = response["prompt_template"]
+    prompt_id = response["id"]
+    # Update the request_start_time and request_end_time with the current time
+    current_time = time.time()
+    request_start_time = current_time
+    if model == "openai":
+        import openai
+
+        if "messages" in prompt:
+            # Get the system message
+            template = prompt["messages"][0]["prompt"]["template"]
+            # Get user message
+            message = prompt["messages"][1]["prompt"]["template"]
+
+            # Generate new ChatCompletionPrompt
+            completion = openai.ChatCompletion.create(
+                model=engine,
+                messages=[
+                    {"role": "system", "content": template},
+                    {"role": "user", "content": message},
+                ],
+            )
+            function_name = "openai.ChatCompletion.create"
+            kwargs = {
+                "engine": engine,
+                "messages": [
+                    {"content": template, "role": "system"},
+                    {"content": message, "role": "user"},
+                ],
+            }
+        else:
+            # This will load chat completion
+            message = prompt["template"]
+
+            # Generate a new Completion prompt
+            completion = openai.Completion.create(
+                model=engine, prompt=message, max_tokens=7, temperature=0
+            )
+            function_name = "openai.Completion.create"
+            kwargs = {"engine": engine, "prompt": message}
+
+        # Track the request
+        current_time = time.time()
+        request_end_time = current_time
+
+        request_id = promptlayer_api_request(
+            function_name,
+            "langchain",  # ask what is this
+            variables,
+            kwargs,
+            tags,
+            completion,
+            request_start_time,
+            request_end_time,
+            get_api_key(),
+            True,
+            None,
+            prompt_id,
+            version,
+        )
+        return {"pl_request_id": request_id}
+    else:
+        import anthropic
+
+        if "messages" in prompt:
+            message = prompt["messages"][1]["prompt"]["template"]
+        else:
+            message = prompt["template"]
+
+        anthropic = promptlayer.anthropic
+        promptlayer.api_key = os.environ.get("PROMPTLAYER_API_KEY")
+        anthropic_client = anthropic.Client(os.environ.get("ANTHROPIC_API_KEY"))
+
+        response = anthropic_client.completion(
+            prompt=f"{anthropic.HUMAN_PROMPT} {message}{anthropic.AI_PROMPT}",
+            stop_sequences=[anthropic.HUMAN_PROMPT],
+            model="claude-v1-100k",
+            max_tokens_to_sample=100,
+            pl_tags=tags,
+            return_pl_id=True,
+        )
+        request_id = response[1]
+        apikey = get_api_key()
+        promptlayer_track_prompt(request_id, prompt_name, variables, apikey, version)
+        return {"pl_request_id": request_id}
 
 
 def promptlayer_api_handler(
@@ -111,6 +199,8 @@ def promptlayer_api_request(
     api_key,
     return_pl_id=False,
     metadata=None,
+    prompt_id=None,
+    prompt_version=None,
 ):
     if type(response) != dict and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
@@ -128,6 +218,8 @@ def promptlayer_api_request(
                 "request_end_time": request_end_time,
                 "metadata": metadata,
                 "api_key": api_key,
+                "prompt_id": prompt_id,
+                "prompt_version": prompt_version,
             },
         )
         if request_response.status_code != 200:
@@ -241,7 +333,7 @@ def promptlayer_track_prompt(
             json={
                 "request_id": request_id,
                 "prompt_name": prompt_name,
-                "prompt_input_variables": input_variables,
+                # "prompt_input_variables": input_variables,
                 "api_key": api_key,
                 "version": version,
             },

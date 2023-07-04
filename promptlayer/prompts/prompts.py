@@ -35,7 +35,9 @@ def run_prompt(prompt_name, variables=[], tags=[], version=None, engine="", mode
     if engine == "" or engine is None or model == "" or model is None:
         return "Error: Engine and model values are required."
     # Get the current time in seconds since the epoch
-    run_prompt_registry(prompt_name, version, tags, variables, engine, model, api_key)
+    return run_prompt_registry(
+        prompt_name, version, tags, variables, engine, model, api_key
+    )
 
 
 def publish_prompt(prompt_name, tags=[], prompt_template=None):

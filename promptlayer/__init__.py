@@ -12,10 +12,12 @@ api_key = os.environ.get("PROMPTLAYER_API_KEY")
 def __getattr__(name: Union[Literal["openai"], Literal["anthropic"]]):
     if name == "openai":
         import openai as openai_module
+
         openai = PromptLayerBase(openai_module, function_name="openai")
         return openai
     elif name == "anthropic":
         import anthropic as anthropic_module
+
         anthropic = PromptLayerBase(
             anthropic_module,
             function_name="anthropic",

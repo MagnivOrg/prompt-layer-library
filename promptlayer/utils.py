@@ -115,6 +115,7 @@ def promptlayer_api_request(
 ):
     if type(response) != dict and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
+    request_response = None
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/track-request",
@@ -133,13 +134,15 @@ def promptlayer_api_request(
         )
         if request_response.status_code != 200:
             handle_bad_response(request_response, "WARNING: While logging your request PromptLayer had the following error")
+        else:
+            if return_pl_id and request_response:
+                return request_response.json().get("request_id")
     except Exception as e:
         print(
             f"WARNING: While logging your request PromptLayer had the following error: {e}",
             file=sys.stderr,
         )
-    if return_pl_id:
-        return request_response.json().get("request_id")
+        raise e
 
 
 def promptlayer_api_request_async(

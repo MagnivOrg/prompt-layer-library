@@ -5,6 +5,7 @@ import os
 import sys
 import types
 from copy import deepcopy
+from json import JSONDecodeError
 
 import requests
 
@@ -131,16 +132,7 @@ def promptlayer_api_request(
             },
         )
         if request_response.status_code != 200:
-            if hasattr(request_response, "json"):
-                print(
-                    f"WARNING: While logging your request PromptLayer had the following error: {request_response.json().get('message')}",
-                    file=sys.stderr,
-                )
-            else:
-                print(
-                    f"WARNING: While logging your request PromptLayer had the following error: {request_response}",
-                    file=sys.stderr,
-                )
+            handle_bad_response(request_response, "WARNING: While logging your request PromptLayer had the following error")
     except Exception as e:
         print(
             f"WARNING: While logging your request PromptLayer had the following error: {e}",
@@ -190,19 +182,29 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
             params={"prompt_name": prompt_name, "version": version},
         )
         if request_response.status_code != 200:
-            if hasattr(request_response, "json"):
-                raise Exception(
-                    f"PromptLayer had the following error while getting your prompt: {request_response.json().get('message')}"
-                )
-            else:
-                raise Exception(
-                    f"PromptLayer had the following error while getting your prompt: {request_response}"
-                )
+            handle_bad_response(request_response, "PromptLayer had the following error while getting your prompt")
     except Exception as e:
         raise Exception(
             f"PromptLayer had the following error while getting your prompt: {e}"
         )
     return request_response.json()
+
+
+def handle_bad_response(request_response, main_message):
+    if hasattr(request_response, "json"):
+        try:
+            raise Exception(
+                f"{main_message}: {request_response.json().get('message')}"
+            )
+        except JSONDecodeError:
+            print(
+                f"{main_message}: {request_response}",
+                file=sys.stderr,
+            )
+    else:
+        raise Exception(
+            f"{main_message}: {request_response}"
+        )
 
 
 def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
@@ -217,14 +219,7 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
             },
         )
         if request_response.status_code != 200:
-            if hasattr(request_response, "json"):
-                raise Exception(
-                    f"PromptLayer had the following error while publishing your prompt: {request_response.json().get('message')}"
-                )
-            else:
-                raise Exception(
-                    f"PromptLayer had the following error while publishing your prompt: {request_response}"
-                )
+            handle_bad_response(request_response, "PromptLayer had the following error while publishing your prompt")
     except Exception as e:
         raise Exception(
             f"PromptLayer had the following error while publishing your prompt: {e}"
@@ -247,18 +242,8 @@ def promptlayer_track_prompt(
             },
         )
         if request_response.status_code != 200:
-            if hasattr(request_response, "json"):
-                print(
-                    f"WARNING: While tracking your prompt PromptLayer had the following error: {request_response.json().get('message')}",
-                    file=sys.stderr,
-                )
-                return False
-            else:
-                print(
-                    f"WARNING: While tracking your prompt PromptLayer had the following error: {request_response}",
-                    file=sys.stderr,
-                )
-                return False
+            handle_bad_response(request_response, "WARNING: While tracking your prompt PromptLayer had the following error")
+            return False
     except Exception as e:
         print(
             f"WARNING: While tracking your prompt PromptLayer had the following error: {e}",
@@ -279,18 +264,8 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
             },
         )
         if request_response.status_code != 200:
-            if hasattr(request_response, "json"):
-                print(
-                    f"WARNING: While tracking your metadata PromptLayer had the following error: {request_response.json().get('message')}",
-                    file=sys.stderr,
-                )
-                return False
-            else:
-                print(
-                    f"WARNING: While tracking your metadata PromptLayer had the following error: {request_response}",
-                    file=sys.stderr,
-                )
-                return False
+            handle_bad_response(request_response, "WARNING: While tracking your metadata PromptLayer had the following error")
+            return False
     except Exception as e:
         print(
             f"WARNING: While tracking your metadata PromptLayer had the following error: {e}",
@@ -311,18 +286,8 @@ def promptlayer_track_score(request_id, score, api_key):
             },
         )
         if request_response.status_code != 200:
-            if hasattr(request_response, "json"):
-                print(
-                    f"WARNING: While tracking your score PromptLayer had the following error: {request_response.json().get('message')}",
-                    file=sys.stderr,
-                )
-                return False
-            else:
-                print(
-                    f"WARNING: While tracking your score PromptLayer had the following error: {request_response}",
-                    file=sys.stderr,
-                )
-                return False
+            handle_bad_response(request_response, "WARNING: While tracking your score PromptLayer had the following error")
+            return False
     except Exception as e:
         print(
             f"WARNING: While tracking your score PromptLayer had the following error: {e}",

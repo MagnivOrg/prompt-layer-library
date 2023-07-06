@@ -192,41 +192,6 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
     return request_response.json()
 
 
-def warn_on_bad_response(request_response, main_message):
-    if hasattr(request_response, "json"):
-        try:
-            print(
-                f"{main_message}: {request_response.json().get('message')}",
-                file=sys.stderr
-            )
-        except JSONDecodeError:
-            print(
-                f"{main_message}: {request_response}",
-                file=sys.stderr,
-            )
-    else:
-        print(
-            f"{main_message}: {request_response}",
-            file=sys.stderr
-        )
-
-
-def raise_on_bad_response(request_response, main_message):
-    if hasattr(request_response, "json"):
-        try:
-            raise Exception(
-                f"{main_message}: {request_response.json().get('message')}"
-            )
-        except JSONDecodeError:
-            raise Exception(
-                f"{main_message}: {request_response}"
-            )
-    else:
-        raise Exception(
-            f"{main_message}: {request_response}"
-        )
-
-
 def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
     try:
         request_response = requests.post(
@@ -400,3 +365,39 @@ async def run_in_thread_async(executor, func, *args, **kwargs):
     func_call = functools.partial(ctx.run, func, *args, **kwargs)
     res = await loop.run_in_executor(executor, func_call)
     return res
+
+
+def warn_on_bad_response(request_response, main_message):
+    if hasattr(request_response, "json"):
+        try:
+            print(
+                f"{main_message}: {request_response.json().get('message')}",
+                file=sys.stderr
+            )
+        except JSONDecodeError:
+            print(
+                f"{main_message}: {request_response}",
+                file=sys.stderr,
+            )
+    else:
+        print(
+            f"{main_message}: {request_response}",
+            file=sys.stderr
+        )
+
+
+def raise_on_bad_response(request_response, main_message):
+    if hasattr(request_response, "json"):
+        try:
+            raise Exception(
+                f"{main_message}: {request_response.json().get('message')}"
+            )
+        except JSONDecodeError:
+            raise Exception(
+                f"{main_message}: {request_response}"
+            )
+    else:
+        raise Exception(
+            f"{main_message}: {request_response}"
+        )
+

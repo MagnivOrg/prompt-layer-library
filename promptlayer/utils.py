@@ -139,7 +139,7 @@ def promptlayer_api_request(
             f"WARNING: While logging your request PromptLayer had the following error: {e}",
             file=sys.stderr,
         )
-    if return_pl_id:
+    if request_response is not None and return_pl_id:
         return request_response.json().get("request_id")
 
 
@@ -182,12 +182,13 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
             headers={"X-API-KEY": api_key},
             params={"prompt_name": prompt_name, "version": version},
         )
-        if request_response.status_code != 200:
-            raise_on_bad_response(request_response, "PromptLayer had the following error while getting your prompt")
     except Exception as e:
         raise Exception(
             f"PromptLayer had the following error while getting your prompt: {e}"
         )
+    if request_response.status_code != 200:
+        raise_on_bad_response(request_response, "PromptLayer had the following error while getting your prompt")
+
     return request_response.json()
 
 
@@ -237,12 +238,12 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
                 "api_key": api_key,
             },
         )
-        if request_response.status_code != 200:
-            raise_on_bad_response(request_response, "PromptLayer had the following error while publishing your prompt")
     except Exception as e:
         raise Exception(
             f"PromptLayer had the following error while publishing your prompt: {e}"
         )
+    if request_response.status_code != 200:
+        raise_on_bad_response(request_response, "PromptLayer had the following error while publishing your prompt")
     return True
 
 

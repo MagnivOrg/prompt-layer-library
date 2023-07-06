@@ -26,7 +26,16 @@ def get_prompt(prompt_name, langchain=False, version=None):
         return prompt["prompt_template"]
 
 
-def run_prompt(prompt_name, variables=[], tags=[], version=None, engine="", model=""):
+def run_prompt(
+    prompt_name,
+    variables=[],
+    tags=[],
+    version=None,
+    engine="",
+    model="",
+    metadata=None,
+    return_pl_id=None,
+):
     """
     Get a prompt template from PromptLayer and run it to see their results.
     version: The version of the prompt to get. If not specified, the latest version will be returned.
@@ -36,7 +45,15 @@ def run_prompt(prompt_name, variables=[], tags=[], version=None, engine="", mode
         return "Error: Engine and model values are required."
     # Get the current time in seconds since the epoch
     return run_prompt_registry(
-        prompt_name, version, tags, variables, engine, model, api_key
+        prompt_name,
+        version,
+        tags,
+        variables,
+        engine,
+        model,
+        api_key,
+        metadata,
+        return_pl_id,
     )
 
 

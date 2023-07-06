@@ -1,12 +1,12 @@
 import asyncio
 import contextvars
+import datetime
 import functools
 import os
 import sys
 import types
 from copy import deepcopy
 import requests
-import time
 import promptlayer
 
 URL_API_PROMPTLAYER = os.environ.setdefault(
@@ -24,12 +24,22 @@ def get_api_key():
         return promptlayer.api_key
 
 
-def run_prompt_registry(prompt_name, version, tags, variables, engine, model, api_key):
-    response = promptlayer_get_prompt(prompt_name, api_key, version)
-    prompt = response["prompt_template"]
-    prompt_id = response["id"]
+def run_prompt_registry(
+    prompt_name,
+    version,
+    tags,
+    variables,
+    engine,
+    model,
+    api_key,
+    metadata=None,
+    return_pl_id=False,
+):
+    get_prompt = promptlayer_get_prompt(prompt_name, api_key, version)
+    prompt = get_prompt["prompt_template"]
+    prompt_id = get_prompt["id"]
     # Update the request_start_time and request_end_time with the current time
-    current_time = time.time()
+    current_time = datetime.datetime.now().timestamp()
     request_start_time = current_time
     if model == "openai":
         import openai
@@ -41,7 +51,7 @@ def run_prompt_registry(prompt_name, version, tags, variables, engine, model, ap
             message = prompt["messages"][1]["prompt"]["template"]
 
             # Generate new ChatCompletionPrompt
-            completion = openai.ChatCompletion.create(
+            response = openai.ChatCompletion.create(
                 model=engine,
                 messages=[
                     {"role": "system", "content": template},
@@ -61,32 +71,34 @@ def run_prompt_registry(prompt_name, version, tags, variables, engine, model, ap
             message = prompt["template"]
 
             # Generate a new Completion prompt
-            completion = openai.Completion.create(
+            response = openai.Completion.create(
                 model=engine, prompt=message, max_tokens=7, temperature=0
             )
             function_name = "openai.Completion.create"
             kwargs = {"engine": engine, "prompt": message}
 
         # Track the request
-        current_time = time.time()
+        current_time = datetime.datetime.now().timestamp()
         request_end_time = current_time
 
         request_id = promptlayer_api_request(
             function_name,
-            "langchain",  # ask what is this
+            "openai",  # ask what is this
             variables,
             kwargs,
             tags,
-            completion,
+            response,
             request_start_time,
             request_end_time,
             get_api_key(),
-            True,
-            None,
+            return_pl_id,
+            metadata,
             prompt_id,
             version,
         )
-        return {"pl_request_id": request_id}
+        if return_pl_id == True:
+            return response, request_id
+        return response
     else:
         import anthropic
 
@@ -98,7 +110,6 @@ def run_prompt_registry(prompt_name, version, tags, variables, engine, model, ap
         anthropic = promptlayer.anthropic
         promptlayer.api_key = os.environ.get("PROMPTLAYER_API_KEY")
         anthropic_client = anthropic.Client(os.environ.get("ANTHROPIC_API_KEY"))
-
         response = anthropic_client.completion(
             prompt=f"{anthropic.HUMAN_PROMPT} {message}{anthropic.AI_PROMPT}",
             stop_sequences=[anthropic.HUMAN_PROMPT],
@@ -110,7 +121,9 @@ def run_prompt_registry(prompt_name, version, tags, variables, engine, model, ap
         request_id = response[1]
         apikey = get_api_key()
         promptlayer_track_prompt(request_id, prompt_name, variables, apikey, version)
-        return {"pl_request_id": request_id}
+        if return_pl_id == True:
+            return response, request_id
+        return response
 
 
 def promptlayer_api_handler(
@@ -333,7 +346,7 @@ def promptlayer_track_prompt(
             json={
                 "request_id": request_id,
                 "prompt_name": prompt_name,
-                # "prompt_input_variables": input_variables,
+                "prompt_input_variables": input_variables,
                 "api_key": api_key,
                 "version": version,
             },

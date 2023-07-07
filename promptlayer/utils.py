@@ -107,7 +107,7 @@ def run_prompt_registry(
         else:
             message = prompt["template"]
 
-        anthropic = promptlayer.anthropic
+        # anthropic = promptlayer.anthropic
         promptlayer.api_key = os.environ.get("PROMPTLAYER_API_KEY")
         anthropic_client = anthropic.Client(os.environ.get("ANTHROPIC_API_KEY"))
         response = anthropic_client.completion(
@@ -118,9 +118,26 @@ def run_prompt_registry(
             pl_tags=tags,
             return_pl_id=True,
         )
-        request_id = response[1]
-        apikey = get_api_key()
-        promptlayer_track_prompt(request_id, prompt_name, variables, apikey, version)
+
+        current_time = datetime.datetime.now().timestamp()
+        request_end_time = current_time
+        kwargs = {"prompt": message}
+
+        request_id = promptlayer_api_request(
+            "anthropic.Client.completion",
+            "anthropic",  # ask what is this,
+            variables,
+            kwargs,
+            tags,
+            response,
+            request_start_time,
+            request_end_time,
+            get_api_key(),
+            True,
+            metadata,
+            prompt_id,
+            version,
+        )
         if return_pl_id == True:
             return response, request_id
         return response

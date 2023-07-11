@@ -4,7 +4,7 @@ import inspect
 from promptlayer.utils import (
     get_api_key,
     promptlayer_api_handler,
-    promptlayer_api_handler_async,
+    async_wrapper,
 )
 
 
@@ -18,7 +18,15 @@ class PromptLayerBase(object):
 
     def __getattr__(self, name):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
-        if inspect.isclass(attr) or inspect.isfunction(attr) or inspect.ismethod(attr):
+        if (
+            inspect.isclass(attr)
+            or inspect.isfunction(attr)
+            or inspect.ismethod(attr)
+            or str(type(attr))
+            == "<class 'anthropic.resources.completions.Completions'>"
+            or str(type(attr))
+            == "<class 'anthropic.resources.completions.AsyncCompletions'>"
+        ):
             return PromptLayerBase(
                 attr,
                 function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
@@ -45,26 +53,20 @@ class PromptLayerBase(object):
                 function_name=object.__getattribute__(self, "_function_name"),
                 provider_type=object.__getattribute__(self, "_provider_type"),
             )
-        if inspect.iscoroutinefunction(function_object):
-
-            async def async_wrapper(*args, **kwargs):
-                response = await function_object(*args, **kwargs)
-                request_end_time = datetime.datetime.now().timestamp()
-                return await promptlayer_api_handler_async(
-                    object.__getattribute__(self, "_function_name"),
-                    object.__getattribute__(self, "_provider_type"),
-                    args,
-                    kwargs,
-                    tags,
-                    response,
-                    request_start_time,
-                    request_end_time,
-                    get_api_key(),
-                    return_pl_id=return_pl_id,
-                )
-
-            return async_wrapper(*args, **kwargs)
-        response = function_object(*args, **kwargs)
+        function_response = function_object(*args, **kwargs)
+        if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(
+            function_response
+        ):
+            return async_wrapper(
+                function_response,
+                return_pl_id,
+                request_start_time,
+                object.__getattribute__(self, "_function_name"),
+                object.__getattribute__(self, "_provider_type"),
+                tags,
+                *args,
+                **kwargs,
+            )
         request_end_time = datetime.datetime.now().timestamp()
         return promptlayer_api_handler(
             object.__getattribute__(self, "_function_name"),
@@ -72,7 +74,7 @@ class PromptLayerBase(object):
             args,
             kwargs,
             tags,
-            response,
+            function_response,
             request_start_time,
             request_end_time,
             get_api_key(),

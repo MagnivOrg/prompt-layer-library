@@ -1,5 +1,6 @@
 import asyncio
 import contextvars
+import datetime
 import functools
 import os
 import sys
@@ -116,6 +117,10 @@ def promptlayer_api_request(
     if type(response) != dict and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
     request_response = None
+    if hasattr(
+        response, "dict"
+    ):  # added this for anthropic 3.0 changes, they return a completion object
+        response = response.dict()
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/track-request",
@@ -409,3 +414,29 @@ def raise_on_bad_response(request_response, main_message):
             raise Exception(f"{main_message}: {request_response}")
     else:
         raise Exception(f"{main_message}: {request_response}")
+
+
+async def async_wrapper(
+    coroutine_obj,
+    return_pl_id,
+    request_start_time,
+    function_name,
+    provider_type,
+    tags,
+    *args,
+    **kwargs,
+):
+    response = await coroutine_obj
+    request_end_time = datetime.datetime.now().timestamp()
+    return await promptlayer_api_handler_async(
+        function_name,
+        provider_type,
+        args,
+        kwargs,
+        tags,
+        response,
+        request_start_time,
+        request_end_time,
+        get_api_key(),
+        return_pl_id=return_pl_id,
+    )

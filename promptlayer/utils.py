@@ -133,7 +133,10 @@ def promptlayer_api_request(
             },
         )
         if request_response.status_code != 200:
-            warn_on_bad_response(request_response, "WARNING: While logging your request PromptLayer had the following error")
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While logging your request PromptLayer had the following error",
+            )
     except Exception as e:
         print(
             f"WARNING: While logging your request PromptLayer had the following error: {e}",
@@ -187,7 +190,10 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
             f"PromptLayer had the following error while getting your prompt: {e}"
         )
     if request_response.status_code != 200:
-        raise_on_bad_response(request_response, "PromptLayer had the following error while getting your prompt")
+        raise_on_bad_response(
+            request_response,
+            "PromptLayer had the following error while getting your prompt",
+        )
 
     return request_response.json()
 
@@ -208,7 +214,10 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
             f"PromptLayer had the following error while publishing your prompt: {e}"
         )
     if request_response.status_code != 200:
-        raise_on_bad_response(request_response, "PromptLayer had the following error while publishing your prompt")
+        raise_on_bad_response(
+            request_response,
+            "PromptLayer had the following error while publishing your prompt",
+        )
     return True
 
 
@@ -227,7 +236,10 @@ def promptlayer_track_prompt(
             },
         )
         if request_response.status_code != 200:
-            warn_on_bad_response(request_response, "WARNING: While tracking your prompt PromptLayer had the following error")
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While tracking your prompt PromptLayer had the following error",
+            )
             return False
     except Exception as e:
         print(
@@ -249,7 +261,10 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
             },
         )
         if request_response.status_code != 200:
-            warn_on_bad_response(request_response, "WARNING: While tracking your metadata PromptLayer had the following error")
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While tracking your metadata PromptLayer had the following error",
+            )
             return False
     except Exception as e:
         print(
@@ -271,7 +286,10 @@ def promptlayer_track_score(request_id, score, api_key):
             },
         )
         if request_response.status_code != 200:
-            warn_on_bad_response(request_response, "WARNING: While tracking your score PromptLayer had the following error")
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While tracking your score PromptLayer had the following error",
+            )
             return False
     except Exception as e:
         print(
@@ -372,7 +390,7 @@ def warn_on_bad_response(request_response, main_message):
         try:
             print(
                 f"{main_message}: {request_response.json().get('message')}",
-                file=sys.stderr
+                file=sys.stderr,
             )
         except JSONDecodeError:
             print(
@@ -380,24 +398,14 @@ def warn_on_bad_response(request_response, main_message):
                 file=sys.stderr,
             )
     else:
-        print(
-            f"{main_message}: {request_response}",
-            file=sys.stderr
-        )
+        print(f"{main_message}: {request_response}", file=sys.stderr)
 
 
 def raise_on_bad_response(request_response, main_message):
     if hasattr(request_response, "json"):
         try:
-            raise Exception(
-                f"{main_message}: {request_response.json().get('message')}"
-            )
+            raise Exception(f"{main_message}: {request_response.json().get('message')}")
         except JSONDecodeError:
-            raise Exception(
-                f"{main_message}: {request_response}"
-            )
+            raise Exception(f"{main_message}: {request_response}")
     else:
-        raise Exception(
-            f"{main_message}: {request_response}"
-        )
-
+        raise Exception(f"{main_message}: {request_response}")

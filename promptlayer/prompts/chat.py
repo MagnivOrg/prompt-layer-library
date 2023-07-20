@@ -1,7 +1,7 @@
+import copy
 import json
 
 from langchain import prompts
-import copy
 
 CHAT_PROMPTLAYER_LANGCHAIN = "chat_promptlayer_langchain"
 ROLE_SYSTEM = "system"
@@ -41,7 +41,10 @@ def to_prompt(prompt_dict: dict):
                 message = prompts.HumanMessagePromptTemplate(prompt=prompt, **message)
             messages.append(message)
         prompt_template = prompts.ChatPromptTemplate(
-            messages=messages, **prompt_dict_copy
+            messages=messages,
+            input_variables=prompt_dict_copy.pop("input_variables"),
+            output_parser=prompt_dict_copy.pop("output_parser"),
+            partial_variables=prompt_dict_copy.pop("partial_variables"),
         )
         return prompt_template
     except Exception as e:

@@ -42,11 +42,11 @@ def to_prompt(prompt_dict: dict):
             messages.append(message)
         prompt_template = prompts.ChatPromptTemplate(
             messages=messages,
-            input_variables=prompt_dict_copy.pop("input_variables"),
-            output_parser=prompt_dict_copy.pop("output_parser"),
-            partial_variables=prompt_dict_copy.pop("partial_variables"),
+            input_variables=prompt_dict_copy.get("input_variables", []),
+            output_parser=prompt_dict_copy.get("output_parser", None),
+            partial_variables=prompt_dict_copy.get("partial_variables", {}),
         )
         return prompt_template
     except Exception as e:
-        print(e)
+        print("Unknown error occurred. ", e)
         return None

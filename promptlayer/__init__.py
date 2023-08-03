@@ -1,15 +1,15 @@
 import os
 from typing import Literal, Union
 
-import promptlayer.langchain as langchain
-import promptlayer.prompts as prompts
 import promptlayer.track as track
 from promptlayer.promptlayer import PromptLayerBase
 
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
 
 
-def __getattr__(name: Union[Literal["openai"], Literal["anthropic"]]):
+def __getattr__(
+    name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]]
+):
     if name == "openai":
         import openai as openai_module
 
@@ -24,6 +24,10 @@ def __getattr__(name: Union[Literal["openai"], Literal["anthropic"]]):
             provider_type="anthropic",
         )
         return anthropic
+    elif name == "prompts":
+        import promptlayer.prompts as prompts
+
+        return prompts
     else:
         raise AttributeError(f"module {__name__} has no attribute {name}")
 

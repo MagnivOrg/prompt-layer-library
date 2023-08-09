@@ -2,6 +2,7 @@ from langchain import PromptTemplate, prompts
 from langchain.prompts.loading import load_prompt_from_config
 
 from promptlayer.prompts.chat import CHAT_PROMPTLAYER_LANGCHAIN, to_dict, to_prompt
+from promptlayer.resources.prompt import Prompt
 from promptlayer.utils import (
     get_api_key,
     promptlayer_get_prompt,
@@ -39,3 +40,31 @@ def publish_prompt(prompt_name, tags=[], prompt_template=None):
         raise Exception(
             "Please provide either a JSON prompt template or a langchain prompt template."
         )
+
+
+def all(page: int = 1, per_page: int = 30):
+    """
+    List all prompts on PromptLayer.
+
+    Parameters:
+    ----------
+    page: int
+        The page of prompts to get.
+    per_page: int
+        The number of prompts to get per page.
+
+    Returns:
+    -------
+    list of prompts
+    """
+    try:
+        response = Prompt.list({"page": page, "per_page": per_page})
+        # TODO: When the API is updated, this should be changed to return a list of PromptTemplate objects.
+        return [
+            item["prompt_template"]
+            for item in response["items"]
+            if "prompt_template" in item
+        ]
+    except Exception as e:
+        print(e)
+        return []

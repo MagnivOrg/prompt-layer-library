@@ -23,5 +23,5 @@ setup(
     version="0.1.96",
     py_modules=["promptlayer"],
     packages=find_packages(),
-    install_requires=["requests"],
+    install_requires=["requests", "pydantic>=1,<2"],
 )

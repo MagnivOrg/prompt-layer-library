@@ -14,3 +14,4 @@ tqdm==4.64.1
 types-pytz==2022.7.0.0
 typing-extensions==4.4.0
 urllib3==1.26.13
+pydantic==1.10.12

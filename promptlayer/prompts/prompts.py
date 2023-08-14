@@ -60,11 +60,7 @@ def all(page: int = 1, per_page: int = 30):
     try:
         response = Prompt.list({"page": page, "per_page": per_page})
         # TODO: When the API is updated, this should be changed to return a list of PromptTemplate objects.
-        return [
-            item["prompt_template"]
-            for item in response["items"]
-            if "prompt_template" in item
-        ]
+        return response["items"]
     except Exception as e:
         print(e)
         return []

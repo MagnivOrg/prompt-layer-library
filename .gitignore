@@ -131,3 +131,6 @@ dmypy.json
 .test/
 plvenv
 test.py
+
+# VSCode
+.vscode/

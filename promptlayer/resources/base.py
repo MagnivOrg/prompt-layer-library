@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 class Base:
     API_KEY = os.environ.get("PROMPTLAYER_API_KEY", "")
-    BASE_URL = os.environ.get("BASE_URL", "https://api.promptlayer.com")
+    BASE_URL = os.environ.get("BASE_URL", "https://api.promptlayer.com/rest")
 
     @classmethod
     def list(cls, params_model: Type[BaseModel], params={}):

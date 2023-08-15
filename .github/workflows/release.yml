@@ -22,7 +22,6 @@ jobs:
         run: poetry install
       - name: Build and publish
         env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_PASSWORD }}
         run: |
           poetry publish --build

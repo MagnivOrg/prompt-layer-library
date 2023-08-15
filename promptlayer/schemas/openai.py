@@ -1,4 +1,5 @@
-from typing import Annotated, Literal
+from typing import Literal, Union
+from typing_extensions import Annotated
 
 from pydantic import BaseModel, constr, validator
 
@@ -10,11 +11,11 @@ class FunctionCall(BaseModel):
 
 class Message(BaseModel):
     role: Literal["system", "user", "assistant", "function"]
-    function_call: FunctionCall | None = None
+    function_call: Union[FunctionCall, None] = None
     content: str = ""
-    name: Annotated[
-        str, constr(max_length=64, regex="^[a-zA-Z0-9_-]{1,64}$")
-    ] | None = None
+    name: Union[
+        Annotated[str, constr(max_length=64, regex="^[a-zA-Z0-9_-]{1,64}$")], None
+    ] = None
 
     @validator("content")
     def validate_content(cls, value, values):

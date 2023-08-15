@@ -1,4 +1,5 @@
-from typing import Annotated, Dict, Literal
+from typing import Dict, Literal, Union, List
+from typing_extensions import Annotated
 
 from langchain.prompts import ChatMessagePromptTemplate
 from langchain.prompts import ChatPromptTemplate as BaseChatPromptTemplate
@@ -6,7 +7,6 @@ from langchain.prompts import PromptTemplate as BasePromptTemplate
 from pydantic import BaseModel, constr, root_validator, validator
 
 from promptlayer.schemas import openai
-
 
 # PromptTemplate from langchain calls root_validator which doesn't skip on failure
 class SafePromptTemplate(BasePromptTemplate):
@@ -31,13 +31,13 @@ class SystemMessagePromptTemplate(BaseChatMessagePromptTemplate):
     role = "system"
 
 
-Message = BaseChatMessagePromptTemplate | openai.Message
+Message = Union[BaseChatMessagePromptTemplate, openai.Message]
 
 
 class ChatPromptTemplate(BaseChatPromptTemplate):
-    messages: list[Message]
-    functions: list[openai.Function] | None = None
-    function_call: Literal["none", "auto"] | dict[Literal["name"], str] = "none"
+    messages: List[Message]
+    functions: Union[List[openai.Function], None] = None
+    function_call: Union[Literal["none", "auto"], Dict[Literal["name"], str]] = "none"
 
     @property
     def _prompt_type(self) -> str:
@@ -91,7 +91,7 @@ class ChatPromptTemplate(BaseChatPromptTemplate):
         )
 
 
-PromptTemplate = ChatPromptTemplate | SafePromptTemplate
+PromptTemplate = Union[ChatPromptTemplate, SafePromptTemplate]
 
 
 class Base(BaseModel):
@@ -99,4 +99,4 @@ class Base(BaseModel):
         str, constr(min_length=1, max_length=128, regex="^[a-zA-Z0-9_-]*$")
     ]
     prompt_template: PromptTemplate
-    tags: list[str] = []
+    tags: List[str] = []

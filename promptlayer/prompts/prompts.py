@@ -1,22 +1,20 @@
 from langchain import PromptTemplate, prompts
 from langchain.prompts.loading import load_prompt_from_config
 
-from promptlayer.prompts.chat import CHAT_PROMPTLAYER_LANGCHAIN, to_dict, to_prompt
+from promptlayer.prompts.chat import (CHAT_PROMPTLAYER_LANGCHAIN, to_dict,
+                                      to_prompt)
 from promptlayer.resources.prompt import Prompt
-from promptlayer.utils import (
-    get_api_key,
-    promptlayer_get_prompt,
-    promptlayer_publish_prompt,
-)
+from promptlayer.utils import (get_api_key, promptlayer_get_prompt,
+                               promptlayer_publish_prompt)
 
 
-def get_prompt(prompt_name, langchain=False, version=None):
+def get_prompt(prompt_name, langchain=False, version=None, release=None):
     """
     Get a prompt template from PromptLayer.
     version: The version of the prompt to get. If not specified, the latest version will be returned.
     """
     api_key = get_api_key()
-    prompt = promptlayer_get_prompt(prompt_name, api_key, version)
+    prompt = promptlayer_get_prompt(prompt_name, api_key, version, release)
     if langchain:
         if "_type" not in prompt["prompt_template"]:
             prompt["prompt_template"]["_type"] = "prompt"

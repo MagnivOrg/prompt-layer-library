@@ -179,7 +179,7 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(prompt_name, api_key, version=None):
+def promptlayer_get_prompt(prompt_name, api_key, version=None, release=None):
     """
     Get a prompt from the PromptLayer library
     version: version of the prompt to get, None for latest
@@ -188,7 +188,7 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
         request_response = requests.get(
             f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
             headers={"X-API-KEY": api_key},
-            params={"prompt_name": prompt_name, "version": version},
+            params={"prompt_name": prompt_name, "version": version, "release": release},
         )
     except Exception as e:
         raise Exception(

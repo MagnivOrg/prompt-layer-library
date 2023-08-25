@@ -179,10 +179,13 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(prompt_name, api_key, version=None, release=None):
+def promptlayer_get_prompt(
+    prompt_name, api_key, version: int = None, release: str = None
+):
     """
     Get a prompt from the PromptLayer library
     version: version of the prompt to get, None for latest
+    release: The specific release of a prompt you want to get. Setting this will supercede version
     """
     try:
         request_response = requests.get(

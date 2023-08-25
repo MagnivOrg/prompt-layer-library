@@ -1,12 +1,13 @@
-from typing import Dict, Literal, Union, List
-from typing_extensions import Annotated
+from typing import Dict, List, Literal, Union
 
 from langchain.prompts import ChatMessagePromptTemplate
 from langchain.prompts import ChatPromptTemplate as BaseChatPromptTemplate
 from langchain.prompts import PromptTemplate as BasePromptTemplate
-from pydantic import BaseModel, constr, root_validator, validator
+from pydantic import BaseModel, PositiveInt, constr, root_validator, validator
+from typing_extensions import Annotated
 
 from promptlayer.schemas import openai
+
 
 # PromptTemplate from langchain calls root_validator which doesn't skip on failure
 class SafePromptTemplate(BasePromptTemplate):
@@ -100,3 +101,9 @@ class Base(BaseModel):
     ]
     prompt_template: PromptTemplate
     tags: List[str] = []
+
+
+class GetByName(BaseModel):
+    prompt_name: str
+    version: Union[PositiveInt, None] = None
+    release: Union[str, None] = None

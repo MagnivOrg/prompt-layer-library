@@ -1,10 +1,8 @@
 from langchain import PromptTemplate, prompts
 from langchain.prompts.loading import load_prompt_from_config
-from pydantic import ValidationError
 
 from promptlayer.prompts.chat import CHAT_PROMPTLAYER_LANGCHAIN, to_dict, to_prompt
 from promptlayer.resources.prompt import Prompt
-from promptlayer.schemas.prompt import GetByName
 from promptlayer.utils import (
     get_api_key,
     promptlayer_get_prompt,
@@ -20,11 +18,6 @@ def get_prompt(prompt_name, langchain=False, version: int = None, release: str =
     version: The version of the prompt to get. If not specified, the latest version will be returned.
     release: The specific release of a prompt you want to get. Setting this will supercede version
     """
-    try:
-        GetByName(prompt_name=prompt_name, version=version, release=release)
-    except ValidationError as e:
-        print(e)
-        return None
     api_key = get_api_key()
     prompt = promptlayer_get_prompt(prompt_name, api_key, version, release)
     if langchain:
@@ -69,7 +62,6 @@ def all(page: int = 1, per_page: int = 30):
     """
     try:
         response = Prompt.list({"page": page, "per_page": per_page})
-        # TODO: When the API is updated, this should be changed to return a list of PromptTemplate objects.
         return response["items"]
     except Exception as e:
         print(e)

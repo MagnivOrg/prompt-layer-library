@@ -179,16 +179,19 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(prompt_name, api_key, version=None):
+def promptlayer_get_prompt(
+    prompt_name, api_key, version: int = None, label: str = None
+):
     """
     Get a prompt from the PromptLayer library
     version: version of the prompt to get, None for latest
+    label: The specific label of a prompt you want to get. Setting this will supercede version
     """
     try:
         request_response = requests.get(
             f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
             headers={"X-API-KEY": api_key},
-            params={"prompt_name": prompt_name, "version": version},
+            params={"prompt_name": prompt_name, "version": version, "label": label},
         )
     except Exception as e:
         raise Exception(

@@ -206,13 +206,16 @@ def promptlayer_get_prompt(
     return request_response.json()
 
 
-def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
+def promptlayer_publish_prompt(
+    prompt_name, prompt_template, commit_message, tags, api_key
+):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-publish-prompt-template",
             json={
                 "prompt_name": prompt_name,
                 "prompt_template": prompt_template,
+                "commit_message": commit_message,
                 "tags": tags,
                 "api_key": api_key,
             },

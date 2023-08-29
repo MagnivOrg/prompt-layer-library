@@ -10,13 +10,16 @@ from promptlayer.utils import (
 )
 
 
-def get_prompt(prompt_name, langchain=False, version=None):
+def get_prompt(prompt_name, langchain=False, version: int = None, label: str = None):
     """
     Get a prompt template from PromptLayer.
+    prompt_name: the prompt name
+    langchain: Enable this for langchain compatible prompt
     version: The version of the prompt to get. If not specified, the latest version will be returned.
+    label: The specific label of a prompt you want to get. Setting this will supercede version
     """
     api_key = get_api_key()
-    prompt = promptlayer_get_prompt(prompt_name, api_key, version)
+    prompt = promptlayer_get_prompt(prompt_name, api_key, version, label)
     if langchain:
         if "_type" not in prompt["prompt_template"]:
             prompt["prompt_template"]["_type"] = "prompt"
@@ -67,7 +70,6 @@ def all(page: int = 1, per_page: int = 30):
     """
     try:
         response = Prompt.list({"page": page, "per_page": per_page})
-        # TODO: When the API is updated, this should be changed to return a list of PromptTemplate objects.
         return response["items"]
     except Exception as e:
         print(e)

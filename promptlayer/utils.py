@@ -2,11 +2,11 @@ import asyncio
 import contextvars
 import datetime
 import functools
+import json
 import os
 import sys
 import types
 from copy import deepcopy
-from json import JSONDecodeError
 
 import requests
 
@@ -128,7 +128,9 @@ def promptlayer_api_request(
                 "function_name": function_name,
                 "provider_type": provider_type,
                 "args": args,
-                "kwargs": kwargs,
+                "kwargs": {
+                    k: v for k, v in kwargs.items() if _check_if_json_serializable(v)
+                },
                 "tags": tags,
                 "request_response": response,
                 "request_start_time": request_start_time,
@@ -265,11 +267,7 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-metadata",
-            json={
-                "request_id": request_id,
-                "metadata": metadata,
-                "api_key": api_key,
-            },
+            json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
         )
         if request_response.status_code != 200:
             warn_on_bad_response(
@@ -290,11 +288,7 @@ def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-score",
-            json={
-                "request_id": request_id,
-                "score": score,
-                "api_key": api_key,
-            },
+            json={"request_id": request_id, "score": score, "api_key": api_key,},
         )
         if request_response.status_code != 200:
             warn_on_bad_response(
@@ -403,10 +397,9 @@ def warn_on_bad_response(request_response, main_message):
                 f"{main_message}: {request_response.json().get('message')}",
                 file=sys.stderr,
             )
-        except JSONDecodeError:
+        except json.JSONDecodeError:
             print(
-                f"{main_message}: {request_response}",
-                file=sys.stderr,
+                f"{main_message}: {request_response}", file=sys.stderr,
             )
     else:
         print(f"{main_message}: {request_response}", file=sys.stderr)
@@ -416,7 +409,7 @@ def raise_on_bad_response(request_response, main_message):
     if hasattr(request_response, "json"):
         try:
             raise Exception(f"{main_message}: {request_response.json().get('message')}")
-        except JSONDecodeError:
+        except json.JSONDecodeError:
             raise Exception(f"{main_message}: {request_response}")
     else:
         raise Exception(f"{main_message}: {request_response}")
@@ -446,3 +439,11 @@ async def async_wrapper(
         get_api_key(),
         return_pl_id=return_pl_id,
     )
+
+
+def _check_if_json_serializable(value):
+    try:
+        json.dumps(value)
+        return True
+    except:
+        return False

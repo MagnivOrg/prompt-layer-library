@@ -45,27 +45,23 @@ def get_prompt(
     return prompt_template
 
 
-def publish_prompt(prompt_name, tags=[], commit_message=None, prompt_template=None):
+def publish_prompt(
+    prompt_name, tags=[], commit_message=None, prompt_template=None, model=None
+):
     api_key = get_api_key()
     if len(commit_message) > 72:
         raise Exception("Commit message must be less than 72 characters.")
-    if type(prompt_template) == dict:
-        promptlayer_publish_prompt(
-            prompt_name, prompt_template, commit_message, tags, api_key
-        )
-    elif isinstance(prompt_template, prompts.ChatPromptTemplate):
-        prompt_template_dict = to_dict(prompt_template)
-        promptlayer_publish_prompt(
-            prompt_name, prompt_template_dict, commit_message, tags, api_key
-        )
+    if isinstance(prompt_template, prompts.ChatPromptTemplate):
+        prompt_template = to_dict(prompt_template)
     elif isinstance(prompt_template, PromptTemplate):
-        promptlayer_publish_prompt(
-            prompt_name, prompt_template.dict(), commit_message, tags, api_key
-        )
-    else:
+        prompt_template = prompt_template.dict()
+    elif not isinstance(prompt_template, dict):
         raise Exception(
             "Please provide either a JSON prompt template or a langchain prompt template."
         )
+    promptlayer_publish_prompt(
+        prompt_name, prompt_template, commit_message, tags, api_key, model
+    )
 
 
 def all(page: int = 1, per_page: int = 30):

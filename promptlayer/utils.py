@@ -209,7 +209,7 @@ def promptlayer_get_prompt(
 
 
 def promptlayer_publish_prompt(
-    prompt_name, prompt_template, commit_message, tags, api_key
+    prompt_name, prompt_template, commit_message, tags, api_key, model_parameters=None
 ):
     try:
         request_response = requests.post(
@@ -220,6 +220,7 @@ def promptlayer_publish_prompt(
                 "commit_message": commit_message,
                 "tags": tags,
                 "api_key": api_key,
+                "model": model_parameters,
             },
         )
     except Exception as e:

@@ -10,13 +10,20 @@ from promptlayer.utils import (
 )
 
 
-def get_prompt(prompt_name, langchain=False, version: int = None, label: str = None):
+def get_prompt(
+    prompt_name,
+    langchain=False,
+    version: int = None,
+    label: str = None,
+    include_parameters: bool = False,
+):
     """
     Get a prompt template from PromptLayer.
     prompt_name: the prompt name
     langchain: Enable this for langchain compatible prompt
     version: The version of the prompt to get. If not specified, the latest version will be returned.
     label: The specific label of a prompt you want to get. Setting this will supercede version
+    include_parameters: Whether or not to include the model parameters of the prompt in the response like temperature, max_tokens, etc.
     """
     api_key = get_api_key()
     prompt = promptlayer_get_prompt(prompt_name, api_key, version, label)
@@ -24,33 +31,37 @@ def get_prompt(prompt_name, langchain=False, version: int = None, label: str = N
         if "_type" not in prompt["prompt_template"]:
             prompt["prompt_template"]["_type"] = "prompt"
         elif prompt["prompt_template"]["_type"] == CHAT_PROMPTLAYER_LANGCHAIN:
-            return to_prompt(prompt["prompt_template"])
-        return load_prompt_from_config(prompt["prompt_template"])
+            prompt_template = to_prompt(prompt["prompt_template"])
+        else:
+            prompt_template = load_prompt_from_config(prompt["prompt_template"])
     else:
-        return prompt["prompt_template"]
+        prompt_template = prompt["prompt_template"]
+    if include_parameters:
+        return prompt_template, {
+            "model_provider": prompt["model_provider"],
+            "model": prompt["model"],
+            "parameters": prompt["parameters"],
+        }
+    return prompt_template
 
 
-def publish_prompt(prompt_name, tags=[], commit_message=None, prompt_template=None):
+def publish_prompt(
+    prompt_name, tags=[], commit_message=None, prompt_template=None, model_parameters=None
+):
     api_key = get_api_key()
     if len(commit_message) > 72:
         raise Exception("Commit message must be less than 72 characters.")
-    if type(prompt_template) == dict:
-        promptlayer_publish_prompt(
-            prompt_name, prompt_template, commit_message, tags, api_key
-        )
-    elif isinstance(prompt_template, prompts.ChatPromptTemplate):
-        prompt_template_dict = to_dict(prompt_template)
-        promptlayer_publish_prompt(
-            prompt_name, prompt_template_dict, commit_message, tags, api_key
-        )
+    if isinstance(prompt_template, prompts.ChatPromptTemplate):
+        prompt_template = to_dict(prompt_template)
     elif isinstance(prompt_template, PromptTemplate):
-        promptlayer_publish_prompt(
-            prompt_name, prompt_template.dict(), commit_message, tags, api_key
-        )
-    else:
+        prompt_template = prompt_template.dict()
+    elif not isinstance(prompt_template, dict):
         raise Exception(
             "Please provide either a JSON prompt template or a langchain prompt template."
         )
+    promptlayer_publish_prompt(
+        prompt_name, prompt_template, commit_message, tags, api_key, model_parameters
+    )
 
 
 def all(page: int = 1, per_page: int = 30):

@@ -15,7 +15,7 @@ def get_prompt(
     langchain=False,
     version: int = None,
     label: str = None,
-    include_parameters: bool = False,
+    include_metadata: bool = False,
 ):
     """
     Get a prompt template from PromptLayer.
@@ -23,7 +23,7 @@ def get_prompt(
     langchain: Enable this for langchain compatible prompt
     version: The version of the prompt to get. If not specified, the latest version will be returned.
     label: The specific label of a prompt you want to get. Setting this will supercede version
-    include_parameters: Whether or not to include the model parameters of the prompt in the response like temperature, max_tokens, etc.
+    include_metadata: Whether or not to include the metadata of the prompt in the response.
     """
     api_key = get_api_key()
     prompt = promptlayer_get_prompt(prompt_name, api_key, version, label)
@@ -36,12 +36,8 @@ def get_prompt(
             prompt_template = load_prompt_from_config(prompt["prompt_template"])
     else:
         prompt_template = prompt["prompt_template"]
-    if include_parameters:
-        return prompt_template, {
-            "model_provider": prompt["model_provider"],
-            "model": prompt["model"],
-            "parameters": prompt["parameters"],
-        }
+    if include_metadata:
+        return prompt_template, prompt["metadata"]
     return prompt_template
 
 

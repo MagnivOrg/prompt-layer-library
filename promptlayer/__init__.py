@@ -28,6 +28,10 @@ def __getattr__(
         import promptlayer.prompts as prompts
 
         return prompts
+    elif name == "group":
+        import promptlayer.groups as group
+        
+        return group
     else:
         raise AttributeError(f"module {__name__} has no attribute {name}")
 

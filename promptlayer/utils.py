@@ -448,3 +448,46 @@ def _check_if_json_serializable(value):
         return True
     except:
         return False
+
+def promptlayer_create_group():
+    try:
+        request_response = requests.post(
+            f"{URL_API_PROMPTLAYER}/create-group",
+            json={
+                "api_key": get_api_key(),
+            },
+        )
+        if request_response.status_code != 200:
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While creating your group PromptLayer had the following error"
+            )
+            return False
+    except requests.exceptions.RequestException as e:
+        # I'm aiming for a more specific exception catch here
+        raise Exception(
+            f"PromptLayer had the following error while creating your group: {e}"
+        )
+    return request_response.json()['id']
+
+def promptlayer_track_group(request_id, group_id):
+    try:
+        request_response = requests.post(
+            f"{URL_API_PROMPTLAYER}/track-group",
+            json={
+                "api_key": get_api_key(),
+                "request_id": request_id,
+                "group_id": group_id,
+            },
+        )
+        if request_response.status_code != 200:
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While tracking your group PromptLayer had the following error"
+            )
+            return False
+    except requests.exceptions.RequestException as e:
+        # I'm aiming for a more specific exception catch here
+        raise Exception(
+            f"PromptLayer had the following error while tracking your group: {e}"
+        )

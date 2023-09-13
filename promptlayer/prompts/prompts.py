@@ -30,7 +30,7 @@ def get_prompt(
     if langchain:
         if "_type" not in prompt["prompt_template"]:
             prompt["prompt_template"]["_type"] = "prompt"
-        elif prompt["prompt_template"]["_type"] == CHAT_PROMPTLAYER_LANGCHAIN:
+        if prompt["prompt_template"]["_type"] == CHAT_PROMPTLAYER_LANGCHAIN:
             prompt_template = to_prompt(prompt["prompt_template"])
         else:
             prompt_template = load_prompt_from_config(prompt["prompt_template"])

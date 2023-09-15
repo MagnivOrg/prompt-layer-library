@@ -19,13 +19,16 @@ class PromptLayerBase(object):
     def __getattr__(self, name):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
         if (
-            inspect.isclass(attr)
-            or inspect.isfunction(attr)
-            or inspect.ismethod(attr)
-            or str(type(attr))
-            == "<class 'anthropic.resources.completions.Completions'>"
-            or str(type(attr))
-            == "<class 'anthropic.resources.completions.AsyncCompletions'>"
+            name != "count_tokens" # fix for anthropic count_tokens
+            and (
+                inspect.isclass(attr)
+                or inspect.isfunction(attr)
+                or inspect.ismethod(attr)
+                or str(type(attr))
+                == "<class 'anthropic.resources.completions.Completions'>"
+                or str(type(attr))
+                == "<class 'anthropic.resources.completions.AsyncCompletions'>"
+            )
         ):
             return PromptLayerBase(
                 attr,

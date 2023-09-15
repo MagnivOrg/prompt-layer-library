@@ -1,6 +1,7 @@
 from promptlayer.utils import (get_api_key, promptlayer_track_metadata,
                                promptlayer_track_prompt,
-                               promptlayer_track_score)
+                               promptlayer_track_score,
+                               promptlayer_track_group)
 
 
 def prompt(request_id, prompt_name, prompt_input_variables, version=None):
@@ -25,3 +26,10 @@ def score(request_id, score):
     if score < 0 or score > 100:
         raise Exception("Please provide a score between 0 and 100.")
     return promptlayer_track_score(request_id, score, get_api_key())
+
+
+def group(request_id, group_id):
+    return promptlayer_track_group(
+        request_id,
+        group_id
+    )

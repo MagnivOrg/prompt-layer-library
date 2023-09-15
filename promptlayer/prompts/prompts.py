@@ -30,7 +30,7 @@ def get_prompt(
     if langchain:
         if "_type" not in prompt["prompt_template"]:
             prompt["prompt_template"]["_type"] = "prompt"
-        elif prompt["prompt_template"]["_type"] == CHAT_PROMPTLAYER_LANGCHAIN:
+        if prompt["prompt_template"]["_type"] == CHAT_PROMPTLAYER_LANGCHAIN:
             prompt_template = to_prompt(prompt["prompt_template"])
         else:
             prompt_template = load_prompt_from_config(prompt["prompt_template"])
@@ -42,7 +42,7 @@ def get_prompt(
 
 
 def publish_prompt(
-    prompt_name, tags=[], commit_message=None, prompt_template=None, model_parameters=None
+    prompt_name, tags=[], commit_message=None, prompt_template=None, metadata=None
 ):
     api_key = get_api_key()
     if len(commit_message) > 72:
@@ -56,7 +56,7 @@ def publish_prompt(
             "Please provide either a JSON prompt template or a langchain prompt template."
         )
     promptlayer_publish_prompt(
-        prompt_name, prompt_template, commit_message, tags, api_key, model_parameters
+        prompt_name, prompt_template, commit_message, tags, api_key, metadata
     )
 
 

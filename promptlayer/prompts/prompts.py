@@ -45,7 +45,7 @@ def publish_prompt(
     prompt_name, tags=[], commit_message=None, prompt_template=None, metadata=None
 ):
     api_key = get_api_key()
-    if len(commit_message) > 72:
+    if commit_message is not None and len(commit_message) > 72:
         raise Exception("Commit message must be less than 72 characters.")
     if isinstance(prompt_template, prompts.ChatPromptTemplate):
         prompt_template = to_dict(prompt_template)

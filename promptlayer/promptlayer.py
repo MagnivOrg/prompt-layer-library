@@ -1,6 +1,6 @@
 import datetime
 import inspect
-
+import re
 from promptlayer.utils import (
     get_api_key,
     promptlayer_api_handler,
@@ -19,7 +19,8 @@ class PromptLayerBase(object):
     def __getattr__(self, name):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
         if (
-            name != "count_tokens" # fix for anthropic count_tokens
+            name != "count_tokens"  # fix for anthropic count_tokens
+            and not re.match("<class 'anthropic\..*Error'>", str(attr)) # fix for anthropic errors
             and (
                 inspect.isclass(attr)
                 or inspect.isfunction(attr)
@@ -35,6 +36,7 @@ class PromptLayerBase(object):
                 function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
                 provider_type=object.__getattribute__(self, "_provider_type"),
             )
+        print("no match")
         return attr
 
     def __delattr__(self, name):

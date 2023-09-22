@@ -36,7 +36,6 @@ class PromptLayerBase(object):
                 function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
                 provider_type=object.__getattribute__(self, "_provider_type"),
             )
-        print("no match")
         return attr
 
     def __delattr__(self, name):

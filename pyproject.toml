@@ -1,11 +1,7 @@
 [tool.poetry]
 name = "promptlayer"
-<<<<<<< HEAD
-version = "0.1.99"
-=======
-version = "0.3.1"
->>>>>>> master
-description = "PromptLayer is a package to keep track of your GPT models training"
+version = "0.3.2"
+description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
 readme = "README.md"

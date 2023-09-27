@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "0.1.98"
+version = "0.1.99"
 description = "PromptLayer is a package to keep track of your GPT models training"
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"

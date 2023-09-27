@@ -1,5 +1,3 @@
-from promptlayer.schemas import pagination
-
 from .base import Base
 
 
@@ -11,5 +9,4 @@ class Prompt(Base):
         """
         List all prompts
         """
-        # TODO: parse the response into a list of prompts
-        return super().list(pagination.Base, params)
+        return super().list(params)

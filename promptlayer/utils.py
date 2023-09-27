@@ -2,11 +2,11 @@ import asyncio
 import contextvars
 import datetime
 import functools
+import json
 import os
 import sys
 import types
 from copy import deepcopy
-from json import JSONDecodeError
 
 import requests
 
@@ -128,7 +128,9 @@ def promptlayer_api_request(
                 "function_name": function_name,
                 "provider_type": provider_type,
                 "args": args,
-                "kwargs": kwargs,
+                "kwargs": {
+                    k: v for k, v in kwargs.items() if _check_if_json_serializable(v)
+                },
                 "tags": tags,
                 "request_response": response,
                 "request_start_time": request_start_time,
@@ -179,16 +181,19 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(prompt_name, api_key, version=None):
+def promptlayer_get_prompt(
+    prompt_name, api_key, version: int = None, label: str = None
+):
     """
     Get a prompt from the PromptLayer library
     version: version of the prompt to get, None for latest
+    label: The specific label of a prompt you want to get. Setting this will supercede version
     """
     try:
         request_response = requests.get(
             f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
             headers={"X-API-KEY": api_key},
-            params={"prompt_name": prompt_name, "version": version},
+            params={"prompt_name": prompt_name, "version": version, "label": label},
         )
     except Exception as e:
         raise Exception(
@@ -203,15 +208,19 @@ def promptlayer_get_prompt(prompt_name, api_key, version=None):
     return request_response.json()
 
 
-def promptlayer_publish_prompt(prompt_name, prompt_template, tags, api_key):
+def promptlayer_publish_prompt(
+    prompt_name, prompt_template, commit_message, tags, api_key, metadata=None
+):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-publish-prompt-template",
             json={
                 "prompt_name": prompt_name,
                 "prompt_template": prompt_template,
+                "commit_message": commit_message,
                 "tags": tags,
                 "api_key": api_key,
+                "metadata": metadata,
             },
         )
     except Exception as e:
@@ -260,11 +269,7 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-metadata",
-            json={
-                "request_id": request_id,
-                "metadata": metadata,
-                "api_key": api_key,
-            },
+            json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
         )
         if request_response.status_code != 200:
             warn_on_bad_response(
@@ -285,11 +290,7 @@ def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-score",
-            json={
-                "request_id": request_id,
-                "score": score,
-                "api_key": api_key,
-            },
+            json={"request_id": request_id, "score": score, "api_key": api_key,},
         )
         if request_response.status_code != 200:
             warn_on_bad_response(
@@ -398,10 +399,9 @@ def warn_on_bad_response(request_response, main_message):
                 f"{main_message}: {request_response.json().get('message')}",
                 file=sys.stderr,
             )
-        except JSONDecodeError:
+        except json.JSONDecodeError:
             print(
-                f"{main_message}: {request_response}",
-                file=sys.stderr,
+                f"{main_message}: {request_response}", file=sys.stderr,
             )
     else:
         print(f"{main_message}: {request_response}", file=sys.stderr)
@@ -411,7 +411,7 @@ def raise_on_bad_response(request_response, main_message):
     if hasattr(request_response, "json"):
         try:
             raise Exception(f"{main_message}: {request_response.json().get('message')}")
-        except JSONDecodeError:
+        except json.JSONDecodeError:
             raise Exception(f"{main_message}: {request_response}")
     else:
         raise Exception(f"{main_message}: {request_response}")
@@ -441,3 +441,54 @@ async def async_wrapper(
         get_api_key(),
         return_pl_id=return_pl_id,
     )
+
+
+def _check_if_json_serializable(value):
+    try:
+        json.dumps(value)
+        return True
+    except:
+        return False
+
+def promptlayer_create_group():
+    try:
+        request_response = requests.post(
+            f"{URL_API_PROMPTLAYER}/create-group",
+            json={
+                "api_key": get_api_key(),
+            },
+        )
+        if request_response.status_code != 200:
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While creating your group PromptLayer had the following error"
+            )
+            return False
+    except requests.exceptions.RequestException as e:
+        # I'm aiming for a more specific exception catch here
+        raise Exception(
+            f"PromptLayer had the following error while creating your group: {e}"
+        )
+    return request_response.json()['id']
+
+def promptlayer_track_group(request_id, group_id):
+    try:
+        request_response = requests.post(
+            f"{URL_API_PROMPTLAYER}/track-group",
+            json={
+                "api_key": get_api_key(),
+                "request_id": request_id,
+                "group_id": group_id,
+            },
+        )
+        if request_response.status_code != 200:
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While tracking your group PromptLayer had the following error"
+            )
+            return False
+    except requests.exceptions.RequestException as e:
+        # I'm aiming for a more specific exception catch here
+        raise Exception(
+            f"PromptLayer had the following error while tracking your group: {e}"
+        )

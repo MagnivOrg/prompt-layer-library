@@ -24,29 +24,30 @@ def to_dict(prompt_template: prompts.ChatPromptTemplate):
 
 
 def to_prompt(prompt_dict: dict):
-    prompt_dict_copy = copy.deepcopy(prompt_dict)
     try:
         messages = []
-        prompt_dict_copy.pop("_type")
-        for message in prompt_dict_copy.pop("messages"):
-            role = message.pop("role")
-            prompt = message.pop("prompt")
-            prompt.pop("_type")
-            prompt = prompts.PromptTemplate(**prompt)
+        for message in prompt_dict.get("messages", []):
+            role = message.get("role")
+            prompt = message.get("prompt", {})
+            if not prompt or "_type" not in prompt:
+                continue
+            prompt_template = prompts.PromptTemplate(**{k: v for k, v in prompt.items() if k != "_type"})
+            message_fields = {k: v for k, v in message.items() if k != "role" and k != "prompt"}
             if role == ROLE_SYSTEM:
-                message = prompts.SystemMessagePromptTemplate(prompt=prompt, **message)
+                message = prompts.SystemMessagePromptTemplate(prompt=prompt_template, **message_fields)
             elif role == ROLE_ASSISTANT:
-                message = prompts.AIMessagePromptTemplate(prompt=prompt, **message)
+                message = prompts.AIMessagePromptTemplate(prompt=prompt_template, **message_fields)
             elif role == ROLE_USER:
-                message = prompts.HumanMessagePromptTemplate(prompt=prompt, **message)
+                message = prompts.HumanMessagePromptTemplate(prompt=prompt_template, **message_fields)
             messages.append(message)
         prompt_template = prompts.ChatPromptTemplate(
             messages=messages,
-            input_variables=prompt_dict_copy.get("input_variables", []),
-            output_parser=prompt_dict_copy.get("output_parser", None),
-            partial_variables=prompt_dict_copy.get("partial_variables", {}),
+            input_variables=prompt_dict.get("input_variables", []),
+            output_parser=prompt_dict.get("output_parser", None),
+            partial_variables=prompt_dict.get("partial_variables", {}),
         )
         return prompt_template
     except Exception as e:
         print("Unknown error occurred. ", e)
         return None
+

@@ -236,7 +236,7 @@ def promptlayer_publish_prompt(
 
 
 def promptlayer_track_prompt(
-    request_id, prompt_name, input_variables, api_key, version
+    request_id, prompt_name, input_variables, api_key, version, label
 ):
     try:
         request_response = requests.post(
@@ -247,6 +247,7 @@ def promptlayer_track_prompt(
                 "prompt_input_variables": input_variables,
                 "api_key": api_key,
                 "version": version,
+                "label": label,
             },
         )
         if request_response.status_code != 200:

@@ -1,4 +1,4 @@
-from langchain import PromptTemplate, prompts
+from langchain.prompts import PromptTemplate, prompts
 from langchain.prompts.loading import load_prompt_from_config
 
 from promptlayer.prompts.chat import CHAT_PROMPTLAYER_LANGCHAIN, to_dict, to_prompt

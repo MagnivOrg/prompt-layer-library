@@ -1,4 +1,4 @@
-from langchain.prompts import PromptTemplate, prompts
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.prompts.loading import load_prompt_from_config
 
 from promptlayer.prompts.chat import CHAT_PROMPTLAYER_LANGCHAIN, to_dict, to_prompt
@@ -47,7 +47,7 @@ def publish_prompt(
     api_key = get_api_key()
     if commit_message is not None and len(commit_message) > 72:
         raise Exception("Commit message must be less than 72 characters.")
-    if isinstance(prompt_template, prompts.ChatPromptTemplate):
+    if isinstance(prompt_template, ChatPromptTemplate):
         prompt_template = to_dict(prompt_template)
     elif isinstance(prompt_template, PromptTemplate):
         prompt_template = prompt_template.dict()

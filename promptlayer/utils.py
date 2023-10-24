@@ -39,8 +39,13 @@ def promptlayer_api_handler(
     api_key,
     return_pl_id=False,
 ):
-    if isinstance(response, types.GeneratorType) or isinstance(
-        response, types.AsyncGeneratorType
+    if (
+        isinstance(response, types.GeneratorType)
+        or isinstance(response, types.AsyncGeneratorType)
+        or (
+            type(response).__module__ == "anthropic"
+            and type(response).__name__ == "Stream"
+        )
     ):
         return GeneratorProxy(
             response,
@@ -330,7 +335,7 @@ class GeneratorProxy:
     def _abstracted_next(self, result):
         self.results.append(result)
         provider_type = self.api_request_arugments["provider_type"]
-        end_anthropic = provider_type == "anthropic" and result.get("stop")
+        end_anthropic = provider_type == "anthropic" and result.stop_reason
         end_openai = provider_type == "openai" and (
             result.choices[0].finish_reason == "stop"
             or result.choices[0].finish_reason == "length"
@@ -357,7 +362,11 @@ class GeneratorProxy:
     def cleaned_result(self):
         provider_type = self.api_request_arugments["provider_type"]
         if provider_type == "anthropic":
+            response = ""
+            for result in self.results:
+                response = f"{response}{result.completion}"
             final_result = deepcopy(self.results[-1])
+            final_result.completion = response
             return final_result
         if hasattr(self.results[0].choices[0], "text"):  # this is regular completion
             response = ""
@@ -450,18 +459,16 @@ def _check_if_json_serializable(value):
     except:
         return False
 
+
 def promptlayer_create_group():
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/create-group",
-            json={
-                "api_key": get_api_key(),
-            },
+            f"{URL_API_PROMPTLAYER}/create-group", json={"api_key": get_api_key(),},
         )
         if request_response.status_code != 200:
             warn_on_bad_response(
                 request_response,
-                "WARNING: While creating your group PromptLayer had the following error"
+                "WARNING: While creating your group PromptLayer had the following error",
             )
             return False
     except requests.exceptions.RequestException as e:
@@ -469,7 +476,8 @@ def promptlayer_create_group():
         raise Exception(
             f"PromptLayer had the following error while creating your group: {e}"
         )
-    return request_response.json()['id']
+    return request_response.json()["id"]
+
 
 def promptlayer_track_group(request_id, group_id):
     try:
@@ -484,7 +492,7 @@ def promptlayer_track_group(request_id, group_id):
         if request_response.status_code != 200:
             warn_on_bad_response(
                 request_response,
-                "WARNING: While tracking your group PromptLayer had the following error"
+                "WARNING: While tracking your group PromptLayer had the following error",
             )
             return False
     except requests.exceptions.RequestException as e:

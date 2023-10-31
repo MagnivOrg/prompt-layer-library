@@ -1,11 +1,8 @@
 import datetime
 import inspect
 import re
-from promptlayer.utils import (
-    get_api_key,
-    promptlayer_api_handler,
-    async_wrapper,
-)
+
+from promptlayer.utils import async_wrapper, get_api_key, promptlayer_api_handler
 
 
 class PromptLayerBase(object):
@@ -20,11 +17,14 @@ class PromptLayerBase(object):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
         if (
             name != "count_tokens"  # fix for anthropic count_tokens
-            and not re.match("<class 'anthropic\..*Error'>", str(attr)) # fix for anthropic errors
+            and not re.match(
+                "<class 'anthropic\..*Error'>", str(attr)
+            )  # fix for anthropic errors
             and (
                 inspect.isclass(attr)
                 or inspect.isfunction(attr)
                 or inspect.ismethod(attr)
+                or isinstance(attr, object)
                 or str(type(attr))
                 == "<class 'anthropic.resources.completions.Completions'>"
                 or str(type(attr))

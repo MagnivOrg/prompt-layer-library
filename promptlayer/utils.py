@@ -116,7 +116,7 @@ def promptlayer_api_request(
     return_pl_id=False,
     metadata=None,
 ):
-    if type(response) != dict and hasattr(response, "to_dict_recursive"):
+    if isinstance(response, dict) and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
     request_response = None
     if hasattr(
@@ -468,7 +468,7 @@ def _check_if_json_serializable(value):
     try:
         json.dumps(value)
         return True
-    except:
+    except Exception:
         return False
 
 

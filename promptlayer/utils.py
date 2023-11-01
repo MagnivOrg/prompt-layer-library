@@ -42,10 +42,7 @@ def promptlayer_api_handler(
     if (
         isinstance(response, types.GeneratorType)
         or isinstance(response, types.AsyncGeneratorType)
-        or (
-            type(response).__module__ == "anthropic"
-            and type(response).__name__ == "Stream"
-        )
+        or type(response).__name__ in ["Stream", "AsyncStream"]
     ):
         return GeneratorProxy(
             response,
@@ -119,7 +116,7 @@ def promptlayer_api_request(
     return_pl_id=False,
     metadata=None,
 ):
-    if type(response) != dict and hasattr(response, "to_dict_recursive"):
+    if isinstance(response, dict) and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
     request_response = None
     if hasattr(
@@ -274,7 +271,11 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-metadata",
-            json={"request_id": request_id, "metadata": metadata, "api_key": api_key,},
+            json={
+                "request_id": request_id,
+                "metadata": metadata,
+                "api_key": api_key,
+            },
         )
         if request_response.status_code != 200:
             warn_on_bad_response(
@@ -295,7 +296,11 @@ def promptlayer_track_score(request_id, score, api_key):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-score",
-            json={"request_id": request_id, "score": score, "api_key": api_key,},
+            json={
+                "request_id": request_id,
+                "score": score,
+                "api_key": api_key,
+            },
         )
         if request_response.status_code != 200:
             warn_on_bad_response(
@@ -380,9 +385,15 @@ class GeneratorProxy:
         ):  # this is completion with delta
             response = {"role": "", "content": ""}
             for result in self.results:
-                if hasattr(result.choices[0].delta, "role"):
+                if (
+                    hasattr(result.choices[0].delta, "role")
+                    and result.choices[0].delta.role is not None
+                ):
                     response["role"] = result.choices[0].delta.role
-                if hasattr(result.choices[0].delta, "content"):
+                if (
+                    hasattr(result.choices[0].delta, "content")
+                    and result.choices[0].delta.content is not None
+                ):
                     response[
                         "content"
                     ] = f"{response['content']}{result.choices[0].delta.content}"
@@ -410,7 +421,8 @@ def warn_on_bad_response(request_response, main_message):
             )
         except json.JSONDecodeError:
             print(
-                f"{main_message}: {request_response}", file=sys.stderr,
+                f"{main_message}: {request_response}",
+                file=sys.stderr,
             )
     else:
         print(f"{main_message}: {request_response}", file=sys.stderr)
@@ -456,14 +468,17 @@ def _check_if_json_serializable(value):
     try:
         json.dumps(value)
         return True
-    except:
+    except Exception:
         return False
 
 
 def promptlayer_create_group():
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/create-group", json={"api_key": get_api_key(),},
+            f"{URL_API_PROMPTLAYER}/create-group",
+            json={
+                "api_key": get_api_key(),
+            },
         )
         if request_response.status_code != 200:
             warn_on_bad_response(

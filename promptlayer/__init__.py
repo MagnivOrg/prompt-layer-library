@@ -31,6 +31,10 @@ def __getattr__(
         import promptlayer.groups as group
 
         return group
+    elif name == "track":
+        import promptlayer.track as track
+
+        return track
     else:
         raise AttributeError(f"module {__name__} has no attribute {name}")
 

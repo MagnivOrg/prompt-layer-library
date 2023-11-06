@@ -2,9 +2,11 @@ import os
 
 import requests
 
+from promptlayer.utils import get_api_key
+
 
 class Base:
-    API_KEY = os.environ.get("PROMPTLAYER_API_KEY", "")
+    API_KEY = get_api_key()
     BASE_URL = os.environ.get("BASE_URL", "https://api.promptlayer.com/rest")
 
     @classmethod

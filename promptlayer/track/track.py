@@ -26,12 +26,14 @@ def metadata(request_id, metadata):
     return promptlayer_track_metadata(request_id, metadata, get_api_key())
 
 
-def score(request_id, score):
+def score(request_id, score, score_name=None):
     if not isinstance(score, int):
         raise Exception("Please provide a int score.")
+    if not isinstance(score_name, str) and score_name is not None:
+        raise Exception("Please provide a string as score name.")
     if score < 0 or score > 100:
         raise Exception("Please provide a score between 0 and 100.")
-    return promptlayer_track_score(request_id, score, get_api_key())
+    return promptlayer_track_score(request_id, score, score_name, get_api_key())
 
 
 def group(request_id, group_id):

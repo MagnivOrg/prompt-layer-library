@@ -292,15 +292,14 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     return True
 
 
-def promptlayer_track_score(request_id, score, api_key):
+def promptlayer_track_score(request_id, score, score_name, api_key):
     try:
+        data = {"request_id": request_id, "score": score, "api_key": api_key}
+        if score_name is not None:
+            data["name"] = score_name
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-score",
-            json={
-                "request_id": request_id,
-                "score": score,
-                "api_key": api_key,
-            },
+            json=data,
         )
         if request_response.status_code != 200:
             warn_on_bad_response(

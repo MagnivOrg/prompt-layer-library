@@ -1,7 +1,6 @@
 import os
 from typing import Literal, Union
 
-import promptlayer.track as track
 from promptlayer.promptlayer import PromptLayerBase
 
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -30,8 +29,12 @@ def __getattr__(
         return prompts
     elif name == "group":
         import promptlayer.groups as group
-        
+
         return group
+    elif name == "track":
+        import promptlayer.track as track
+
+        return track
     else:
         raise AttributeError(f"module {__name__} has no attribute {name}")
 

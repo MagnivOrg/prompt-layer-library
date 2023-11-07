@@ -1,4 +1,3 @@
-import copy
 import json
 
 from langchain import prompts
@@ -31,14 +30,24 @@ def to_prompt(prompt_dict: dict):
             prompt = message.get("prompt", {})
             if not prompt or "_type" not in prompt:
                 continue
-            prompt_template = prompts.PromptTemplate(**{k: v for k, v in prompt.items() if k != "_type"})
-            message_fields = {k: v for k, v in message.items() if k != "role" and k != "prompt"}
+            prompt_template = prompts.PromptTemplate(
+                **{k: v for k, v in prompt.items() if k != "_type"}
+            )
+            message_fields = {
+                k: v for k, v in message.items() if k != "role" and k != "prompt"
+            }
             if role == ROLE_SYSTEM:
-                message = prompts.SystemMessagePromptTemplate(prompt=prompt_template, **message_fields)
+                message = prompts.SystemMessagePromptTemplate(
+                    prompt=prompt_template, **message_fields
+                )
             elif role == ROLE_ASSISTANT:
-                message = prompts.AIMessagePromptTemplate(prompt=prompt_template, **message_fields)
+                message = prompts.AIMessagePromptTemplate(
+                    prompt=prompt_template, **message_fields
+                )
             elif role == ROLE_USER:
-                message = prompts.HumanMessagePromptTemplate(prompt=prompt_template, **message_fields)
+                message = prompts.HumanMessagePromptTemplate(
+                    prompt=prompt_template, **message_fields
+                )
             messages.append(message)
         prompt_template = prompts.ChatPromptTemplate(
             messages=messages,
@@ -50,4 +59,3 @@ def to_prompt(prompt_dict: dict):
     except Exception as e:
         print("Unknown error occurred. ", e)
         return None
-

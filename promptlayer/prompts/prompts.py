@@ -75,9 +75,9 @@ def all(page: int = 1, per_page: int = 30):
     -------
     list of prompts
     """
-    try:
-        response = Prompt.list({"page": page, "per_page": per_page})
-        return response["items"]
-    except Exception as e:
-        print(e)
-        return []
+    response = Prompt.list({"page": page, "per_page": per_page})
+    if not response.get("success", True):
+        raise Exception(
+            f"Failed to get prompts from PromptLayer. {response.get('message')}"
+        )
+    return response["items"]

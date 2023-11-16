@@ -20,6 +20,9 @@ class PromptLayerBase(object):
             and not re.match(
                 "<class 'anthropic\..*Error'>", str(attr)
             )  # fix for anthropic errors
+            and not re.match(
+                "<class 'openai\..*Error'>", str(attr)
+            )  # fix for openai errors
             and (
                 inspect.isclass(attr)
                 or inspect.isfunction(attr)

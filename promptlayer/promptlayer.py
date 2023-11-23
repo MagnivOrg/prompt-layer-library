@@ -27,7 +27,6 @@ class PromptLayerBase(object):
                 inspect.isclass(attr)
                 or inspect.isfunction(attr)
                 or inspect.ismethod(attr)
-                or isinstance(attr, object)
                 or str(type(attr))
                 == "<class 'anthropic.resources.completions.Completions'>"
                 or str(type(attr))

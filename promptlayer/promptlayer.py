@@ -31,6 +31,7 @@ class PromptLayerBase(object):
                 == "<class 'anthropic.resources.completions.Completions'>"
                 or str(type(attr))
                 == "<class 'anthropic.resources.completions.AsyncCompletions'>"
+                or re.match("<class 'openai\.resources.*'>", str(type(attr)))
             )
         ):
             return PromptLayerBase(
@@ -59,6 +60,7 @@ class PromptLayerBase(object):
                 function_name=object.__getattribute__(self, "_function_name"),
                 provider_type=object.__getattribute__(self, "_provider_type"),
             )
+        print(args, kwargs)
         function_response = function_object(*args, **kwargs)
         if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(
             function_response

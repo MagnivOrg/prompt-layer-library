@@ -2,6 +2,7 @@ import os
 from typing import Literal, Union
 
 from promptlayer.promptlayer import PromptLayerBase
+
 from . import templates
 
 api_key = os.environ.get("PROMPTLAYER_API_KEY")

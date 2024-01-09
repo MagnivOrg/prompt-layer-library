@@ -7,6 +7,7 @@ import os
 import sys
 import types
 from copy import deepcopy
+from typing import Dict, Union
 
 import requests
 
@@ -513,4 +514,30 @@ def promptlayer_track_group(request_id, group_id):
         # I'm aiming for a more specific exception catch here
         raise Exception(
             f"PromptLayer had the following error while tracking your group: {e}"
+        )
+
+
+def get_prompt_template(
+    *,
+    prompt_name: str,
+    provider: Union[str, None] = None,
+    input_variables: Dict[str, str] = {},
+):
+    try:
+        response = requests.get(
+            f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
+            headers={"X-API-KEY": get_api_key()},
+            params={
+                "provider": provider,
+                "input_variables": json.dumps(input_variables),
+            },
+        )
+        if response.status_code != 200:
+            raise Exception(
+                f"PromptLayer had the following error while getting your prompt template: {response.text}"
+            )
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting your prompt template: {e}"
         )

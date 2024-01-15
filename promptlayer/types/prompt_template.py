@@ -1,8 +1,8 @@
-from typing import Dict, TypedDict, Union
+from typing import Dict, TypedDict
 
 
 class GetPromptTemplate(TypedDict, total=False):
-    version: Union[int, None]
-    label: Union[str, None]
-    provider: Union[str, None]
-    input_variables: Union[Dict[str, str], None]
+    version: int
+    label: str
+    provider: str
+    input_variables: Dict[str, str]

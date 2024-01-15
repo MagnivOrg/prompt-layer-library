@@ -7,11 +7,12 @@ import os
 import sys
 import types
 from copy import deepcopy
-from typing import Dict, Union
+from typing import Union
 
 import requests
 
 import promptlayer
+from promptlayer.types.prompt_template import GetPromptTemplate
 
 URL_API_PROMPTLAYER = os.environ.setdefault(
     "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
@@ -518,20 +519,16 @@ def promptlayer_track_group(request_id, group_id):
 
 
 def get_prompt_template(
-    *,
-    prompt_name: str,
-    provider: Union[str, None] = None,
-    input_variables: Dict[str, str] = {},
+    *, prompt_name: str, params: Union[GetPromptTemplate, None] = None
 ):
     try:
+        json_body = {"api_key": get_api_key()}
+        if params:
+            json_body = {**json_body, **params}
         response = requests.post(
             f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
             headers={"X-API-KEY": get_api_key()},
-            json={
-                "api_key": get_api_key(),
-                "provider": provider,
-                "input_variables": input_variables,
-            },
+            json=json_body,
         )
         if response.status_code != 200:
             raise Exception(

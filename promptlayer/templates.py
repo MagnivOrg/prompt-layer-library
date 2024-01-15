@@ -1,14 +1,8 @@
-from typing import Dict, Union
+from typing import Union
 
+from promptlayer.types.prompt_template import GetPromptTemplate
 from promptlayer.utils import get_prompt_template
 
 
-def get(
-    *,
-    prompt_name: str,
-    provider: Union[str, None] = None,
-    input_variables: Dict[str, str] = {},
-):
-    return get_prompt_template(
-        prompt_name=prompt_name, provider=provider, input_variables=input_variables
-    )
+def get(*, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
+    return get_prompt_template(prompt_name=prompt_name, params=params)

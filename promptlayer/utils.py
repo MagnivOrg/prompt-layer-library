@@ -524,12 +524,13 @@ def get_prompt_template(
     input_variables: Dict[str, str] = {},
 ):
     try:
-        response = requests.get(
+        response = requests.post(
             f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
             headers={"X-API-KEY": get_api_key()},
-            params={
+            json={
+                "api_key": get_api_key(),
                 "provider": provider,
-                "input_variables": json.dumps(input_variables),
+                "input_variables": input_variables,
             },
         )
         if response.status_code != 200:

@@ -519,7 +519,7 @@ def promptlayer_track_group(request_id, group_id):
 
 
 def get_prompt_template(
-    *, prompt_name: str, params: Union[GetPromptTemplate, None] = None
+    prompt_name: str, params: Union[GetPromptTemplate, None] = None
 ):
     try:
         json_body = {"api_key": get_api_key()}

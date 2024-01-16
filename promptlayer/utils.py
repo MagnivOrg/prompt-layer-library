@@ -7,10 +7,12 @@ import os
 import sys
 import types
 from copy import deepcopy
+from typing import Union
 
 import requests
 
 import promptlayer
+from promptlayer.types.prompt_template import GetPromptTemplate
 
 URL_API_PROMPTLAYER = os.environ.setdefault(
     "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
@@ -513,4 +515,27 @@ def promptlayer_track_group(request_id, group_id):
         # I'm aiming for a more specific exception catch here
         raise Exception(
             f"PromptLayer had the following error while tracking your group: {e}"
+        )
+
+
+def get_prompt_template(
+    prompt_name: str, params: Union[GetPromptTemplate, None] = None
+):
+    try:
+        json_body = {"api_key": get_api_key()}
+        if params:
+            json_body = {**json_body, **params}
+        response = requests.post(
+            f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
+            headers={"X-API-KEY": get_api_key()},
+            json=json_body,
+        )
+        if response.status_code != 200:
+            raise Exception(
+                f"PromptLayer had the following error while getting your prompt template: {response.text}"
+            )
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting your prompt template: {e}"
         )

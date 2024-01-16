@@ -3,11 +3,13 @@ from typing import Literal, Union
 
 from promptlayer.promptlayer import PromptLayerBase
 
+from . import templates
+
 api_key = os.environ.get("PROMPTLAYER_API_KEY")
 
 
 def __getattr__(
-    name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]]
+    name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]],
 ):
     if name == "openai":
         import openai as openai_module
@@ -39,4 +41,4 @@ def __getattr__(
         raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
-__all__ = ["api_key", "openai", "anthropic"]
+__all__ = ["api_key", "openai", "anthropic", "templates"]

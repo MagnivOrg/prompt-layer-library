@@ -143,7 +143,12 @@ def promptlayer_api_request(
                 "api_key": api_key,
             },
         )
-        if request_response.status_code != 200:
+        if not hasattr(request_response, 'status_code'):
+            warn_on_bad_response(
+                request_response,
+                "WARNING: While logging your request PromptLayer had the following issue"
+            )
+        elif request_response.status_code != 200:
             warn_on_bad_response(
                 request_response,
                 "WARNING: While logging your request PromptLayer had the following error",

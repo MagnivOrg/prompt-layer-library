@@ -105,6 +105,19 @@ async def promptlayer_api_handler_async(
     )
 
 
+def convert_native_object_to_dict(native_object):
+    if isinstance(native_object, dict):
+        return {k: convert_native_object_to_dict(v) for k, v in native_object.items()}
+    if isinstance(native_object, list):
+        return [convert_native_object_to_dict(v) for v in native_object]
+    if hasattr(native_object, "__dict__"):
+        return {
+            k: convert_native_object_to_dict(v)
+            for k, v in native_object.__dict__.items()
+        }
+    return native_object
+
+
 def promptlayer_api_request(
     function_name,
     provider_type,
@@ -132,9 +145,7 @@ def promptlayer_api_request(
                 "function_name": function_name,
                 "provider_type": provider_type,
                 "args": args,
-                "kwargs": {
-                    k: v for k, v in kwargs.items() if _check_if_json_serializable(v)
-                },
+                "kwargs": convert_native_object_to_dict(kwargs),
                 "tags": tags,
                 "request_response": response,
                 "request_start_time": request_start_time,
@@ -143,10 +154,10 @@ def promptlayer_api_request(
                 "api_key": api_key,
             },
         )
-        if not hasattr(request_response, 'status_code'):
+        if not hasattr(request_response, "status_code"):
             warn_on_bad_response(
                 request_response,
-                "WARNING: While logging your request PromptLayer had the following issue"
+                "WARNING: While logging your request PromptLayer had the following issue",
             )
         elif request_response.status_code != 200:
             warn_on_bad_response(
@@ -468,14 +479,6 @@ async def async_wrapper(
         get_api_key(),
         return_pl_id=return_pl_id,
     )
-
-
-def _check_if_json_serializable(value):
-    try:
-        json.dumps(value)
-        return True
-    except Exception:
-        return False
 
 
 def promptlayer_create_group():

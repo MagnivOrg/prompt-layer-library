@@ -28,7 +28,7 @@ def to_prompt(prompt_dict: dict):
         for message in prompt_dict.get("messages", []):
             role = message.get("role")
             prompt = message.get("prompt", {})
-            if not prompt or "_type" not in prompt:
+            if not prompt:
                 continue
             prompt_template = prompts.PromptTemplate(
                 **{k: v for k, v in prompt.items() if k != "_type"}

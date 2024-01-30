@@ -12,7 +12,11 @@ from typing import Union
 import requests
 
 import promptlayer
-from promptlayer.types.prompt_template import GetPromptTemplate
+from promptlayer.types.prompt_template import (
+    GetPromptTemplate,
+    PublishPromptTemplate,
+    PublishPromptTemplateResponse,
+)
 
 URL_API_PROMPTLAYER = os.environ.setdefault(
     "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
@@ -546,4 +550,24 @@ def get_prompt_template(
     except requests.exceptions.RequestException as e:
         raise Exception(
             f"PromptLayer had the following error while getting your prompt template: {e}"
+        )
+
+
+def publish_prompt_template(
+    body: PublishPromptTemplate,
+) -> PublishPromptTemplateResponse:
+    try:
+        response = requests.post(
+            f"{URL_API_PROMPTLAYER}/rest/prompt-templates",
+            headers={"X-API-KEY": get_api_key()},
+            json=body,
+        )
+        if response.status_code == 400:
+            raise Exception(
+                f"PromptLayer had the following error while publishing your prompt template: {response.text}"
+            )
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"PromptLayer had the following error while publishing your prompt template: {e}"
         )

@@ -1,6 +1,3 @@
-from langchain.prompts import ChatPromptTemplate, PromptTemplate
-from langchain.prompts.loading import load_prompt_from_config
-
 from promptlayer.prompts.chat import CHAT_PROMPTLAYER_LANGCHAIN, to_dict, to_prompt
 from promptlayer.resources.prompt import Prompt
 from promptlayer.utils import (
@@ -28,6 +25,12 @@ def get_prompt(
     api_key = get_api_key()
     prompt = promptlayer_get_prompt(prompt_name, api_key, version, label)
     if langchain:
+        try:
+            from langchain.prompts.loading import load_prompt_from_config
+        except ImportError:
+            raise Exception(
+                "Please install langchain to use langchain compatible prompts."
+            )
         if "_type" not in prompt["prompt_template"]:
             prompt["prompt_template"]["_type"] = "prompt"
         if prompt["prompt_template"]["_type"] == CHAT_PROMPTLAYER_LANGCHAIN:
@@ -44,6 +47,11 @@ def get_prompt(
 def publish_prompt(
     prompt_name, tags=[], commit_message=None, prompt_template=None, metadata=None
 ):
+    try:
+        from langchain.prompts import ChatPromptTemplate, PromptTemplate
+    except ImportError:
+        raise Exception("Please install langchain to use langchain compatible prompts.")
+
     api_key = get_api_key()
     if commit_message is not None and len(commit_message) > 72:
         raise Exception("Commit message must be less than 72 characters.")

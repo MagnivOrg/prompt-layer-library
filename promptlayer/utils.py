@@ -7,6 +7,7 @@ import os
 import sys
 import types
 from copy import deepcopy
+from enum import Enum
 from typing import Union
 
 import requests
@@ -114,6 +115,8 @@ def convert_native_object_to_dict(native_object):
         return {k: convert_native_object_to_dict(v) for k, v in native_object.items()}
     if isinstance(native_object, list):
         return [convert_native_object_to_dict(v) for v in native_object]
+    if isinstance(native_object, Enum):
+        return native_object.value
     if hasattr(native_object, "__dict__"):
         return {
             k: convert_native_object_to_dict(v)

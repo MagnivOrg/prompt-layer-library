@@ -111,7 +111,7 @@ class Metadata(TypedDict, total=False):
 
 class BasePromptTemplate(TypedDict, total=False):
     prompt_name: str
-    tags: List[str]
+    tags: NotRequired[List[str]]
 
 
 class PromptVersion(TypedDict, total=False):

@@ -21,7 +21,6 @@ def to_dict(prompt_template: prompts.ChatPromptTemplate):
 
     return prompt_dict
 
-
 def to_prompt(prompt_dict: dict):
     try:
         messages = []

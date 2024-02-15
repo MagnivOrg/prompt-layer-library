@@ -7,7 +7,9 @@ from promptlayer.utils import get_api_key
 
 class Base:
     API_KEY = get_api_key()
-    BASE_URL = os.environ.get("URL_API_PROMPTLAYER", "https://api.promptlayer.com") + "/rest"
+    BASE_URL = (
+        os.environ.get("URL_API_PROMPTLAYER", "https://api.promptlayer.com") + "/rest"
+    )
 
     @classmethod
     def list(cls, params={}):

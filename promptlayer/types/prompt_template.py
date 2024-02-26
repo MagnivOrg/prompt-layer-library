@@ -36,6 +36,11 @@ class Function(TypedDict, total=False):
     parameters: dict
 
 
+class Tool(TypedDict, total=False):
+    type: Literal["function"]
+    function: Function
+
+
 class FunctionCall(TypedDict, total=False):
     name: str
     arguments: str
@@ -57,6 +62,12 @@ class UserMessage(TypedDict, total=False):
     name: NotRequired[str]
 
 
+class ToolCall(TypedDict, total=False):
+    id: str
+    type: Literal["function"]
+    function: FunctionCall
+
+
 class AssistantMessage(TypedDict, total=False):
     role: Literal["assistant"]
     input_variables: NotRequired[List[str]]
@@ -64,6 +75,7 @@ class AssistantMessage(TypedDict, total=False):
     content: NotRequired[Sequence[Content]]
     function_call: NotRequired[FunctionCall]
     name: NotRequired[str]
+    tool_calls: NotRequired[List[ToolCall]]
 
 
 class FunctionMessage(TypedDict, total=False):
@@ -74,11 +86,29 @@ class FunctionMessage(TypedDict, total=False):
     name: str
 
 
+class ToolMessage(TypedDict, total=False):
+    role: Literal["tool"]
+    input_variables: NotRequired[List[str]]
+    template_format: NotRequired[TemplateFormat]
+    content: Sequence[Content]
+    tool_call_id: str
+    name: NotRequired[str]
+
+
 class ChatFunctionCall(TypedDict, total=False):
     name: str
 
 
-Message = Union[SystemMessage, UserMessage, AssistantMessage, FunctionMessage]
+class ChatToolChoice(TypedDict, total=False):
+    type: Literal["function"]
+    function: ChatFunctionCall
+
+
+ToolChoice = Union[str, ChatToolChoice]
+
+Message = Union[
+    SystemMessage, UserMessage, AssistantMessage, FunctionMessage, ToolMessage
+]
 
 
 class CompletionPromptTemplate(TypedDict, total=False):
@@ -94,6 +124,8 @@ class ChatPromptTemplate(TypedDict, total=False):
     functions: NotRequired[Sequence[Function]]
     function_call: NotRequired[Union[Literal["auto", "none"], ChatFunctionCall]]
     input_variables: NotRequired[List[str]]
+    tools: NotRequired[Sequence[Tool]]
+    tool_choice: NotRequired[ToolChoice]
 
 
 PromptTemplate = Union[CompletionPromptTemplate, ChatPromptTemplate]

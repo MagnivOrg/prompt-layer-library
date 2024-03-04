@@ -31,6 +31,7 @@ class PromptLayerBase(object):
                 == "<class 'anthropic.resources.completions.Completions'>"
                 or str(type(attr))
                 == "<class 'anthropic.resources.completions.AsyncCompletions'>"
+                or str(type(attr)) == "<class 'anthropic.resources.messages.Messages'>"
                 or re.match("<class 'openai\.resources.*'>", str(type(attr)))
             )
         ):

@@ -1,6 +1,7 @@
 import datetime
 import inspect
 import re
+import types
 
 from promptlayer.utils import async_wrapper, get_api_key, promptlayer_api_handler
 
@@ -13,8 +14,20 @@ class PromptLayerBase(object):
         object.__setattr__(self, "_function_name", function_name)
         object.__setattr__(self, "_provider_type", provider_type)
 
+    def __enter__(self):
+        print("entering ..,")
+        return PromptLayerBase(
+            self._obj.__enter__(),
+            function_name=object.__getattribute__(self, "_function_name"),
+            provider_type=object.__getattribute__(self, "_provider_type"),
+        )
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self._obj.__exit__(exc_type, exc_val, exc_tb)
+
     def __getattr__(self, name):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
+        print(type(object.__getattribute__(self, "_obj")), str(type(attr)))
         if (
             name != "count_tokens"  # fix for anthropic count_tokens
             and not re.match(
@@ -31,6 +44,7 @@ class PromptLayerBase(object):
                 == "<class 'anthropic.resources.completions.Completions'>"
                 or str(type(attr))
                 == "<class 'anthropic.resources.completions.AsyncCompletions'>"
+                or str(type(attr)) == "<class 'anthropic.resources.messages.Messages'>"
                 or re.match("<class 'openai\.resources.*'>", str(type(attr)))
             )
         ):
@@ -39,6 +53,9 @@ class PromptLayerBase(object):
                 function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
                 provider_type=object.__getattribute__(self, "_provider_type"),
             )
+        if isinstance(attr, types.GeneratorType):
+            return
+        print("we iz out of wrapper")
         return attr
 
     def __delattr__(self, name):
@@ -48,6 +65,7 @@ class PromptLayerBase(object):
         setattr(object.__getattribute__(self, "_obj"), name, value)
 
     def __call__(self, *args, **kwargs):
+        print("we iz here calling function")
         tags = kwargs.pop("pl_tags", None)
         if tags is not None and not isinstance(tags, list):
             raise Exception("pl_tags must be a list of strings.")
@@ -74,6 +92,15 @@ class PromptLayerBase(object):
                 *args,
                 **kwargs,
             )
+        elif (
+            type(function_response).__name__ == "MessageStreamManager"
+        ):  # anthropic streaming messages
+            return PromptLayerBase(
+                function_object(*args, **kwargs),
+                function_name=object.__getattribute__(self, "_function_name"),
+                provider_type=object.__getattribute__(self, "_provider_type"),
+            )
+        print("we iz out of here")
         request_end_time = datetime.datetime.now().timestamp()
         return promptlayer_api_handler(
             object.__getattribute__(self, "_function_name"),

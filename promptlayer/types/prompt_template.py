@@ -1,4 +1,6 @@
-from typing import Dict, Literal, Sequence, TypedDict, Union
+from typing import Dict, List, Literal, Sequence, TypedDict, Union
+
+from typing_extensions import NotRequired
 
 
 class GetPromptTemplate(TypedDict, total=False):
@@ -34,6 +36,11 @@ class Function(TypedDict, total=False):
     parameters: dict
 
 
+class Tool(TypedDict, total=False):
+    type: Literal["function"]
+    function: Function
+
+
 class FunctionCall(TypedDict, total=False):
     name: str
     arguments: str
@@ -41,60 +48,118 @@ class FunctionCall(TypedDict, total=False):
 
 class SystemMessage(TypedDict, total=False):
     role: Literal["system"]
-    template_format: Union[TemplateFormat, None]
+    input_variables: NotRequired[List[str]]
+    template_format: NotRequired[TemplateFormat]
     content: Sequence[Content]
-    name: Union[str, None]
+    name: NotRequired[str]
 
 
 class UserMessage(TypedDict, total=False):
     role: Literal["user"]
-    template_format: Union[TemplateFormat, None]
+    input_variables: NotRequired[List[str]]
+    template_format: NotRequired[TemplateFormat]
     content: Sequence[Content]
-    name: Union[str, None]
+    name: NotRequired[str]
+
+
+class ToolCall(TypedDict, total=False):
+    id: str
+    type: Literal["function"]
+    function: FunctionCall
 
 
 class AssistantMessage(TypedDict, total=False):
     role: Literal["assistant"]
-    template_format: Union[TemplateFormat, None]
-    content: Union[Sequence[Content], None]
-    function_call: Union[FunctionCall, None]
-    name: Union[str, None]
+    input_variables: NotRequired[List[str]]
+    template_format: NotRequired[TemplateFormat]
+    content: NotRequired[Sequence[Content]]
+    function_call: NotRequired[FunctionCall]
+    name: NotRequired[str]
+    tool_calls: NotRequired[List[ToolCall]]
 
 
 class FunctionMessage(TypedDict, total=False):
     role: Literal["function"]
-    template_format: Union[TemplateFormat, None]
-    content: Union[Sequence[Content], None]
+    input_variables: NotRequired[List[str]]
+    template_format: NotRequired[TemplateFormat]
+    content: NotRequired[Sequence[Content]]
     name: str
+
+
+class ToolMessage(TypedDict, total=False):
+    role: Literal["tool"]
+    input_variables: NotRequired[List[str]]
+    template_format: NotRequired[TemplateFormat]
+    content: Sequence[Content]
+    tool_call_id: str
+    name: NotRequired[str]
 
 
 class ChatFunctionCall(TypedDict, total=False):
     name: str
 
 
-Message = Union[SystemMessage, UserMessage, AssistantMessage, FunctionMessage]
+class ChatToolChoice(TypedDict, total=False):
+    type: Literal["function"]
+    function: ChatFunctionCall
+
+
+ToolChoice = Union[str, ChatToolChoice]
+
+Message = Union[
+    SystemMessage, UserMessage, AssistantMessage, FunctionMessage, ToolMessage
+]
 
 
 class CompletionPromptTemplate(TypedDict, total=False):
     type: Literal["completion"]
-    template_format: Union[TemplateFormat, None]
+    template_format: NotRequired[TemplateFormat]
     content: Sequence[Content]
+    input_variables: NotRequired[List[str]]
 
 
 class ChatPromptTemplate(TypedDict, total=False):
     type: Literal["chat"]
     messages: Sequence[Message]
-    functions: Union[Sequence[Function], None]
-    function_call: Union[Literal["auto", "none"], ChatFunctionCall, None]
+    functions: NotRequired[Sequence[Function]]
+    function_call: NotRequired[Union[Literal["auto", "none"], ChatFunctionCall]]
+    input_variables: NotRequired[List[str]]
+    tools: NotRequired[Sequence[Tool]]
+    tool_choice: NotRequired[ToolChoice]
 
 
 PromptTemplate = Union[CompletionPromptTemplate, ChatPromptTemplate]
 
 
-class PublishPromptTemplate(TypedDict, total=False):
+class Model(TypedDict, total=False):
+    provider: str
+    name: str
+    parameters: Dict[str, object]
+
+
+class Metadata(TypedDict, total=False):
+    model: NotRequired[Model]
+
+
+class BasePromptTemplate(TypedDict, total=False):
     prompt_name: str
+    tags: NotRequired[List[str]]
+
+
+class PromptVersion(TypedDict, total=False):
     prompt_template: PromptTemplate
+    commit_message: NotRequired[str]
+    metadata: NotRequired[Metadata]
 
 
-class PublishPromptTemplateResponse(PublishPromptTemplate):
+class PublishPromptTemplate(BasePromptTemplate, PromptVersion):
+    pass
+
+
+class PublishPromptTemplateResponse(TypedDict, total=False):
     id: int
+    prompt_name: str
+    tags: List[str]
+    prompt_template: PromptTemplate
+    commit_message: NotRequired[str]
+    metadata: NotRequired[Metadata]

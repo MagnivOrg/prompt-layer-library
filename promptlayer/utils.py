@@ -46,13 +46,11 @@ def promptlayer_api_handler(
     api_key,
     return_pl_id=False,
 ):
-    print("we iz in handler")
     if (
         isinstance(response, types.GeneratorType)
         or isinstance(response, types.AsyncGeneratorType)
-        or type(response).__name__ in ["Stream", "AsyncStream", "MessageStreamManager"]
+        or type(response).__name__ in ["Stream", "AsyncStream"]
     ):
-        print("we iz in generator")
         return GeneratorProxy(
             response,
             {

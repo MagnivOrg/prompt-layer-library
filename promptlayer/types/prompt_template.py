@@ -156,10 +156,23 @@ class PublishPromptTemplate(BasePromptTemplate, PromptVersion):
     pass
 
 
-class PublishPromptTemplateResponse(TypedDict, total=False):
+class BasePromptTemplateResponse(TypedDict, total=False):
     id: int
     prompt_name: str
     tags: List[str]
     prompt_template: PromptTemplate
     commit_message: NotRequired[str]
     metadata: NotRequired[Metadata]
+
+
+class PublishPromptTemplateResponse(TypedDict, total=False):
+    pass
+
+
+class GetPromptTemplateResponse(BasePromptTemplateResponse):
+    llm_kwargs: NotRequired[Dict[str, object]]
+    version: int
+
+
+class ListPromptTemplateResponse(BasePromptTemplateResponse, total=False):
+    version: int

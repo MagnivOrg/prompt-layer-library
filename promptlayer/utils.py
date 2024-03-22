@@ -16,6 +16,7 @@ import promptlayer
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
     GetPromptTemplateResponse,
+    ListPromptTemplateResponse,
     PublishPromptTemplate,
     PublishPromptTemplateResponse,
 )
@@ -579,7 +580,7 @@ def publish_prompt_template(
 
 def get_all_prompt_templates(
     page: int = 1, per_page: int = 30
-) -> List[GetPromptTemplateResponse]:
+) -> List[ListPromptTemplateResponse]:
     try:
         response = requests.get(
             f"{URL_API_PROMPTLAYER}/prompt-templates",

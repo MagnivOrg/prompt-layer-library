@@ -170,4 +170,9 @@ class PublishPromptTemplateResponse(TypedDict, total=False):
 
 
 class GetPromptTemplateResponse(BasePromptTemplateResponse):
+    llm_kwargs: NotRequired[Dict[str, object]]
+    version: int
+
+
+class ListPromptTemplateResponse(BasePromptTemplateResponse, total=False):
     version: int

@@ -8,13 +8,14 @@ import sys
 import types
 from copy import deepcopy
 from enum import Enum
-from typing import Union
+from typing import List, Union
 
 import requests
 
 import promptlayer
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
+    GetPromptTemplateResponse,
     PublishPromptTemplate,
     PublishPromptTemplateResponse,
 )
@@ -573,4 +574,25 @@ def publish_prompt_template(
     except requests.exceptions.RequestException as e:
         raise Exception(
             f"PromptLayer had the following error while publishing your prompt template: {e}"
+        )
+
+
+def get_all_prompt_templates(
+    page: int = 1, per_page: int = 30
+) -> List[GetPromptTemplateResponse]:
+    try:
+        response = requests.get(
+            f"{URL_API_PROMPTLAYER}/prompt-templates",
+            headers={"X-API-KEY": get_api_key()},
+            params={"page": page, "per_page": per_page},
+        )
+        if response.status_code != 200:
+            raise Exception(
+                f"PromptLayer had the following error while getting all your prompt templates: {response.text}"
+            )
+        items = response.json().get("items", [])
+        return items
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting all your prompt templates: {e}"
         )

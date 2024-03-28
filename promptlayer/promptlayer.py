@@ -18,10 +18,10 @@ class PromptLayerBase(object):
         if (
             name != "count_tokens"  # fix for anthropic count_tokens
             and not re.match(
-                "<class 'anthropic\..*Error'>", str(attr)
+                r"<class 'anthropic\..*Error'>", str(attr)
             )  # fix for anthropic errors
             and not re.match(
-                "<class 'openai\..*Error'>", str(attr)
+                r"<class 'openai\..*Error'>", str(attr)
             )  # fix for openai errors
             and (
                 inspect.isclass(attr)
@@ -33,8 +33,8 @@ class PromptLayerBase(object):
                 == "<class 'anthropic.resources.completions.AsyncCompletions'>"
                 or str(type(attr)) == "<class 'anthropic.resources.messages.Messages'>"
                 or str(type(attr))
-                == "<class 'anthropic.resources.messages.AsyncMessages'>"
-                or re.match("<class 'openai\.resources.*'>", str(type(attr)))
+                == r"<class 'anthropic.resources.messages.AsyncMessages'>"
+                or re.match(r"<class 'openai\.resources.*'>", str(type(attr)))
             )
         ):
             return PromptLayerBase(

@@ -51,7 +51,8 @@ def promptlayer_api_handler(
     if (
         isinstance(response, types.GeneratorType)
         or isinstance(response, types.AsyncGeneratorType)
-        or type(response).__name__ in ["Stream", "AsyncStream"]
+        or type(response).__name__
+        in ["Stream", "AsyncStream", "AsyncMessageStreamManager"]
     ):
         return GeneratorProxy(
             response,
@@ -355,6 +356,17 @@ class GeneratorProxy:
     def __aiter__(self):
         return self
 
+    async def __aenter__(self):
+        api_request_arguments = self.api_request_arugments
+        if hasattr(self.generator, "_AsyncMessageStreamManager__api_request"):
+            return GeneratorProxy(
+                await self.generator._AsyncMessageStreamManager__api_request,
+                api_request_arguments,
+            )
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
     async def __anext__(self):
         result = await self.generator.__anext__()
         return self._abstracted_next(result)
@@ -363,14 +375,29 @@ class GeneratorProxy:
         result = next(self.generator)
         return self._abstracted_next(result)
 
+    def __getattr__(self, name):
+        if name == "text_stream":  # anthropic async stream
+            return GeneratorProxy(
+                self.generator.text_stream, self.api_request_arugments
+            )
+        return getattr(self.generator, name)
+
     def _abstracted_next(self, result):
         self.results.append(result)
         provider_type = self.api_request_arugments["provider_type"]
-        end_anthropic = provider_type == "anthropic" and result.stop_reason
+        end_anthropic = False
+        if provider_type == "anthropic":
+            if hasattr(result, "stop_reason"):
+                end_anthropic = result.stop_reason
+            elif hasattr(result, "message"):
+                end_anthropic = result.message.stop_reason
+            elif hasattr(result, "type") and result.type == "message_stop":
+                end_anthropic = True
         end_openai = provider_type == "openai" and (
             result.choices[0].finish_reason == "stop"
             or result.choices[0].finish_reason == "length"
         )
+
         if end_anthropic or end_openai:
             request_id = promptlayer_api_request(
                 self.api_request_arugments["function_name"],
@@ -395,9 +422,28 @@ class GeneratorProxy:
         if provider_type == "anthropic":
             response = ""
             for result in self.results:
-                response = f"{response}{result.completion}"
-            final_result = deepcopy(self.results[-1])
-            final_result.completion = response
+                if hasattr(result, "completion"):
+                    response = f"{response}{result.completion}"
+                elif hasattr(result, "message") and isinstance(result.message, str):
+                    response = f"{response}{result.message}"
+                elif hasattr(result, "content_block") and hasattr(
+                    result.content_block, "text"
+                ):
+                    response = f"{response}{result.content_block.text}"
+                elif hasattr(result, "delta") and hasattr(result.delta, "text"):
+                    response = f"{response}{result.delta.text}"
+            if (
+                hasattr(self.results[-1], "type")
+                and self.results[-1].type == "message_stop"
+            ):  # this is a message stream and not the correct event
+                final_result = deepcopy(self.results[0].message)
+                final_result.usage = None
+                content_block = deepcopy(self.results[1].content_block)
+                content_block.text = response
+                final_result.content = [content_block]
+            else:
+                final_result = deepcopy(self.results[-1])
+                final_result.completion = response
             return final_result
         if hasattr(self.results[0].choices[0], "text"):  # this is regular completion
             response = ""

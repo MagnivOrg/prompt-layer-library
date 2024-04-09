@@ -611,7 +611,11 @@ def publish_prompt_template(
         response = requests.post(
             f"{URL_API_PROMPTLAYER}/rest/prompt-templates",
             headers={"X-API-KEY": get_api_key()},
-            json={"prompt_template": {**body}, "prompt_version": {**body}},
+            json={
+                "prompt_template": {**body},
+                "prompt_version": {**body},
+                "release_label": body.get("release_label"),
+            },
         )
         if response.status_code == 400:
             raise Exception(

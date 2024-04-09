@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Sequence, TypedDict, Union
+from typing import Dict, List, Literal, Optional, Sequence, TypedDict, Union
 
 
 class GetPromptTemplate(TypedDict, total=False):
@@ -150,8 +150,8 @@ class PromptVersion(TypedDict, total=False):
     metadata: Metadata
 
 
-class PublishPromptTemplate(BasePromptTemplate, PromptVersion):
-    pass
+class PublishPromptTemplate(BasePromptTemplate, PromptVersion, total=False):
+    release_label: Optional[str] = None
 
 
 class BasePromptTemplateResponse(TypedDict):

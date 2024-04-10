@@ -614,7 +614,7 @@ def publish_prompt_template(
             json={
                 "prompt_template": {**body},
                 "prompt_version": {**body},
-                "release_label": body.get("release_label"),
+                "release_labels": body.get("release_labels"),
             },
         )
         if response.status_code == 400:

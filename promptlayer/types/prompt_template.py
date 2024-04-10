@@ -151,7 +151,7 @@ class PromptVersion(TypedDict, total=False):
 
 
 class PublishPromptTemplate(BasePromptTemplate, PromptVersion, total=False):
-    release_label: Optional[str] = None
+    release_labels: Optional[List[str]] = None
 
 
 class BasePromptTemplateResponse(TypedDict):

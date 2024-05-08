@@ -12,7 +12,6 @@ from typing import List, Union
 
 import requests
 
-import promptlayer
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
     GetPromptTemplateResponse,
@@ -24,16 +23,6 @@ from promptlayer.types.prompt_template import (
 URL_API_PROMPTLAYER = os.environ.setdefault(
     "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
 )
-
-
-def get_api_key():
-    # raise an error if the api key is not set
-    if promptlayer.api_key is None:
-        raise Exception(
-            "Please set your PROMPTLAYER_API_KEY environment variable or set API KEY in code using 'promptlayer.api_key = <your_api_key>' "
-        )
-    else:
-        return promptlayer.api_key
 
 
 def promptlayer_api_handler(
@@ -66,6 +55,7 @@ def promptlayer_api_handler(
                 "request_end_time": request_end_time,
                 "return_pl_id": return_pl_id,
             },
+            api_key,
         )
     else:
         request_id = promptlayer_api_request(
@@ -108,7 +98,7 @@ async def promptlayer_api_handler_async(
         response,
         request_start_time,
         request_end_time,
-        get_api_key(),
+        api_key,
         return_pl_id=return_pl_id,
     )
 
@@ -345,10 +335,11 @@ def promptlayer_track_score(request_id, score, score_name, api_key):
 
 
 class GeneratorProxy:
-    def __init__(self, generator, api_request_arguments):
+    def __init__(self, generator, api_request_arguments, api_key):
         self.generator = generator
         self.results = []
         self.api_request_arugments = api_request_arguments
+        self.api_key = api_key
 
     def __iter__(self):
         return self
@@ -362,6 +353,7 @@ class GeneratorProxy:
             return GeneratorProxy(
                 await self.generator._AsyncMessageStreamManager__api_request,
                 api_request_arguments,
+                self.api_key,
             )
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -378,7 +370,7 @@ class GeneratorProxy:
     def __getattr__(self, name):
         if name == "text_stream":  # anthropic async stream
             return GeneratorProxy(
-                self.generator.text_stream, self.api_request_arugments
+                self.generator.text_stream, self.api_request_arugments, self.api_key
             )
         return getattr(self.generator, name)
 
@@ -408,7 +400,7 @@ class GeneratorProxy:
                 self.cleaned_result(),
                 self.api_request_arugments["request_start_time"],
                 self.api_request_arugments["request_end_time"],
-                get_api_key(),
+                self.api_key,
                 return_pl_id=self.api_request_arugments["return_pl_id"],
             )
             if self.api_request_arugments["return_pl_id"]:
@@ -517,6 +509,7 @@ async def async_wrapper(
     function_name,
     provider_type,
     tags,
+    api_key: str = None,
     *args,
     **kwargs,
 ):
@@ -531,17 +524,17 @@ async def async_wrapper(
         response,
         request_start_time,
         request_end_time,
-        get_api_key(),
+        api_key,
         return_pl_id=return_pl_id,
     )
 
 
-def promptlayer_create_group():
+def promptlayer_create_group(api_key: str = None):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/create-group",
             json={
-                "api_key": get_api_key(),
+                "api_key": api_key,
             },
         )
         if request_response.status_code != 200:
@@ -558,12 +551,12 @@ def promptlayer_create_group():
     return request_response.json()["id"]
 
 
-def promptlayer_track_group(request_id, group_id):
+def promptlayer_track_group(request_id, group_id, api_key: str = None):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/track-group",
             json={
-                "api_key": get_api_key(),
+                "api_key": api_key,
                 "request_id": request_id,
                 "group_id": group_id,
             },
@@ -582,15 +575,15 @@ def promptlayer_track_group(request_id, group_id):
 
 
 def get_prompt_template(
-    prompt_name: str, params: Union[GetPromptTemplate, None] = None
+    prompt_name: str, params: Union[GetPromptTemplate, None] = None, api_key: str = None
 ) -> GetPromptTemplateResponse:
     try:
-        json_body = {"api_key": get_api_key()}
+        json_body = {"api_key": api_key}
         if params:
             json_body = {**json_body, **params}
         response = requests.post(
             f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
-            headers={"X-API-KEY": get_api_key()},
+            headers={"X-API-KEY": api_key},
             json=json_body,
         )
         if response.status_code != 200:
@@ -606,11 +599,12 @@ def get_prompt_template(
 
 def publish_prompt_template(
     body: PublishPromptTemplate,
+    api_key: str = None,
 ) -> PublishPromptTemplateResponse:
     try:
         response = requests.post(
             f"{URL_API_PROMPTLAYER}/rest/prompt-templates",
-            headers={"X-API-KEY": get_api_key()},
+            headers={"X-API-KEY": api_key},
             json={
                 "prompt_template": {**body},
                 "prompt_version": {**body},
@@ -629,12 +623,12 @@ def publish_prompt_template(
 
 
 def get_all_prompt_templates(
-    page: int = 1, per_page: int = 30
+    page: int = 1, per_page: int = 30, api_key: str = None
 ) -> List[ListPromptTemplateResponse]:
     try:
         response = requests.get(
             f"{URL_API_PROMPTLAYER}/prompt-templates",
-            headers={"X-API-KEY": get_api_key()},
+            headers={"X-API-KEY": api_key},
             params={"page": page, "per_page": per_page},
         )
         if response.status_code != 200:

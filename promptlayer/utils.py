@@ -572,6 +572,7 @@ def promptlayer_track_group(request_id, group_id, api_key: str = None):
         raise Exception(
             f"PromptLayer had the following error while tracking your group: {e}"
         )
+    return True
 
 
 def get_prompt_template(

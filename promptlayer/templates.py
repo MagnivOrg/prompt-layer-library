@@ -8,13 +8,15 @@ from promptlayer.utils import (
 )
 
 
-def get(prompt_name: str, params: Union[GetPromptTemplate, None] = None):
-    return get_prompt_template(prompt_name, params)
+class TemplateManager:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
 
+    def get(self, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
+        return get_prompt_template(prompt_name, params, self.api_key)
 
-def publish(body: PublishPromptTemplate):
-    return publish_prompt_template(body)
+    def publish(self, body: PublishPromptTemplate):
+        return publish_prompt_template(body, self.api_key)
 
-
-def all(page: int = 1, per_page: int = 30):
-    return get_all_prompt_templates(page, per_page)
+    def all(self, page: int = 1, per_page: int = 30):
+        return get_all_prompt_templates(page, per_page, self.api_key)

@@ -1,6 +1,6 @@
 from promptlayer.utils import promptlayer_create_group
 
 
-def create():
+def create(api_key: str = None):
     """Create a new group."""
-    return promptlayer_create_group()
+    return promptlayer_create_group(api_key)

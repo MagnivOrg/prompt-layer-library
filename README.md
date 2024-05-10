@@ -39,8 +39,9 @@ Once you have that all set up, [install PromptLayer using](https://pypi.org/proj
 In the Python file where you use OpenAI APIs, add the following. This allows us to keep track of your requests without needing any other code changes.
 
 ```python
-import promptlayer
-promptlayer.api_key = "<YOUR PromptLayer API KEY pl_xxxxxx>"
+from promptlayer import PromptLayer
+
+promptlayer = PromptLayer(api_key="<YOUR PromptLayer API KEY pl_xxxxxx>")
 openai = promptlayer.openai
 ```
 

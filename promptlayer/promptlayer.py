@@ -2,26 +2,27 @@ import datetime
 import inspect
 import re
 
-from promptlayer.utils import async_wrapper, get_api_key, promptlayer_api_handler
+from promptlayer.utils import async_wrapper, promptlayer_api_handler
 
 
 class PromptLayerBase(object):
-    __slots__ = ["_obj", "__weakref__", "_function_name", "_provider_type"]
+    __slots__ = ["_obj", "__weakref__", "_function_name", "_provider_type", "_api_key"]
 
-    def __init__(self, obj, function_name="", provider_type="openai"):
+    def __init__(self, obj, function_name="", provider_type="openai", api_key=None):
         object.__setattr__(self, "_obj", obj)
         object.__setattr__(self, "_function_name", function_name)
         object.__setattr__(self, "_provider_type", provider_type)
+        object.__setattr__(self, "_api_key", api_key)
 
     def __getattr__(self, name):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
         if (
             name != "count_tokens"  # fix for anthropic count_tokens
             and not re.match(
-                "<class 'anthropic\..*Error'>", str(attr)
+                r"<class 'anthropic\..*Error'>", str(attr)
             )  # fix for anthropic errors
             and not re.match(
-                "<class 'openai\..*Error'>", str(attr)
+                r"<class 'openai\..*Error'>", str(attr)
             )  # fix for openai errors
             and (
                 inspect.isclass(attr)
@@ -34,13 +35,14 @@ class PromptLayerBase(object):
                 or str(type(attr)) == "<class 'anthropic.resources.messages.Messages'>"
                 or str(type(attr))
                 == "<class 'anthropic.resources.messages.AsyncMessages'>"
-                or re.match("<class 'openai\.resources.*'>", str(type(attr)))
+                or re.match(r"<class 'openai\.resources.*'>", str(type(attr)))
             )
         ):
             return PromptLayerBase(
                 attr,
                 function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
                 provider_type=object.__getattribute__(self, "_provider_type"),
+                api_key=object.__getattribute__(self, "_api_key"),
             )
         return attr
 
@@ -62,6 +64,7 @@ class PromptLayerBase(object):
                 function_object(*args, **kwargs),
                 function_name=object.__getattribute__(self, "_function_name"),
                 provider_type=object.__getattribute__(self, "_provider_type"),
+                api_key=object.__getattribute__(self, "_api_key"),
             )
         function_response = function_object(*args, **kwargs)
         if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(
@@ -74,6 +77,7 @@ class PromptLayerBase(object):
                 object.__getattribute__(self, "_function_name"),
                 object.__getattribute__(self, "_provider_type"),
                 tags,
+                api_key=object.__getattribute__(self, "_api_key"),
                 *args,
                 **kwargs,
             )
@@ -87,6 +91,6 @@ class PromptLayerBase(object):
             function_response,
             request_start_time,
             request_end_time,
-            get_api_key(),
+            object.__getattribute__(self, "_api_key"),
             return_pl_id=return_pl_id,
         )

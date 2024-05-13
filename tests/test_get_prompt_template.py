@@ -33,14 +33,16 @@ def test_get_prompt_template_provider_base_url_name(capsys):
         ],
     }
 
-    promptlayer.templates.publish({
-        "provider_base_url_name": provider_base_url_name,
-        "prompt_name": prompt_registry_name,
-        "prompt_template": prompt_template,
-    })
+    promptlayer.templates.publish(
+        {
+            "provider_base_url_name": provider_base_url_name,
+            "prompt_name": prompt_registry_name,
+            "prompt_template": prompt_template,
+        }
+    )
 
     get_response = promptlayer.templates.get(
         prompt_registry_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
     )
 
-    assert get_response['provider_base_url'] is None
+    assert get_response["provider_base_url"] is None

@@ -8,7 +8,7 @@ def test_get_prompt_template_provider_base_url_name(capsys):
     promptlayer = PromptLayer(api_key=os.environ.get("PROMPTLAYER_API_KEY"))
 
     prompt_registry_name = f"test_template:{datetime.datetime.now()}"
-    provider_base_url_name = "test_provider_base_url_name"
+    provider_base_url_name = "does_not_exist"
 
     prompt_template = {
         "type": "chat",
@@ -43,4 +43,4 @@ def test_get_prompt_template_provider_base_url_name(capsys):
         prompt_registry_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
     )
 
-    assert get_response['provider_base_url_name'] == provider_base_url_name
+    assert get_response['provider_base_url'] is None

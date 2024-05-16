@@ -45,4 +45,5 @@ class PromptLayer:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
-__all__ = ["PromptLayer"]
+__version__ = "1.0.2"
+__all__ = ["PromptLayer", "__version__"]

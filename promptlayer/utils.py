@@ -642,3 +642,68 @@ def get_all_prompt_templates(
         raise Exception(
             f"PromptLayer had the following error while getting all your prompt templates: {e}"
         )
+
+
+def track_request(**body):
+    try:
+        response = requests.post(
+            f"{URL_API_PROMPTLAYER}/track-request",
+            json=body,
+        )
+        if response.status_code == 200:
+            return response.json()
+        raise Exception(
+            f"PromptLayer had the following error while tracking your request: {response.text}"
+        )
+    except requests.exceptions.RequestException as e:
+        raise Exception(
+            f"PromptLayer had the following error while tracking your request: {e}"
+        )
+
+
+def openai_chat_request(client, **kwargs):
+    return client.chat.completions.create(**kwargs)
+
+
+def openai_completions_request(client, **kwargs):
+    return client.completions.create(**kwargs)
+
+
+MAP_TYPE_TO_OPENAI_FUNCTION = {
+    "chat": openai_chat_request,
+    "completion": openai_completions_request,
+}
+
+
+def openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+    from openai import OpenAI
+
+    client = OpenAI()
+    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
+        prompt_blueprint["prompt_template"]["type"]
+    ]
+    return request_to_make(client, **kwargs)
+
+
+def anthropic_chat_request(client, **kwargs):
+    return client.messages.create(**kwargs)
+
+
+def anthropic_completions_request(client, **kwargs):
+    return client.completions.create(**kwargs)
+
+
+MAP_TYPE_TO_ANTHROPIC_FUNCTION = {
+    "chat": anthropic_chat_request,
+    "completion": anthropic_completions_request,
+}
+
+
+def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+    from anthropic import Anthropic
+
+    client = Anthropic()
+    request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[
+        prompt_blueprint["prompt_template"]["type"]
+    ]
+    return request_to_make(client, **kwargs)

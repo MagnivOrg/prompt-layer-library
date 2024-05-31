@@ -67,20 +67,14 @@ class PromptLayer:
     def run(
         self,
         prompt_name: str,
-        version: Union[int, None] = None,
-        label: Union[str, None] = None,
-        input_variables: Union[Dict[str, str], None] = None,
+        template_get_params: Union[GetPromptTemplate, None] = None,
         tags: Union[List[str], None] = None,
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
     ):
-        template_get_params: GetPromptTemplate = {}
-        if version:
-            template_get_params["version"] = version
-        if label:
-            template_get_params["label"] = label
-        if input_variables:
-            template_get_params["input_variables"] = input_variables
+        input_variables = {}
+        if template_get_params and "input_variables" in template_get_params:
+            input_variables = template_get_params["input_variables"]
         prompt_blueprint = self.templates.get(prompt_name, template_get_params)
         prompt_template = prompt_blueprint["prompt_template"]
         if not prompt_blueprint["llm_kwargs"]:
@@ -101,17 +95,21 @@ class PromptLayer:
         request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
         kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
         function_name = MAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
-        response = MAP_PROVIDER_TO_FUNCTION[provider](prompt_blueprint, **kwargs)
-        response = response.model_dump()
+        request_function = MAP_PROVIDER_TO_FUNCTION[provider]
+        provider_base_url = prompt_blueprint.get("provider_base_url", None)
+        if provider_base_url:
+            kwargs["base_url"] = provider_base_url["url"]
+        response = request_function(prompt_blueprint, **kwargs)
+        request_response = response.model_dump()
 
         request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
         request_log = track_request(
             function_name=function_name,
-            provider=provider,
+            provider_type=provider,
             args=[],
             kwargs=kwargs,
             tags=tags,
-            request_response=response,
+            request_response=request_response,
             request_start_time=request_start_time,
             request_end_time=request_end_time,
             api_key=self.api_key,

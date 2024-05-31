@@ -156,13 +156,27 @@ class PublishPromptTemplate(BasePromptTemplate, PromptVersion, total=False):
     release_labels: Optional[List[str]] = None
 
 
-class BasePromptTemplateResponse(TypedDict):
-    id: int
-    prompt_name: str
+class BaseProviderBaseURL(TypedDict):
+    name: Required[str]
+    provider: Required[str]
+    url: Required[str]
+
+
+class ProviderBaseURL(BaseProviderBaseURL):
+    id: Required[int]
+
+
+class BasePromptTemplateResponse(TypedDict, total=False):
+    id: Required[int]
+    prompt_name: Required[str]
     tags: List[str]
-    prompt_template: PromptTemplate
+    prompt_template: Required[PromptTemplate]
     commit_message: str
     metadata: Metadata
+    provider_base_url: ProviderBaseURL
+
+
+a: BasePromptTemplateResponse = {"provider_base_url": {"url": ""}}
 
 
 class PublishPromptTemplateResponse(BasePromptTemplateResponse):

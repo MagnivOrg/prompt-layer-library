@@ -458,9 +458,9 @@ class GeneratorProxy:
                     hasattr(result.choices[0].delta, "content")
                     and result.choices[0].delta.content is not None
                 ):
-                    response[
-                        "content"
-                    ] = f"{response['content']}{result.choices[0].delta.content}"
+                    response["content"] = (
+                        f"{response['content']}{result.choices[0].delta.content}"
+                    )
             final_result = deepcopy(self.results[-1])
             final_result.choices[0] = response
             return final_result
@@ -678,7 +678,7 @@ MAP_TYPE_TO_OPENAI_FUNCTION = {
 def openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     from openai import OpenAI
 
-    client = OpenAI()
+    client = OpenAI(base_url=kwargs.pop("base_url", None))
     request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
         prompt_blueprint["prompt_template"]["type"]
     ]
@@ -702,7 +702,7 @@ MAP_TYPE_TO_ANTHROPIC_FUNCTION = {
 def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     from anthropic import Anthropic
 
-    client = Anthropic()
+    client = Anthropic(base_url=kwargs.pop("base_url", None))
     request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[
         prompt_blueprint["prompt_template"]["type"]
     ]

@@ -458,9 +458,9 @@ class GeneratorProxy:
                     hasattr(result.choices[0].delta, "content")
                     and result.choices[0].delta.content is not None
                 ):
-                    response["content"] = (
-                        f"{response['content']}{result.choices[0].delta.content}"
-                    )
+                    response[
+                        "content"
+                    ] = f"{response['content']}{result.choices[0].delta.content}"
             final_result = deepcopy(self.results[-1])
             final_result.choices[0] = response
             return final_result

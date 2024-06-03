@@ -120,6 +120,7 @@ class PromptLayer:
             group_id=group_id,
             return_data=True,
         )
+        request_log["raw_response"] = response
         return request_log
 
 

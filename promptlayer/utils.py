@@ -458,9 +458,9 @@ class GeneratorProxy:
                     hasattr(result.choices[0].delta, "content")
                     and result.choices[0].delta.content is not None
                 ):
-                    response[
-                        "content"
-                    ] = f"{response['content']}{result.choices[0].delta.content}"
+                    response["content"] = (
+                        f"{response['content']}{result.choices[0].delta.content}"
+                    )
             final_result = deepcopy(self.results[-1])
             final_result.choices[0] = response
             return final_result
@@ -650,15 +650,18 @@ def track_request(**body):
             f"{URL_API_PROMPTLAYER}/track-request",
             json=body,
         )
-        if response.status_code == 200:
-            return response.json()
-        raise Exception(
-            f"PromptLayer had the following error while tracking your request: {response.text}"
-        )
+        if response.status_code != 200:
+            warn_on_bad_response(
+                response,
+                f"PromptLayer had the following error while tracking your request: {response.text}",
+            )
+        return response.json()
     except requests.exceptions.RequestException as e:
-        raise Exception(
-            f"PromptLayer had the following error while tracking your request: {e}"
+        print(
+            f"WARNING: While logging your request PromptLayer had the following error: {e}",
+            file=sys.stderr,
         )
+        return {}
 
 
 def openai_chat_request(client, **kwargs):

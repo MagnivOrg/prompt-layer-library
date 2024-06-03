@@ -123,5 +123,5 @@ class PromptLayer:
         return request_log
 
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __all__ = ["PromptLayer", "__version__"]

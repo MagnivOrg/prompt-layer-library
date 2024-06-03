@@ -118,10 +118,14 @@ class PromptLayer:
             prompt_version=prompt_blueprint["version"],
             prompt_input_variables=input_variables,
             group_id=group_id,
-            return_data=True,
+            return_prompt_blueprint=True,
         )
-        request_log["raw_response"] = response
-        return request_log
+        data = {
+            "request_id": request_log["request_id"],
+            "raw_response": response,
+            "prompt_blueprint": request_log["prompt_blueprint"],
+        }
+        return data
 
 
 __version__ = "1.0.3"

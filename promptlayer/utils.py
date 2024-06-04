@@ -670,7 +670,7 @@ def openai_stream_chat(results: list):
         ChatCompletionChunk,
         ChatCompletionMessage,
     )
-    from openai.types.chat.chat_completion import ChatCompletion, Choice
+    from openai.types.chat.chat_completion import Choice
 
     chat_completion_chunks: List[ChatCompletionChunk] = results
     response: ChatCompletion = ChatCompletion(

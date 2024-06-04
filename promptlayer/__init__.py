@@ -8,16 +8,37 @@ from promptlayer.promptlayer import PromptLayerBase
 from promptlayer.templates import TemplateManager
 from promptlayer.track import TrackManager
 from promptlayer.types.prompt_template import GetPromptTemplate
-from promptlayer.utils import anthropic_request, openai_request, track_request
+from promptlayer.utils import (
+    anthropic_request,
+    anthropic_stream_completion,
+    anthropic_stream_message,
+    openai_request,
+    openai_stream_chat,
+    openai_stream_completion,
+    stream_response,
+    track_request,
+)
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {
     "openai": {
-        "chat": "openai.chat.completions.create",
-        "completion": "openai.completions.create",
+        "chat": {
+            "function_name": "openai.chat.completions.create",
+            "stream_function": openai_stream_chat,
+        },
+        "completion": {
+            "function_name": "openai.completions.create",
+            "stream_function": openai_stream_completion,
+        },
     },
     "anthropic": {
-        "chat": "anthropic.messages.create",
-        "completion": "anthropic.completions.create",
+        "chat": {
+            "function_name": "anthropic.messages.create",
+            "stream_function": anthropic_stream_message,
+        },
+        "completion": {
+            "function_name": "anthropic.completions.create",
+            "stream_function": anthropic_stream_completion,
+        },
     },
 }
 
@@ -71,6 +92,7 @@ class PromptLayer:
         tags: Union[List[str], None] = None,
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
+        stream=False,
     ):
         input_variables = {}
         if template_get_params and "input_variables" in template_get_params:
@@ -94,32 +116,41 @@ class PromptLayer:
         provider = prompt_blueprint_model["provider"]
         request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
         kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
-        function_name = MAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
+        config = MAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
+        function_name = config["function_name"]
+        stream_function = config["stream_function"]
         request_function = MAP_PROVIDER_TO_FUNCTION[provider]
         provider_base_url = prompt_blueprint.get("provider_base_url", None)
         if provider_base_url:
             kwargs["base_url"] = provider_base_url["url"]
+        kwargs["stream"] = stream
+        if stream and provider == "openai":
+            kwargs["stream_options"] = {"include_usage": True}
         response = request_function(prompt_blueprint, **kwargs)
-        request_response = response.model_dump()
 
-        request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
-        request_log = track_request(
-            function_name=function_name,
-            provider_type=provider,
-            args=[],
-            kwargs=kwargs,
-            tags=tags,
-            request_response=request_response,
-            request_start_time=request_start_time,
-            request_end_time=request_end_time,
-            api_key=self.api_key,
-            metadata=metadata,
-            prompt_id=prompt_blueprint["id"],
-            prompt_version=prompt_blueprint["version"],
-            prompt_input_variables=input_variables,
-            group_id=group_id,
-            return_prompt_blueprint=True,
-        )
+        def _track_request(**body):
+            request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            return track_request(
+                function_name=function_name,
+                provider_type=provider,
+                args=[],
+                kwargs=kwargs,
+                tags=tags,
+                request_start_time=request_start_time,
+                request_end_time=request_end_time,
+                api_key=self.api_key,
+                metadata=metadata,
+                prompt_id=prompt_blueprint["id"],
+                prompt_version=prompt_blueprint["version"],
+                prompt_input_variables=input_variables,
+                group_id=group_id,
+                return_prompt_blueprint=True,
+                **body,
+            )
+
+        if stream:
+            return stream_response(response, _track_request, stream_function)
+        request_log = _track_request(request_response=response.model_dump())
         data = {
             "request_id": request_log["request_id"],
             "raw_response": response,

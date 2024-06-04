@@ -8,7 +8,7 @@ import sys
 import types
 from copy import deepcopy
 from enum import Enum
-from typing import List, Union
+from typing import Callable, Generator, List, Union
 
 import requests
 
@@ -662,6 +662,142 @@ def track_request(**body):
             file=sys.stderr,
         )
         return {}
+
+
+def openai_stream_chat(results: list):
+    from openai.types.chat import (
+        ChatCompletion,
+        ChatCompletionChunk,
+        ChatCompletionMessage,
+    )
+    from openai.types.chat.chat_completion import ChatCompletion, Choice
+
+    chat_completion_chunks: List[ChatCompletionChunk] = results
+    response: ChatCompletion = ChatCompletion(
+        id="",
+        object="chat.completion",
+        choices=[
+            Choice(
+                finish_reason="stop",
+                index=0,
+                message=ChatCompletionMessage(role="assistant"),
+            )
+        ],
+        created=0,
+        model="",
+    )
+    last_result = chat_completion_chunks[-1]
+    response.id = last_result.id
+    response.created = last_result.created
+    response.model = last_result.model
+    content = ""
+    for result in chat_completion_chunks:
+        system_fingerprint = result.system_fingerprint
+        usage = result.usage
+        if len(result.choices) > 0 and result.choices[0].delta.content:
+            content = f"{content}{result.choices[0].delta.content}"
+        if usage:
+            response.usage = usage
+        if system_fingerprint:
+            response.system_fingerprint = system_fingerprint
+    response.choices[0].message.content = content
+    return response
+
+
+def openai_stream_completion(results: list):
+    from openai.types.completion import Completion, CompletionChoice
+
+    completions: List[Completion] = results
+    last_chunk = completions[-1]
+    response = Completion(
+        id=last_chunk.id,
+        created=last_chunk.created,
+        model=last_chunk.model,
+        object="text_completion",
+        choices=[CompletionChoice(finish_reason="stop", index=0, text="")],
+    )
+    text = ""
+    for completion in completions:
+        usage = completion.usage
+        system_fingerprint = completion.system_fingerprint
+        if len(completion.choices) > 0 and completion.choices[0].text:
+            text = f"{text}{completion.choices[0].text}"
+        if usage:
+            response.usage = usage
+        if system_fingerprint:
+            response.system_fingerprint = system_fingerprint
+    response.choices[0].text = text
+    return response
+
+
+def anthropic_stream_message(results: list):
+    from anthropic.types import Message, MessageStreamEvent, TextBlock, Usage
+
+    message_stream_events: List[MessageStreamEvent] = results
+    response: Message = Message(
+        id="",
+        model="",
+        content=[],
+        role="assistant",
+        type="message",
+        stop_reason="stop_sequence",
+        stop_sequence=None,
+        usage=Usage(input_tokens=0, output_tokens=0),
+    )
+    content = ""
+    for result in message_stream_events:
+        if result.type == "message_start":
+            response = result.message
+        elif result.type == "content_block_delta":
+            if result.delta.type == "text_delta":
+                content = f"{content}{result.delta.text}"
+        elif result.type == "message_delta":
+            if hasattr(result, "usage"):
+                response.usage.output_tokens = result.usage.output_tokens
+            if hasattr(result.delta, "stop_reason"):
+                response.stop_reason = result.delta.stop_reason
+    response.content.append(TextBlock(type="text", text=content))
+    return response
+
+
+def anthropic_stream_completion(results: list):
+    from anthropic.types import Completion
+
+    completions: List[Completion] = results
+    last_chunk = completions[-1]
+    response = Completion(
+        id=last_chunk.id,
+        completion="",
+        model=last_chunk.model,
+        stop_reason="stop",
+        type="completion",
+    )
+
+    text = ""
+    for completion in completions:
+        text = f"{text}{completion.completion}"
+    response.completion = text
+    return response
+
+
+def stream_response(
+    generator: Generator, after_stream: Callable, map_results: Callable
+):
+    data = {
+        "request_id": None,
+        "raw_response": None,
+        "prompt_blueprint": None,
+    }
+    results = []
+    for result in generator:
+        results.append(result)
+        data["raw_response"] = result
+        yield data
+    request_response = map_results(results)
+    response = after_stream(request_response=request_response.model_dump())
+    data["request_id"] = response.get("request_id")
+    data["prompt_blueprint"] = response.get("prompt_blueprint")
+    yield data
 
 
 def openai_chat_request(client, **kwargs):

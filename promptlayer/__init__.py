@@ -88,8 +88,8 @@ class PromptLayer:
     def run(
         self,
         prompt_name: str,
-        version: Union[int, None] = None,
-        label: Union[str, None] = None,
+        prompt_version: Union[int, None] = None,
+        prompt_release_label: Union[str, None] = None,
         input_variables: Union[Dict[str, str], None] = None,
         tags: Union[List[str], None] = None,
         metadata: Union[Dict[str, str], None] = None,
@@ -97,10 +97,10 @@ class PromptLayer:
         stream=False,
     ):
         template_get_params: GetPromptTemplate = {}
-        if version:
-            template_get_params["version"] = version
-        if label:
-            template_get_params["label"] = label
+        if prompt_version:
+            template_get_params["version"] = prompt_version
+        if prompt_release_label:
+            template_get_params["label"] = prompt_release_label
         if input_variables:
             template_get_params["input_variables"] = input_variables
         prompt_blueprint = self.templates.get(prompt_name, template_get_params)

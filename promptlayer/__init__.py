@@ -88,15 +88,21 @@ class PromptLayer:
     def run(
         self,
         prompt_name: str,
-        template_get_params: Union[GetPromptTemplate, None] = None,
+        version: Union[int, None] = None,
+        label: Union[str, None] = None,
+        input_variables: Union[Dict[str, str], None] = None,
         tags: Union[List[str], None] = None,
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
         stream=False,
     ):
-        input_variables = {}
-        if template_get_params and "input_variables" in template_get_params:
-            input_variables = template_get_params["input_variables"]
+        template_get_params: GetPromptTemplate = {}
+        if version:
+            template_get_params["version"] = version
+        if label:
+            template_get_params["label"] = label
+        if input_variables:
+            template_get_params["input_variables"] = input_variables
         prompt_blueprint = self.templates.get(prompt_name, template_get_params)
         prompt_template = prompt_blueprint["prompt_template"]
         if not prompt_blueprint["llm_kwargs"]:

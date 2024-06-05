@@ -690,16 +690,12 @@ def openai_stream_chat(results: list):
     response.id = last_result.id
     response.created = last_result.created
     response.model = last_result.model
+    response.system_fingerprint = last_result.system_fingerprint
+    response.usage = last_result.usage
     content = ""
     for result in chat_completion_chunks:
-        system_fingerprint = result.system_fingerprint
-        usage = result.usage
         if len(result.choices) > 0 and result.choices[0].delta.content:
             content = f"{content}{result.choices[0].delta.content}"
-        if usage:
-            response.usage = usage
-        if system_fingerprint:
-            response.system_fingerprint = system_fingerprint
     response.choices[0].message.content = content
     return response
 

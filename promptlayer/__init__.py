@@ -103,6 +103,8 @@ class PromptLayer:
             template_get_params["label"] = prompt_release_label
         if input_variables:
             template_get_params["input_variables"] = input_variables
+        if metadata:
+            template_get_params["metadata_filters"] = metadata
         prompt_blueprint = self.templates.get(prompt_name, template_get_params)
         prompt_template = prompt_blueprint["prompt_template"]
         if not prompt_blueprint["llm_kwargs"]:

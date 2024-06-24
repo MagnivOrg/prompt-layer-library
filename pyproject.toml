@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.3"
+version = "1.0.4"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -9,15 +9,15 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
 requests = "^2.31.0"
-openai = "^1.26.0"
-anyio = "^4.3.0"
-anthropic = "^0.25.8"
 
 [tool.poetry.group.dev.dependencies]
 langchain = "^0.0.260"
 behave = "^1.2.6"
 pytest = "^8.2.0"
 pytest-asyncio = "^0.23.6"
+openai = "^1.26.0"
+anyio = "^4.3.0"
+anthropic = "^0.25.8"
 
 [build-system]
 requires = ["poetry-core"]

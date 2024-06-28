@@ -41,7 +41,12 @@ def promptlayer_api_handler(
         isinstance(response, types.GeneratorType)
         or isinstance(response, types.AsyncGeneratorType)
         or type(response).__name__
-        in ["Stream", "AsyncStream", "AsyncMessageStreamManager"]
+        in [
+            "Stream",
+            "AsyncStream",
+            "AsyncMessageStreamManager",
+            "MessageStreamManager",
+        ]
     ):
         return GeneratorProxy(
             response,
@@ -356,6 +361,19 @@ class GeneratorProxy:
                 self.api_key,
             )
 
+    def __enter__(self):
+        api_request_arguments = self.api_request_arugments
+        if hasattr(self.generator, "_MessageStreamManager__api_request"):
+            stream = self.generator.__enter__()
+            return GeneratorProxy(
+                stream,
+                api_request_arguments,
+                self.api_key,
+            )
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         pass
 
@@ -458,7 +476,7 @@ class GeneratorProxy:
                     hasattr(result.choices[0].delta, "content")
                     and result.choices[0].delta.content is not None
                 ):
-                    response[
+                    response["content"] = response[
                         "content"
                     ] = f"{response['content']}{result.choices[0].delta.content}"
             final_result = deepcopy(self.results[-1])

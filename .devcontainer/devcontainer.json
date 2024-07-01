@@ -14,7 +14,7 @@
         "ms-python.vscode-pylance",
         "ms-toolsai.jupyter",
         "ms-python.isort",
-        "ms-python.black-formatter",
+        "ms-python.black-formatter@2023.6.0",
         "esbenp.prettier-vscode"
       ]
     }

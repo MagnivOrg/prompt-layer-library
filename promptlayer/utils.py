@@ -436,8 +436,11 @@ class GeneratorProxy:
                     response = f"{response}{result.completion}"
                 elif hasattr(result, "message") and isinstance(result.message, str):
                     response = f"{response}{result.message}"
-                elif hasattr(result, "content_block") and hasattr(
-                    result.content_block, "text"
+                elif (
+                    hasattr(result, "content_block")
+                    and hasattr(result.content_block, "text")
+                    and "type" in result
+                    and result.type != "message_stop"
                 ):
                     response = f"{response}{result.content_block.text}"
                 elif hasattr(result, "delta") and hasattr(result.delta, "text"):

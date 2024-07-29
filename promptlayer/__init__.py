@@ -1,7 +1,7 @@
 import datetime
 import os
 from copy import deepcopy
-from typing import Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Union
 
 from promptlayer.groups import GroupManager
 from promptlayer.promptlayer import PromptLayerBase
@@ -90,7 +90,7 @@ class PromptLayer:
         prompt_name: str,
         prompt_version: Union[int, None] = None,
         prompt_release_label: Union[str, None] = None,
-        input_variables: Union[Dict[str, str], None] = None,
+        input_variables: Union[Dict[str, Any], None] = None,
         tags: Union[List[str], None] = None,
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,

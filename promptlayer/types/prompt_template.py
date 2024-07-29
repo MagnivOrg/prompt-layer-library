@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional, Sequence, TypedDict, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, TypedDict, Union
 
 from typing_extensions import Required
 
@@ -7,7 +7,7 @@ class GetPromptTemplate(TypedDict, total=False):
     version: int
     label: str
     provider: str
-    input_variables: Dict[str, str]
+    input_variables: Dict[str, Any]
     metadata_filters: Dict[str, str]
 
 

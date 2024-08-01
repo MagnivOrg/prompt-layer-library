@@ -96,6 +96,11 @@ class ToolMessage(TypedDict, total=False):
     name: str
 
 
+class PlaceholderMessage(TypedDict, total=False):
+    role: Literal["placeholder"]
+    name: str
+
+
 class ChatFunctionCall(TypedDict, total=False):
     name: str
 
@@ -108,7 +113,12 @@ class ChatToolChoice(TypedDict, total=False):
 ToolChoice = Union[str, ChatToolChoice]
 
 Message = Union[
-    SystemMessage, UserMessage, AssistantMessage, FunctionMessage, ToolMessage
+    SystemMessage,
+    UserMessage,
+    AssistantMessage,
+    FunctionMessage,
+    ToolMessage,
+    PlaceholderMessage,
 ]
 
 

@@ -167,5 +167,5 @@ class PromptLayer:
         return data
 
 
-__version__ = "1.0.3"
+__version__ = "1.0.9"
 __all__ = ["PromptLayer", "__version__"]

@@ -1,3 +1,4 @@
+import json
 from typing import Sequence
 
 import requests
@@ -15,8 +16,12 @@ from promptlayer import PromptLayer
 
 
 class PromptLayerSpanExporter(SpanExporter):
-    def __init__(self, url="http://localhost:8000/spans"):
+    def __init__(self, url="http://localhost:8000/spans-bulk", api_key=None):
         self.url = url
+        self.api_key = (
+            api_key
+            or ""
+        )
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         request_data = []
@@ -62,7 +67,32 @@ class PromptLayerSpanExporter(SpanExporter):
             request_data.append(span_info)
 
         try:
-            response = requests.post(self.url, json=request_data)
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+
+            response = requests.post(
+                self.url,
+                headers=headers,
+                json={
+                    "spans": request_data,
+                    "workspace_id": 1,
+                },
+            )
+
+            print(f"Response Status Code: {response.status_code}")
+            print("Response Headers:")
+            for header, value in response.headers.items():
+                print(f"  {header}: {value}")
+
+            print("Response Content:")
+            try:
+                json_response = response.json()
+                print(json.dumps(json_response, indent=2))
+            except json.JSONDecodeError:
+                print(response.text)
+
             response.raise_for_status()
             return SpanExportResult.SUCCESS
         except requests.RequestException:

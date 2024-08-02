@@ -1,9 +1,19 @@
 import datetime
+import json
 import os
 from copy import deepcopy
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Sequence, Union
 
+import requests
 from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    SpanExporter,
+    SpanExportResult,
+)
+from opentelemetry.semconv.resource import ResourceAttributes
 
 from promptlayer.groups import GroupManager
 from promptlayer.promptlayer import PromptLayerBase
@@ -20,6 +30,107 @@ from promptlayer.utils import (
     stream_response,
     track_request,
 )
+
+
+class PromptLayerSpanExporter(SpanExporter):
+    def __init__(self, url="http://localhost:8000/spans-bulk", api_key=None):
+        self.url = url
+        self.api_key = (
+            api_key
+            or ""
+        )
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        request_data = []
+
+        for span in spans:
+            span_info = {
+                "name": span.name,
+                "context": {
+                    "trace_id": hex(span.context.trace_id)[2:].zfill(
+                        32
+                    ),  # Ensure 32 characters
+                    "span_id": hex(span.context.span_id)[2:].zfill(
+                        16
+                    ),  # Ensure 16 characters
+                    "trace_state": str(span.context.trace_state),
+                },
+                "kind": str(span.kind),
+                "parent_id": hex(span.parent.span_id)[2:] if span.parent else None,
+                "start_time": span.start_time,
+                "end_time": span.end_time,
+                "status": {
+                    "status_code": str(span.status.status_code),
+                    "description": span.status.description,
+                },
+                "attributes": dict(span.attributes),
+                "events": [
+                    {
+                        "name": event.name,
+                        "timestamp": event.timestamp,
+                        "attributes": dict(event.attributes),
+                    }
+                    for event in span.events
+                ],
+                "links": [
+                    {"context": link.context, "attributes": dict(link.attributes)}
+                    for link in span.links
+                ],
+                "resource": {
+                    "attributes": dict(span.resource.attributes),
+                    "schema_url": span.resource.schema_url,
+                },
+            }
+            request_data.append(span_info)
+
+        try:
+            response = requests.post(
+                self.url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "spans": request_data,
+                    "workspace_id": 1,
+                },
+            )
+            self.print_response(response)
+            response.raise_for_status()
+            return SpanExportResult.SUCCESS
+        except requests.RequestException:
+            return SpanExportResult.FAILURE
+
+    @staticmethod
+    def print_response(response):
+        print(f"\nResponse Status Code: {response.status_code}")
+        print("Response Content:")
+
+        try:
+            json_response = response.json()
+            print(json.dumps(json_response, indent=2))
+        except json.JSONDecodeError:
+            print(response.text)
+
+    def shutdown(self):
+        pass
+
+
+# Set up the resource
+resource = Resource(
+    attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
+)
+
+# Set up the tracer provider
+tracer_provider = TracerProvider(resource=resource)
+
+# Create and add the custom PromptLayerSpanExporter
+promptlayer_exporter = PromptLayerSpanExporter()
+span_processor = BatchSpanProcessor(promptlayer_exporter)
+tracer_provider.add_span_processor(span_processor)
+
+# Set the global trace provider
+trace.set_tracer_provider(tracer_provider)
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {
     "openai": {

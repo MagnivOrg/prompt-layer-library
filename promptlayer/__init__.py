@@ -22,6 +22,7 @@ from promptlayer.templates import TemplateManager
 from promptlayer.track import TrackManager
 from promptlayer.types.prompt_template import GetPromptTemplate
 from promptlayer.utils import (
+    URL_API_PROMPTLAYER,
     anthropic_request,
     anthropic_stream_completion,
     anthropic_stream_message,
@@ -34,12 +35,9 @@ from promptlayer.utils import (
 
 
 class PromptLayerSpanExporter(SpanExporter):
-    def __init__(self, url="http://localhost:8000/spans-bulk", api_key=None):
-        self.url = url
-        self.api_key = (
-            api_key
-            or ""
-        )
+    def __init__(self, api_key=None):
+        self.url = f"{URL_API_PROMPTLAYER}/spans-bulk"
+        self.api_key = api_key
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         request_data = []
@@ -88,7 +86,7 @@ class PromptLayerSpanExporter(SpanExporter):
             response = requests.post(
                 self.url,
                 headers={
-                    "Authorization": f"Bearer {self.api_key}",
+                    "X-Api-Key": self.api_key,
                     "Content-Type": "application/json",
                 },
                 json={
@@ -116,22 +114,6 @@ class PromptLayerSpanExporter(SpanExporter):
     def shutdown(self):
         pass
 
-
-# Set up the resource
-resource = Resource(
-    attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
-)
-
-# Set up the tracer provider
-tracer_provider = TracerProvider(resource=resource)
-
-# Create and add the custom PromptLayerSpanExporter
-promptlayer_exporter = PromptLayerSpanExporter()
-span_processor = BatchSpanProcessor(promptlayer_exporter)
-tracer_provider.add_span_processor(span_processor)
-
-# Set the global trace provider
-trace.set_tracer_provider(tracer_provider)
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {
     "openai": {
@@ -174,6 +156,15 @@ class PromptLayer:
         self.templates = TemplateManager(api_key)
         self.group = GroupManager(api_key)
         self.track = TrackManager(api_key)
+
+        resource = Resource(
+            attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
+        )
+        tracer_provider = TracerProvider(resource=resource)
+        promptlayer_exporter = PromptLayerSpanExporter(api_key=self.api_key)
+        span_processor = BatchSpanProcessor(promptlayer_exporter)
+        tracer_provider.add_span_processor(span_processor)
+        trace.set_tracer_provider(tracer_provider)
         self.tracer = trace.get_tracer(__name__)
 
     def __getattr__(

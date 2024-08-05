@@ -1,13 +1,10 @@
 from promptlayer import PromptLayer
 
-pl = PromptLayer(api_key="pl_7b93c14d8a188035bcaa52e61d9b8c58")
+pl = PromptLayer(api_key="pl_7b93c14d8a188035bcaa52e61d9b8c58", enable_tracing=True)
 
 
 @pl.traceable()
 def beans(qty):
-    import time
-
-    time.sleep(1)
     return f"{qty} beans"
 
 

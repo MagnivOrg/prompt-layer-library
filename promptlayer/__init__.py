@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 from copy import deepcopy
+from functools import wraps
 from typing import Any, Dict, List, Literal, Sequence, Union
 
 import requests
@@ -320,6 +321,37 @@ class PromptLayer:
                 "raw_response": response,
                 "prompt_blueprint": request_log["prompt_blueprint"],
             }
+
+    def traceable(self, run_type=None, metadata=None):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                with self.tracer.start_as_current_span(func.__name__) as span:
+                    if run_type:
+                        span.set_attribute("run_type", run_type)
+
+                    if metadata:
+                        for key, value in metadata.items():
+                            span.set_attribute(key, value)
+
+                    promptlayer_extra = kwargs.pop("promptlayer_extra", {})
+                    run_id = promptlayer_extra.get("run_id")
+
+                    if run_id:
+                        span.set_attribute("run_id", run_id)
+
+                    extra_metadata = promptlayer_extra.get("metadata", {})
+
+                    for key, value in extra_metadata.items():
+                        span.set_attribute(key, value)
+
+                    result = func(*args, **kwargs)
+
+                    return result
+
+            return wrapper
+
+        return decorator
 
 
 __version__ = "1.0.9"

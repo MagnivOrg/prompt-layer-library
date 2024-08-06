@@ -308,7 +308,7 @@ class PromptLayer:
                         track_request_span.set_attribute("function_name", function_name)
                         track_request_span.set_attribute("provider_type", provider)
 
-                        request_log = track_request(
+                        _request_log = track_request(
                             function_name=function_name,
                             provider_type=provider,
                             args=[],
@@ -327,9 +327,9 @@ class PromptLayer:
                         )
 
                         llm_request_span.set_attribute(
-                            "request_log_id", request_log["request_id"]
+                            "request_log_id", _request_log["request_id"]
                         )
-                        return request_log
+                        return _request_log
 
                 # Handle streaming response
                 if stream:

@@ -302,9 +302,14 @@ class PromptLayer:
         if stream and provider == "openai":
             kwargs["stream_options"] = {"include_usage": True}
 
+        llm_request_span_id = None
+
         # Make the request
         if self.tracer:
             with self.tracer.start_as_current_span("llm_request") as llm_request_span:
+                llm_request_span_id = hex(llm_request_span.context.span_id)[2:].zfill(
+                    16
+                )
                 llm_request_span.set_attribute("provider", provider)
                 llm_request_span.set_attribute("function_name", function_name)
                 response = request_function(prompt_blueprint, **kwargs)
@@ -337,6 +342,7 @@ class PromptLayer:
                 prompt_input_variables=input_variables,
                 group_id=group_id,
                 return_prompt_blueprint=True,
+                llm_request_span_id=llm_request_span_id,
                 **body,
             )
 

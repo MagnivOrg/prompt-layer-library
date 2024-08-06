@@ -108,43 +108,6 @@ class PromptLayer:
         else:
             return None
 
-    def run(
-        self,
-        prompt_name: str,
-        prompt_version: Union[int, None] = None,
-        prompt_release_label: Union[str, None] = None,
-        input_variables: Union[Dict[str, Any], None] = None,
-        tags: Union[List[str], None] = None,
-        metadata: Union[Dict[str, str], None] = None,
-        group_id: Union[int, None] = None,
-        stream: bool = False,
-    ) -> Dict[str, Any]:
-        if self.tracer:
-            with self.tracer.start_as_current_span("PromptLayer.run") as main_span:
-                main_span.set_attribute("prompt_name", prompt_name)
-                main_span.set_attribute("stream", stream)
-                return self._run_internal(
-                    prompt_name,
-                    prompt_version,
-                    prompt_release_label,
-                    input_variables,
-                    tags,
-                    metadata,
-                    group_id,
-                    stream,
-                )
-        else:
-            return self._run_internal(
-                prompt_name,
-                prompt_version,
-                prompt_release_label,
-                input_variables,
-                tags,
-                metadata,
-                group_id,
-                stream,
-            )
-
     def _run_internal(
         self,
         prompt_name: str,
@@ -286,6 +249,43 @@ class PromptLayer:
             "raw_response": response,
             "prompt_blueprint": request_log["prompt_blueprint"],
         }
+
+    def run(
+        self,
+        prompt_name: str,
+        prompt_version: Union[int, None] = None,
+        prompt_release_label: Union[str, None] = None,
+        input_variables: Union[Dict[str, Any], None] = None,
+        tags: Union[List[str], None] = None,
+        metadata: Union[Dict[str, str], None] = None,
+        group_id: Union[int, None] = None,
+        stream: bool = False,
+    ) -> Dict[str, Any]:
+        if self.tracer:
+            with self.tracer.start_as_current_span("PromptLayer.run") as main_span:
+                main_span.set_attribute("prompt_name", prompt_name)
+                main_span.set_attribute("stream", stream)
+                return self._run_internal(
+                    prompt_name,
+                    prompt_version,
+                    prompt_release_label,
+                    input_variables,
+                    tags,
+                    metadata,
+                    group_id,
+                    stream,
+                )
+        else:
+            return self._run_internal(
+                prompt_name,
+                prompt_version,
+                prompt_release_label,
+                input_variables,
+                tags,
+                metadata,
+                group_id,
+                stream,
+            )
 
     def traceable(self, run_type=None, metadata=None):
         def decorator(func):

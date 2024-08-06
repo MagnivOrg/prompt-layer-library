@@ -78,7 +78,10 @@ class PromptLayer:
             import openai as openai_module
 
             openai = PromptLayerBase(
-                openai_module, function_name="openai", api_key=self.api_key
+                openai_module,
+                function_name="openai",
+                api_key=self.api_key,
+                tracer=self.tracer,
             )
             return openai
         elif name == "anthropic":
@@ -89,6 +92,7 @@ class PromptLayer:
                 function_name="anthropic",
                 provider_type="anthropic",
                 api_key=self.api_key,
+                tracer=self.tracer,
             )
             return anthropic
         else:
@@ -287,15 +291,12 @@ class PromptLayer:
                 stream,
             )
 
-    def traceable(self, run_type=None, metadata=None):
+    def traceable(self, metadata=None):
         def decorator(func):
             @wraps(func)
             def wrapper(*args, **kwargs):
                 if self.tracer:
                     with self.tracer.start_as_current_span(func.__name__) as span:
-                        if run_type:
-                            span.set_attribute("run_type", run_type)
-
                         if metadata:
                             for key, value in metadata.items():
                                 span.set_attribute(key, value)

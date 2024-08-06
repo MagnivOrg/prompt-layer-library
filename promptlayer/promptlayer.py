@@ -201,45 +201,30 @@ class PromptLayer:
         def _track_request(**body):
             request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
+            common_args = {
+                "function_name": function_name,
+                "provider_type": provider,
+                "args": [],
+                "kwargs": kwargs,
+                "tags": tags,
+                "request_start_time": request_start_time,
+                "request_end_time": request_end_time,
+                "api_key": self.api_key,
+                "metadata": metadata,
+                "prompt_id": prompt_blueprint["id"],
+                "prompt_version": prompt_blueprint["version"],
+                "prompt_input_variables": input_variables,
+                "group_id": group_id,
+                "return_prompt_blueprint": True,
+                "span_id": llm_request_span_id,
+                **body,
+            }
+
             if self.tracer:
                 with self.tracer.start_as_current_span("track_request"):
-                    return track_request(
-                        function_name=function_name,
-                        provider_type=provider,
-                        args=[],
-                        kwargs=kwargs,
-                        tags=tags,
-                        request_start_time=request_start_time,
-                        request_end_time=request_end_time,
-                        api_key=self.api_key,
-                        metadata=metadata,
-                        prompt_id=prompt_blueprint["id"],
-                        prompt_version=prompt_blueprint["version"],
-                        prompt_input_variables=input_variables,
-                        group_id=group_id,
-                        return_prompt_blueprint=True,
-                        span_id=llm_request_span_id,
-                        **body,
-                    )
+                    return track_request(**common_args)
             else:
-                return track_request(
-                    function_name=function_name,
-                    provider_type=provider,
-                    args=[],
-                    kwargs=kwargs,
-                    tags=tags,
-                    request_start_time=request_start_time,
-                    request_end_time=request_end_time,
-                    api_key=self.api_key,
-                    metadata=metadata,
-                    prompt_id=prompt_blueprint["id"],
-                    prompt_version=prompt_blueprint["version"],
-                    prompt_input_variables=input_variables,
-                    group_id=group_id,
-                    return_prompt_blueprint=True,
-                    span_id=llm_request_span_id,
-                    **body,
-                )
+                return track_request(**common_args)
 
         # Handle streaming response
         if stream:

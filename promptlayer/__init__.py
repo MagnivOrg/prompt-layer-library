@@ -342,7 +342,7 @@ class PromptLayer:
                 prompt_input_variables=input_variables,
                 group_id=group_id,
                 return_prompt_blueprint=True,
-                llm_request_span_id=llm_request_span_id,
+                span_id=llm_request_span_id,
                 **body,
             )
 

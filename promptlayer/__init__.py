@@ -156,19 +156,7 @@ class PromptLayer:
         self.templates = TemplateManager(api_key)
         self.group = GroupManager(api_key)
         self.track = TrackManager(api_key)
-
-        if enable_tracing:
-            resource = Resource(
-                attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
-            )
-            tracer_provider = TracerProvider(resource=resource)
-            promptlayer_exporter = PromptLayerSpanExporter(api_key=self.api_key)
-            span_processor = BatchSpanProcessor(promptlayer_exporter)
-            tracer_provider.add_span_processor(span_processor)
-            trace.set_tracer_provider(tracer_provider)
-            self.tracer = trace.get_tracer(__name__)
-        else:
-            self.tracer = None
+        self.tracer = self._initialize_tracer(enable_tracing)
 
     def __getattr__(
         self,
@@ -193,6 +181,20 @@ class PromptLayer:
             return anthropic
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
+
+    def _initialize_tracer(self, enable_tracing: bool):
+        if enable_tracing:
+            resource = Resource(
+                attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
+            )
+            tracer_provider = TracerProvider(resource=resource)
+            promptlayer_exporter = PromptLayerSpanExporter(api_key=self.api_key)
+            span_processor = BatchSpanProcessor(promptlayer_exporter)
+            tracer_provider.add_span_processor(span_processor)
+            trace.set_tracer_provider(tracer_provider)
+            return trace.get_tracer(__name__)
+        else:
+            return None
 
     def run(
         self,

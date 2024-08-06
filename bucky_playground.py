@@ -11,9 +11,6 @@ OpenAI = pl.openai.OpenAI
 @pl.traceable()
 def get_current_weather(location, unit="fahrenheit"):
     """Get the current weather in a given location"""
-    import time
-
-    time.sleep(1)
     if "tokyo" in location.lower():
         return json.dumps({"location": "Tokyo", "temperature": "10", "unit": unit})
     elif "san francisco" in location.lower():

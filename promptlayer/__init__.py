@@ -1,5 +1,4 @@
 import datetime
-import json
 import os
 from copy import deepcopy
 from functools import wraps
@@ -94,22 +93,10 @@ class PromptLayerSpanExporter(SpanExporter):
                     "workspace_id": 1,
                 },
             )
-            self.print_response(response)
             response.raise_for_status()
             return SpanExportResult.SUCCESS
         except requests.RequestException:
             return SpanExportResult.FAILURE
-
-    @staticmethod
-    def print_response(response):
-        print(f"\nResponse Status Code: {response.status_code}")
-        print("Response Content:")
-
-        try:
-            json_response = response.json()
-            print(json.dumps(json_response, indent=2))
-        except json.JSONDecodeError:
-            print(response.text)
 
     def shutdown(self):
         pass
@@ -308,50 +295,92 @@ class PromptLayer:
                 llm_request_span.set_attribute("provider", provider)
                 llm_request_span.set_attribute("function_name", function_name)
                 response = request_function(prompt_blueprint, **kwargs)
+
+                # Define tracking function
+                def _track_request(**body):
+                    request_end_time = datetime.datetime.now(
+                        datetime.timezone.utc
+                    ).timestamp()
+
+                    with self.tracer.start_as_current_span(
+                        "track_request"
+                    ) as track_request_span:
+                        track_request_span.set_attribute("function_name", function_name)
+                        track_request_span.set_attribute("provider_type", provider)
+
+                        request_log = track_request(
+                            function_name=function_name,
+                            provider_type=provider,
+                            args=[],
+                            kwargs=kwargs,
+                            tags=tags,
+                            request_start_time=request_start_time,
+                            request_end_time=request_end_time,
+                            api_key=self.api_key,
+                            metadata=metadata,
+                            prompt_id=prompt_blueprint["id"],
+                            prompt_version=prompt_blueprint["version"],
+                            prompt_input_variables=input_variables,
+                            group_id=group_id,
+                            return_prompt_blueprint=True,
+                            **body,
+                        )
+
+                        llm_request_span.set_attribute(
+                            "request_log_id", request_log["request_id"]
+                        )
+                        return request_log
+
+                # Handle streaming response
+                if stream:
+                    return stream_response(response, _track_request, stream_function)
+
+                # Handle non-streaming response
+                request_log = _track_request(request_response=response.model_dump())
+
+                return {
+                    "request_id": request_log["request_id"],
+                    "raw_response": response,
+                    "prompt_blueprint": request_log["prompt_blueprint"],
+                }
         else:
             response = request_function(prompt_blueprint, **kwargs)
 
-        # Define tracking function
-        def _track_request(**body):
-            request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            # Define tracking function
+            def _track_request(**body):
+                request_end_time = datetime.datetime.now(
+                    datetime.timezone.utc
+                ).timestamp()
+                return track_request(
+                    function_name=function_name,
+                    provider_type=provider,
+                    args=[],
+                    kwargs=kwargs,
+                    tags=tags,
+                    request_start_time=request_start_time,
+                    request_end_time=request_end_time,
+                    api_key=self.api_key,
+                    metadata=metadata,
+                    prompt_id=prompt_blueprint["id"],
+                    prompt_version=prompt_blueprint["version"],
+                    prompt_input_variables=input_variables,
+                    group_id=group_id,
+                    return_prompt_blueprint=True,
+                    **body,
+                )
 
-            if self.tracer:
-                with self.tracer.start_as_current_span(
-                    "track_request"
-                ) as track_request_span:
-                    track_request_span.set_attribute("function_name", function_name)
-                    track_request_span.set_attribute("provider_type", provider)
+            # Handle streaming response
+            if stream:
+                return stream_response(response, _track_request, stream_function)
 
-            return track_request(
-                function_name=function_name,
-                provider_type=provider,
-                args=[],
-                kwargs=kwargs,
-                tags=tags,
-                request_start_time=request_start_time,
-                request_end_time=request_end_time,
-                api_key=self.api_key,
-                metadata=metadata,
-                prompt_id=prompt_blueprint["id"],
-                prompt_version=prompt_blueprint["version"],
-                prompt_input_variables=input_variables,
-                group_id=group_id,
-                return_prompt_blueprint=True,
-                **body,
-            )
+            # Handle non-streaming response
+            request_log = _track_request(request_response=response.model_dump())
 
-        # Handle streaming response
-        if stream:
-            return stream_response(response, _track_request, stream_function)
-
-        # Handle non-streaming response
-        request_log = _track_request(request_response=response.model_dump())
-
-        return {
-            "request_id": request_log["request_id"],
-            "raw_response": response,
-            "prompt_blueprint": request_log["prompt_blueprint"],
-        }
+            return {
+                "request_id": request_log["request_id"],
+                "raw_response": response,
+                "prompt_blueprint": request_log["prompt_blueprint"],
+            }
 
     def traceable(self, run_type=None, metadata=None):
         def decorator(func):

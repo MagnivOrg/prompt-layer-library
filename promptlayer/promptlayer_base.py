@@ -65,12 +65,13 @@ class PromptLayerBase(object):
 
     def __call__(self, *args, **kwargs):
         tags = kwargs.pop("pl_tags", None)
+
         if tags is not None and not isinstance(tags, list):
             raise Exception("pl_tags must be a list of strings.")
+
         return_pl_id = kwargs.pop("return_pl_id", False)
         request_start_time = datetime.datetime.now().timestamp()
         function_object = object.__getattribute__(self, "_obj")
-
         tracer = object.__getattribute__(self, "_tracer")
         function_name = object.__getattribute__(self, "_function_name")
 
@@ -121,7 +122,7 @@ class PromptLayerBase(object):
                     return_pl_id=return_pl_id,
                 )
         else:
-            # Original code without tracing
+            # Without tracing
             if inspect.isclass(function_object):
                 return PromptLayerBase(
                     function_object(*args, **kwargs),

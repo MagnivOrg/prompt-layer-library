@@ -76,11 +76,14 @@ class PromptLayerBase(object):
         function_name = object.__getattribute__(self, "_function_name")
 
         if tracer:
-            with tracer.start_as_current_span(function_name) as span:
-                span.set_attribute(
+            with tracer.start_as_current_span(function_name) as llm_request_span:
+                llm_request_span_id = hex(llm_request_span.context.span_id)[2:].zfill(
+                    16
+                )
+                llm_request_span.set_attribute(
                     "provider", object.__getattribute__(self, "_provider_type")
                 )
-                span.set_attribute("function_name", function_name)
+                llm_request_span.set_attribute("function_name", function_name)
 
                 if inspect.isclass(function_object):
                     return PromptLayerBase(
@@ -120,6 +123,7 @@ class PromptLayerBase(object):
                     request_end_time,
                     object.__getattribute__(self, "_api_key"),
                     return_pl_id=return_pl_id,
+                    llm_request_span_id=llm_request_span_id,
                 )
         else:
             # Without tracing

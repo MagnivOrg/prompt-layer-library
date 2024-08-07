@@ -36,6 +36,7 @@ def promptlayer_api_handler(
     request_end_time,
     api_key,
     return_pl_id=False,
+    llm_request_span_id=None,
 ):
     if (
         isinstance(response, types.GeneratorType)
@@ -74,6 +75,7 @@ def promptlayer_api_handler(
             request_end_time,
             api_key,
             return_pl_id=return_pl_id,
+            llm_request_span_id=llm_request_span_id,
         )
         if return_pl_id:
             return response, request_id
@@ -135,6 +137,7 @@ def promptlayer_api_request(
     api_key,
     return_pl_id=False,
     metadata=None,
+    llm_request_span_id=None,
 ):
     if isinstance(response, dict) and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
@@ -157,6 +160,7 @@ def promptlayer_api_request(
                 "request_end_time": request_end_time,
                 "metadata": metadata,
                 "api_key": api_key,
+                "span_id": llm_request_span_id,
             },
         )
         if not hasattr(request_response, "status_code"):

@@ -68,7 +68,8 @@ class PromptLayerSpanExporter(SpanExporter):
                     "workspace_id": 1,
                 },
             )
-            self.print_response(response)
+            # TODO: Remove
+            # self.print_response(response)
             response.raise_for_status()
             return SpanExportResult.SUCCESS
         except requests.RequestException:

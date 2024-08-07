@@ -57,8 +57,9 @@ def run_conversation():
         model="gpt-4o",
         messages=messages,
         tools=tools,
-        tool_choice="auto",  # auto is default, but we'll be explicit
+        tool_choice="auto",
     )
+
     response_message = response.choices[0].message
     tool_calls = response_message.tool_calls
     # Step 2: check if the model wanted to call a function
@@ -89,7 +90,9 @@ def run_conversation():
         second_response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
+            return_pl_id=True,
         )  # get a new response from the model where it can see the function response
+
         return second_response
 
 

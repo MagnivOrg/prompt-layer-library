@@ -65,16 +65,16 @@ def promptlayer_api_handler(
             api_key,
         )
     else:
-        request_id = promptlayer_api_request(
-            function_name,
-            provider_type,
-            args,
-            kwargs,
-            tags,
-            response,
-            request_start_time,
-            request_end_time,
-            api_key,
+        request_id = promptlayer_track_request(
+            function_name=function_name,
+            provider_type=provider_type,
+            args=args,
+            kwargs=kwargs,
+            tags=tags,
+            response=response,
+            request_start_time=request_start_time,
+            request_end_time=request_end_time,
+            api_key=api_key,
             return_pl_id=return_pl_id,
             llm_request_span_id=llm_request_span_id,
         )
@@ -128,7 +128,8 @@ def convert_native_object_to_dict(native_object):
     return native_object
 
 
-def promptlayer_api_request(
+def promptlayer_track_request(
+    *,
     function_name,
     provider_type,
     args,
@@ -199,16 +200,16 @@ def promptlayer_api_request_async(
 ):
     return run_in_thread_async(
         None,
-        promptlayer_api_request,
-        function_name,
-        provider_type,
-        args,
-        kwargs,
-        tags,
-        response,
-        request_start_time,
-        request_end_time,
-        api_key,
+        promptlayer_track_request,
+        function_name=function_name,
+        provider_type=provider_type,
+        args=args,
+        kwargs=kwargs,
+        tags=tags,
+        response=response,
+        request_start_time=request_start_time,
+        request_end_time=request_end_time,
+        api_key=api_key,
         return_pl_id=return_pl_id,
     )
 
@@ -403,6 +404,7 @@ class GeneratorProxy:
         self.results.append(result)
         provider_type = self.api_request_arugments["provider_type"]
         end_anthropic = False
+
         if provider_type == "anthropic":
             if hasattr(result, "stop_reason"):
                 end_anthropic = result.stop_reason
@@ -410,28 +412,32 @@ class GeneratorProxy:
                 end_anthropic = result.message.stop_reason
             elif hasattr(result, "type") and result.type == "message_stop":
                 end_anthropic = True
+
         end_openai = provider_type == "openai" and (
             result.choices[0].finish_reason == "stop"
             or result.choices[0].finish_reason == "length"
         )
 
         if end_anthropic or end_openai:
-            request_id = promptlayer_api_request(
-                self.api_request_arugments["function_name"],
-                self.api_request_arugments["provider_type"],
-                self.api_request_arugments["args"],
-                self.api_request_arugments["kwargs"],
-                self.api_request_arugments["tags"],
-                self.cleaned_result(),
-                self.api_request_arugments["request_start_time"],
-                self.api_request_arugments["request_end_time"],
-                self.api_key,
+            request_id = promptlayer_track_request(
+                function_name=self.api_request_arugments["function_name"],
+                provider_type=self.api_request_arugments["provider_type"],
+                args=self.api_request_arugments["args"],
+                kwargs=self.api_request_arugments["kwargs"],
+                tags=self.api_request_arugments["tags"],
+                response=self.cleaned_result(),
+                request_start_time=self.api_request_arugments["request_start_time"],
+                request_end_time=self.api_request_arugments["request_end_time"],
+                api_key=self.api_key,
                 return_pl_id=self.api_request_arugments["return_pl_id"],
             )
+
             if self.api_request_arugments["return_pl_id"]:
                 return result, request_id
+
         if self.api_request_arugments["return_pl_id"]:
             return result, None
+
         return result
 
     def cleaned_result(self):

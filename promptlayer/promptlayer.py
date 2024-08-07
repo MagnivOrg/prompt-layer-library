@@ -112,7 +112,7 @@ class PromptLayer:
 
         return _track_request
 
-    def _fetch_prompt_blueprint(self, prompt_name, template_params):
+    def _fetch_prompt_blueprint(self, *, prompt_name, template_params):
         if self.tracer:
             with self.tracer.start_as_current_span("fetch_prompt_template") as span:
                 span.set_attribute("prompt_name", prompt_name)
@@ -152,8 +152,25 @@ class PromptLayer:
         return response, span_id
 
     @staticmethod
-    def _prepare_request_params(
-        prompt_blueprint, prompt_template, prompt_blueprint_model, stream
+    def _prepare_get_prompt_template_params(
+        *, prompt_version, prompt_release_label, input_variables, metadata
+    ):
+        params = {}
+
+        if prompt_version:
+            params["version"] = prompt_version
+        if prompt_release_label:
+            params["label"] = prompt_release_label
+        if input_variables:
+            params["input_variables"] = input_variables
+        if metadata:
+            params["metadata_filters"] = metadata
+
+        return params
+
+    @staticmethod
+    def _prepare_llm_request_params(
+        *, prompt_blueprint, prompt_template, prompt_blueprint_model, stream
     ):
         provider = prompt_blueprint_model["provider"]
         kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
@@ -174,21 +191,6 @@ class PromptLayer:
             "kwargs": kwargs,
             "prompt_blueprint": prompt_blueprint,
         }
-
-    @staticmethod
-    def _prepare_template_params(
-        prompt_version, prompt_release_label, input_variables, metadata
-    ):
-        params = {}
-        if prompt_version:
-            params["version"] = prompt_version
-        if prompt_release_label:
-            params["label"] = prompt_release_label
-        if input_variables:
-            params["input_variables"] = input_variables
-        if metadata:
-            params["metadata_filters"] = metadata
-        return params
 
     def _prepare_track_request_kwargs(
         self, request_params, tags, input_variables, group_id, span_id, **body
@@ -228,30 +230,38 @@ class PromptLayer:
         group_id: Union[int, None] = None,
         stream: bool = False,
     ) -> Dict[str, Any]:
-        template_params = self._prepare_template_params(
-            prompt_version, prompt_release_label, input_variables, metadata
+        get_prompt_template_params = self._prepare_get_prompt_template_params(
+            prompt_version=prompt_version,
+            prompt_release_label=prompt_release_label,
+            input_variables=input_variables,
+            metadata=metadata,
         )
-        prompt_blueprint = self._fetch_prompt_blueprint(prompt_name, template_params)
-        prompt_template = prompt_blueprint["prompt_template"]
+        prompt_blueprint = self._fetch_prompt_blueprint(
+            prompt_name=prompt_name, template_params=get_prompt_template_params
+        )
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
-            prompt_blueprint, prompt_name
+            prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
-        request_params = self._prepare_request_params(
-            prompt_blueprint, prompt_template, prompt_blueprint_model, stream
+        llm_request_params = self._prepare_llm_request_params(
+            prompt_blueprint=prompt_blueprint,
+            prompt_template=prompt_blueprint["prompt_template"],
+            prompt_blueprint_model=prompt_blueprint_model,
+            stream=stream,
         )
-        response, span_id = self._make_llm_request(request_params)
+
+        response, span_id = self._make_llm_request(llm_request_params)
 
         if stream:
             return stream_response(
                 response,
                 self._create_track_request(
-                    request_params, tags, input_variables, group_id, span_id
+                    llm_request_params, tags, input_variables, group_id, span_id
                 ),
-                request_params["stream_function"],
+                llm_request_params["stream_function"],
             )
 
         request_log = self._track_request(
-            request_params,
+            llm_request_params,
             tags,
             input_variables,
             group_id,
@@ -278,7 +288,7 @@ class PromptLayer:
 
     @staticmethod
     def _validate_and_extract_model_from_prompt_blueprint(
-        prompt_blueprint, prompt_name
+        *, prompt_blueprint, prompt_name
     ):
         if not prompt_blueprint["llm_kwargs"]:
             raise ValueError(

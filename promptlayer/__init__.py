@@ -160,12 +160,12 @@ class PromptLayer:
             return stream_response(response, _track_request, stream_function)
         request_log = _track_request(request_response=response.model_dump())
         data = {
-            "request_id": request_log["request_id"],
+            "request_id": request_log.get("request_id", None),
             "raw_response": response,
-            "prompt_blueprint": request_log["prompt_blueprint"],
+            "prompt_blueprint": request_log.get("prompt_blueprint", None),
         }
         return data
 
 
-__version__ = "1.0.9"
+__version__ = "1.0.10"
 __all__ = ["PromptLayer", "__version__"]

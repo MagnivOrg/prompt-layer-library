@@ -98,10 +98,12 @@ class PromptLayer:
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 
-    def _create_track_request(self, request_params, tags, input_variables, group_id):
+    def _create_track_request(
+        self, request_params, tags, input_variables, group_id, span_id
+    ):
         def _track_request(**body):
             track_request_kwargs = self._prepare_track_request_kwargs(
-                request_params, tags, input_variables, group_id, **body
+                request_params, tags, input_variables, group_id, span_id, **body
             )
             if self.tracer:
                 with self.tracer.start_as_current_span("track_request"):
@@ -132,16 +134,22 @@ class PromptLayer:
             return None
 
     def _make_llm_request(self, request_params):
+        span_id = None
+
         if self.tracer:
             with self.tracer.start_as_current_span("llm_request") as span:
                 span.set_attribute("provider", request_params["provider"])
                 span.set_attribute("function_name", request_params["function_name"])
-                return request_params["request_function"](
+                span_id = hex(span.context.span_id)[2:].zfill(16)
+                response = request_params["request_function"](
                     request_params["prompt_blueprint"], **request_params["kwargs"]
                 )
-        return request_params["request_function"](
-            request_params["prompt_blueprint"], **request_params["kwargs"]
-        )
+        else:
+            response = request_params["request_function"](
+                request_params["prompt_blueprint"], **request_params["kwargs"]
+            )
+
+        return response, span_id
 
     @staticmethod
     def _prepare_request_params(
@@ -183,7 +191,7 @@ class PromptLayer:
         return params
 
     def _prepare_track_request_kwargs(
-        self, request_params, tags, input_variables, group_id, **body
+        self, request_params, tags, input_variables, group_id, span_id, **body
     ):
         return {
             "function_name": request_params["function_name"],
@@ -204,7 +212,7 @@ class PromptLayer:
             "prompt_input_variables": input_variables,
             "group_id": group_id,
             "return_prompt_blueprint": True,
-            "span_id": getattr(self, "llm_request_span_id", None),
+            "span_id": span_id,
             **body,
         }
 
@@ -231,13 +239,13 @@ class PromptLayer:
         request_params = self._prepare_request_params(
             prompt_blueprint, prompt_template, prompt_blueprint_model, stream
         )
-        response = self._make_llm_request(request_params)
+        response, span_id = self._make_llm_request(request_params)
 
         if stream:
             return stream_response(
                 response,
                 self._create_track_request(
-                    request_params, tags, input_variables, group_id
+                    request_params, tags, input_variables, group_id, span_id
                 ),
                 request_params["stream_function"],
             )
@@ -247,6 +255,7 @@ class PromptLayer:
             tags,
             input_variables,
             group_id,
+            span_id,
             request_response=response.model_dump(),
         )
 
@@ -256,9 +265,11 @@ class PromptLayer:
             "prompt_blueprint": request_log["prompt_blueprint"],
         }
 
-    def _track_request(self, request_params, tags, input_variables, group_id, **body):
+    def _track_request(
+        self, request_params, tags, input_variables, group_id, span_id, **body
+    ):
         track_request_kwargs = self._prepare_track_request_kwargs(
-            request_params, tags, input_variables, group_id, **body
+            request_params, tags, input_variables, group_id, span_id, **body
         )
         if self.tracer:
             with self.tracer.start_as_current_span("track_request"):
@@ -330,17 +341,6 @@ class PromptLayer:
                             for key, value in metadata.items():
                                 span.set_attribute(key, value)
 
-                        promptlayer_extra = kwargs.pop("promptlayer_extra", {})
-                        run_id = promptlayer_extra.get("run_id")
-
-                        if run_id:
-                            span.set_attribute("run_id", run_id)
-
-                        extra_metadata = promptlayer_extra.get("metadata", {})
-
-                        for key, value in extra_metadata.items():
-                            span.set_attribute(key, value)
-
                         result = func(*args, **kwargs)
 
                         return result
@@ -354,17 +354,6 @@ class PromptLayer:
                         if metadata:
                             for key, value in metadata.items():
                                 span.set_attribute(key, value)
-
-                        promptlayer_extra = kwargs.pop("promptlayer_extra", {})
-                        run_id = promptlayer_extra.get("run_id")
-
-                        if run_id:
-                            span.set_attribute("run_id", run_id)
-
-                        extra_metadata = promptlayer_extra.get("metadata", {})
-
-                        for key, value in extra_metadata.items():
-                            span.set_attribute(key, value)
 
                         result = await func(*args, **kwargs)
 

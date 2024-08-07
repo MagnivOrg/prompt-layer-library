@@ -98,7 +98,7 @@ class PromptLayer:
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 
-    def _create_track_request(
+    def _create_track_request_callable(
         self, request_params, tags, input_variables, group_id, span_id
     ):
         def _track_request(**body):
@@ -254,13 +254,13 @@ class PromptLayer:
         if stream:
             return stream_response(
                 response,
-                self._create_track_request(
+                self._create_track_request_callable(
                     llm_request_params, tags, input_variables, group_id, span_id
                 ),
                 llm_request_params["stream_function"],
             )
 
-        request_log = self._track_request(
+        request_log = self._track_request_log(
             llm_request_params,
             tags,
             input_variables,
@@ -275,7 +275,7 @@ class PromptLayer:
             "prompt_blueprint": request_log.get("prompt_blueprint", None),
         }
 
-    def _track_request(
+    def _track_request_log(
         self, request_params, tags, input_variables, group_id, span_id, **body
     ):
         track_request_kwargs = self._prepare_track_request_kwargs(

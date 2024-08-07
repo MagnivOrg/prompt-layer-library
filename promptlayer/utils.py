@@ -65,7 +65,7 @@ def promptlayer_api_handler(
             api_key,
         )
     else:
-        request_id = promptlayer_track_request(
+        request_id = promptlayer_api_request(
             function_name=function_name,
             provider_type=provider_type,
             args=args,
@@ -128,7 +128,7 @@ def convert_native_object_to_dict(native_object):
     return native_object
 
 
-def promptlayer_track_request(
+def promptlayer_api_request(
     *,
     function_name,
     provider_type,
@@ -220,7 +220,7 @@ def promptlayer_api_request_async(
 ):
     return run_in_thread_async(
         None,
-        promptlayer_track_request,
+        promptlayer_api_request,
         function_name=function_name,
         provider_type=provider_type,
         args=args,
@@ -439,7 +439,7 @@ class GeneratorProxy:
         )
 
         if end_anthropic or end_openai:
-            request_id = promptlayer_track_request(
+            request_id = promptlayer_api_request(
                 function_name=self.api_request_arugments["function_name"],
                 provider_type=self.api_request_arugments["provider_type"],
                 args=self.api_request_arugments["args"],

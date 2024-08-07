@@ -114,6 +114,7 @@ class PromptLayer:
 
     def _run_internal(
         self,
+        *,
         prompt_name: str,
         prompt_version: Union[int, None] = None,
         prompt_release_label: Union[str, None] = None,
@@ -201,7 +202,7 @@ class PromptLayer:
         def _track_request(**body):
             request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
-            common_args = {
+            track_request_kwargs = {
                 "function_name": function_name,
                 "provider_type": provider,
                 "args": [],
@@ -222,9 +223,9 @@ class PromptLayer:
 
             if self.tracer:
                 with self.tracer.start_as_current_span("track_request"):
-                    return track_request(**common_args)
+                    return track_request(**track_request_kwargs)
             else:
-                return track_request(**common_args)
+                return track_request(**track_request_kwargs)
 
         # Handle streaming response
         if stream:
@@ -250,31 +251,24 @@ class PromptLayer:
         group_id: Union[int, None] = None,
         stream: bool = False,
     ) -> Dict[str, Any]:
+        _run_internal_kwargs = {
+            "prompt_name": prompt_name,
+            "prompt_version": prompt_version,
+            "prompt_release_label": prompt_release_label,
+            "input_variables": input_variables,
+            "tags": tags,
+            "metadata": metadata,
+            "group_id": group_id,
+            "stream": stream,
+        }
+
         if self.tracer:
             with self.tracer.start_as_current_span("PromptLayer.run") as main_span:
                 main_span.set_attribute("prompt_name", prompt_name)
                 main_span.set_attribute("stream", stream)
-                return self._run_internal(
-                    prompt_name,
-                    prompt_version,
-                    prompt_release_label,
-                    input_variables,
-                    tags,
-                    metadata,
-                    group_id,
-                    stream,
-                )
+                return self._run_internal(**_run_internal_kwargs)
         else:
-            return self._run_internal(
-                prompt_name,
-                prompt_version,
-                prompt_release_label,
-                input_variables,
-                tags,
-                metadata,
-                group_id,
-                stream,
-            )
+            return self._run_internal(**_run_internal_kwargs)
 
     def traceable(self, metadata=None):
         def decorator(func):

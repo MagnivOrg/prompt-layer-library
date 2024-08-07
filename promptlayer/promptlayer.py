@@ -342,7 +342,6 @@ class PromptLayer:
                                 span.set_attribute(key, value)
 
                         result = func(*args, **kwargs)
-
                         return result
                 else:
                     return func(*args, **kwargs)
@@ -356,7 +355,6 @@ class PromptLayer:
                                 span.set_attribute(key, value)
 
                         result = await func(*args, **kwargs)
-
                         return result
                 else:
                     return await func(*args, **kwargs)

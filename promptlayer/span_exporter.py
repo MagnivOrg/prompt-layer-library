@@ -1,4 +1,3 @@
-import json
 from typing import Sequence
 
 import requests
@@ -68,23 +67,10 @@ class PromptLayerSpanExporter(SpanExporter):
                     "workspace_id": 1,
                 },
             )
-            # TODO: Remove
-            # self.print_response(response)
             response.raise_for_status()
             return SpanExportResult.SUCCESS
         except requests.RequestException:
             return SpanExportResult.FAILURE
-
-    @staticmethod
-    def print_response(response):
-        print(f"\nResponse Status Code: {response.status_code}")
-        print("Response Content:")
-
-        try:
-            json_response = response.json()
-            print(json.dumps(json_response, indent=2))
-        except json.JSONDecodeError:
-            print(response.text)
 
     def shutdown(self):
         pass

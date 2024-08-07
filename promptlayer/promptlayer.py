@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import os
 from copy import deepcopy
@@ -273,7 +274,7 @@ class PromptLayer:
     def traceable(self, metadata=None):
         def decorator(func):
             @wraps(func)
-            def wrapper(*args, **kwargs):
+            def sync_wrapper(*args, **kwargs):
                 if self.tracer:
                     with self.tracer.start_as_current_span(func.__name__) as span:
                         if metadata:
@@ -297,6 +298,31 @@ class PromptLayer:
                 else:
                     return func(*args, **kwargs)
 
-            return wrapper
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                if self.tracer:
+                    with self.tracer.start_as_current_span(func.__name__) as span:
+                        if metadata:
+                            for key, value in metadata.items():
+                                span.set_attribute(key, value)
+
+                        promptlayer_extra = kwargs.pop("promptlayer_extra", {})
+                        run_id = promptlayer_extra.get("run_id")
+
+                        if run_id:
+                            span.set_attribute("run_id", run_id)
+
+                        extra_metadata = promptlayer_extra.get("metadata", {})
+
+                        for key, value in extra_metadata.items():
+                            span.set_attribute(key, value)
+
+                        result = await func(*args, **kwargs)
+
+                        return result
+                else:
+                    return await func(*args, **kwargs)
+
+            return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
 
         return decorator

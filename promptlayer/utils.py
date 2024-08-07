@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Callable, Generator, List, Union
 
 import requests
+from opentelemetry import context
 
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
@@ -93,6 +94,7 @@ async def promptlayer_api_handler_async(
     request_end_time,
     api_key,
     return_pl_id=False,
+    llm_request_span_id=None,
 ):
     return await run_in_thread_async(
         None,
@@ -107,6 +109,7 @@ async def promptlayer_api_handler_async(
         request_end_time,
         api_key,
         return_pl_id=return_pl_id,
+        llm_request_span_id=llm_request_span_id,
     )
 
 
@@ -535,23 +538,33 @@ async def async_wrapper(
     provider_type,
     tags,
     api_key: str = None,
+    llm_request_span_id: str = None,
     *args,
     **kwargs,
 ):
-    response = await coroutine_obj
-    request_end_time = datetime.datetime.now().timestamp()
-    return await promptlayer_api_handler_async(
-        function_name,
-        provider_type,
-        args,
-        kwargs,
-        tags,
-        response,
-        request_start_time,
-        request_end_time,
-        api_key,
-        return_pl_id=return_pl_id,
-    )
+    # Capture the current context before entering the async function
+    current_context = context.get_current()
+
+    # Use contextvars to propagate the context
+    token = context.attach(current_context)
+    try:
+        response = await coroutine_obj
+        request_end_time = datetime.datetime.now().timestamp()
+        return await promptlayer_api_handler_async(
+            function_name,
+            provider_type,
+            args,
+            kwargs,
+            tags,
+            response,
+            request_start_time,
+            request_end_time,
+            api_key,
+            return_pl_id=return_pl_id,
+            llm_request_span_id=llm_request_span_id,
+        )
+    finally:
+        context.detach(token)
 
 
 def promptlayer_create_group(api_key: str = None):

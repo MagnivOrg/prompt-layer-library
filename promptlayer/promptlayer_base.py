@@ -107,6 +107,7 @@ class PromptLayerBase(object):
                         object.__getattribute__(self, "_provider_type"),
                         tags,
                         api_key=object.__getattribute__(self, "_api_key"),
+                        llm_request_span_id=llm_request_span_id,
                         *args,
                         **kwargs,
                     )

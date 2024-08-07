@@ -138,4 +138,5 @@ test.py
 # VSCode
 .vscode/
 
+# Internal development
 /samples

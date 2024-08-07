@@ -186,6 +186,26 @@ def promptlayer_track_request(
         return request_response.json().get("request_id")
 
 
+def track_request(**body):
+    try:
+        response = requests.post(
+            f"{URL_API_PROMPTLAYER}/track-request",
+            json=body,
+        )
+        if response.status_code != 200:
+            warn_on_bad_response(
+                response,
+                f"PromptLayer had the following error while tracking your request: {response.text}",
+            )
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(
+            f"WARNING: While logging your request PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return {}
+
+
 def promptlayer_api_request_async(
     function_name,
     provider_type,
@@ -686,26 +706,6 @@ def get_all_prompt_templates(
         raise Exception(
             f"PromptLayer had the following error while getting all your prompt templates: {e}"
         )
-
-
-def track_request(**body):
-    try:
-        response = requests.post(
-            f"{URL_API_PROMPTLAYER}/track-request",
-            json=body,
-        )
-        if response.status_code != 200:
-            warn_on_bad_response(
-                response,
-                f"PromptLayer had the following error while tracking your request: {response.text}",
-            )
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(
-            f"WARNING: While logging your request PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
-        return {}
 
 
 def openai_stream_chat(results: list):

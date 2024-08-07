@@ -260,9 +260,9 @@ class PromptLayer:
         )
 
         return {
-            "request_id": request_log["request_id"],
+            "request_id": request_log.get("request_id", None),
             "raw_response": response,
-            "prompt_blueprint": request_log["prompt_blueprint"],
+            "prompt_blueprint": request_log.get("prompt_blueprint", None),
         }
 
     def _track_request(

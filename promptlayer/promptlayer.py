@@ -16,7 +16,6 @@ from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.span_exporter import PromptLayerSpanExporter
 from promptlayer.templates import TemplateManager
 from promptlayer.track import TrackManager
-from promptlayer.types.prompt_template import GetPromptTemplate
 from promptlayer.utils import (
     anthropic_request,
     anthropic_stream_completion,
@@ -99,6 +98,25 @@ class PromptLayer:
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 
+    def _create_track_request(self, request_params, tags, input_variables, group_id):
+        def _track_request(**body):
+            track_request_kwargs = self._prepare_track_request_kwargs(
+                request_params, tags, input_variables, group_id, **body
+            )
+            if self.tracer:
+                with self.tracer.start_as_current_span("track_request"):
+                    return track_request(**track_request_kwargs)
+            return track_request(**track_request_kwargs)
+
+        return _track_request
+
+    def _fetch_prompt_blueprint(self, prompt_name, template_params):
+        if self.tracer:
+            with self.tracer.start_as_current_span("fetch_prompt_template") as span:
+                span.set_attribute("prompt_name", prompt_name)
+                return self.templates.get(prompt_name, template_params)
+        return self.templates.get(prompt_name, template_params)
+
     def _initialize_tracer(self, enable_tracing: bool):
         if enable_tracing:
             resource = Resource(
@@ -113,6 +131,83 @@ class PromptLayer:
         else:
             return None
 
+    def _make_llm_request(self, request_params):
+        if self.tracer:
+            with self.tracer.start_as_current_span("llm_request") as span:
+                span.set_attribute("provider", request_params["provider"])
+                span.set_attribute("function_name", request_params["function_name"])
+                return request_params["request_function"](
+                    request_params["prompt_blueprint"], **request_params["kwargs"]
+                )
+        return request_params["request_function"](
+            request_params["prompt_blueprint"], **request_params["kwargs"]
+        )
+
+    @staticmethod
+    def _prepare_request_params(
+        prompt_blueprint, prompt_template, prompt_blueprint_model, stream
+    ):
+        provider = prompt_blueprint_model["provider"]
+        kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
+        config = MAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
+
+        if provider_base_url := prompt_blueprint.get("provider_base_url"):
+            kwargs["base_url"] = provider_base_url["url"]
+
+        kwargs["stream"] = stream
+        if stream and provider == "openai":
+            kwargs["stream_options"] = {"include_usage": True}
+
+        return {
+            "provider": provider,
+            "function_name": config["function_name"],
+            "stream_function": config["stream_function"],
+            "request_function": MAP_PROVIDER_TO_FUNCTION[provider],
+            "kwargs": kwargs,
+            "prompt_blueprint": prompt_blueprint,
+        }
+
+    @staticmethod
+    def _prepare_template_params(
+        prompt_version, prompt_release_label, input_variables, metadata
+    ):
+        params = {}
+        if prompt_version:
+            params["version"] = prompt_version
+        if prompt_release_label:
+            params["label"] = prompt_release_label
+        if input_variables:
+            params["input_variables"] = input_variables
+        if metadata:
+            params["metadata_filters"] = metadata
+        return params
+
+    def _prepare_track_request_kwargs(
+        self, request_params, tags, input_variables, group_id, **body
+    ):
+        return {
+            "function_name": request_params["function_name"],
+            "provider_type": request_params["provider"],
+            "args": [],
+            "kwargs": request_params["kwargs"],
+            "tags": tags,
+            "request_start_time": datetime.datetime.now(
+                datetime.timezone.utc
+            ).timestamp(),
+            "request_end_time": datetime.datetime.now(
+                datetime.timezone.utc
+            ).timestamp(),
+            "api_key": self.api_key,
+            "metadata": request_params.get("metadata"),
+            "prompt_id": request_params["prompt_blueprint"]["id"],
+            "prompt_version": request_params["prompt_blueprint"]["version"],
+            "prompt_input_variables": input_variables,
+            "group_id": group_id,
+            "return_prompt_blueprint": True,
+            "span_id": getattr(self, "llm_request_span_id", None),
+            **body,
+        }
+
     def _run_internal(
         self,
         *,
@@ -125,121 +220,75 @@ class PromptLayer:
         group_id: Union[int, None] = None,
         stream: bool = False,
     ) -> Dict[str, Any]:
-        # Prepare parameters for getting prompt template
-        template_get_params: GetPromptTemplate = {}
-        if prompt_version:
-            template_get_params["version"] = prompt_version
-        if prompt_release_label:
-            template_get_params["label"] = prompt_release_label
-        if input_variables:
-            template_get_params["input_variables"] = input_variables
-        if metadata:
-            template_get_params["metadata_filters"] = metadata
-
-        # Get prompt blueprint
-        if self.tracer:
-            with self.tracer.start_as_current_span(
-                "fetch_prompt_template"
-            ) as fetch_prompt_template_span:
-                fetch_prompt_template_span.set_attribute("prompt_name", prompt_name)
-                prompt_blueprint = self.templates.get(prompt_name, template_get_params)
-        else:
-            prompt_blueprint = self.templates.get(prompt_name, template_get_params)
-
+        template_params = self._prepare_template_params(
+            prompt_version, prompt_release_label, input_variables, metadata
+        )
+        prompt_blueprint = self._fetch_prompt_blueprint(prompt_name, template_params)
         prompt_template = prompt_blueprint["prompt_template"]
+        prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
+            prompt_blueprint, prompt_name
+        )
+        request_params = self._prepare_request_params(
+            prompt_blueprint, prompt_template, prompt_blueprint_model, stream
+        )
+        response = self._make_llm_request(request_params)
 
-        # Validate prompt blueprint
-        if not prompt_blueprint["llm_kwargs"]:
-            raise ValueError(
-                f"Prompt '{prompt_name}' does not have any LLM kwargs associated with it."
-            )
-
-        prompt_blueprint_metadata = prompt_blueprint.get("metadata")
-        if not prompt_blueprint_metadata:
-            raise ValueError(
-                f"Prompt '{prompt_name}' does not have any metadata associated with it."
-            )
-
-        prompt_blueprint_model = prompt_blueprint_metadata.get("model")
-        if not prompt_blueprint_model:
-            raise ValueError(
-                f"Prompt '{prompt_name}' does not have a model parameters associated with it."
-            )
-
-        # Prepare request parameters
-        provider = prompt_blueprint_model["provider"]
-        request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
-        kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
-        config = MAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
-        function_name = config["function_name"]
-        stream_function = config["stream_function"]
-        request_function = MAP_PROVIDER_TO_FUNCTION[provider]
-
-        # Set provider base URL if available
-        provider_base_url = prompt_blueprint.get("provider_base_url")
-        if provider_base_url:
-            kwargs["base_url"] = provider_base_url["url"]
-
-        # Set streaming options
-        kwargs["stream"] = stream
-        if stream and provider == "openai":
-            kwargs["stream_options"] = {"include_usage": True}
-
-        llm_request_span_id = None
-
-        # Make the request
-        if self.tracer:
-            with self.tracer.start_as_current_span("llm_request") as llm_request_span:
-                llm_request_span_id = hex(llm_request_span.context.span_id)[2:].zfill(
-                    16
-                )
-                llm_request_span.set_attribute("provider", provider)
-                llm_request_span.set_attribute("function_name", function_name)
-                response = request_function(prompt_blueprint, **kwargs)
-        else:
-            response = request_function(prompt_blueprint, **kwargs)
-
-        # Define tracking function
-        def _track_request(**body):
-            request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
-
-            track_request_kwargs = {
-                "function_name": function_name,
-                "provider_type": provider,
-                "args": [],
-                "kwargs": kwargs,
-                "tags": tags,
-                "request_start_time": request_start_time,
-                "request_end_time": request_end_time,
-                "api_key": self.api_key,
-                "metadata": metadata,
-                "prompt_id": prompt_blueprint["id"],
-                "prompt_version": prompt_blueprint["version"],
-                "prompt_input_variables": input_variables,
-                "group_id": group_id,
-                "return_prompt_blueprint": True,
-                "span_id": llm_request_span_id,
-                **body,
-            }
-
-            if self.tracer:
-                with self.tracer.start_as_current_span("track_request"):
-                    return track_request(**track_request_kwargs)
-            else:
-                return track_request(**track_request_kwargs)
-
-        # Handle streaming response
         if stream:
-            return stream_response(response, _track_request, stream_function)
+            return stream_response(
+                response,
+                self._create_track_request(
+                    request_params, tags, input_variables, group_id
+                ),
+                request_params["stream_function"],
+            )
 
-        # Handle non-streaming response
-        request_log = _track_request(request_response=response.model_dump())
+        request_log = self._track_request(
+            request_params,
+            tags,
+            input_variables,
+            group_id,
+            request_response=response.model_dump(),
+        )
 
         return {
             "request_id": request_log["request_id"],
             "raw_response": response,
             "prompt_blueprint": request_log["prompt_blueprint"],
         }
+
+    def _track_request(self, request_params, tags, input_variables, group_id, **body):
+        track_request_kwargs = self._prepare_track_request_kwargs(
+            request_params, tags, input_variables, group_id, **body
+        )
+        if self.tracer:
+            with self.tracer.start_as_current_span("track_request"):
+                return track_request(**track_request_kwargs)
+        return track_request(**track_request_kwargs)
+
+    @staticmethod
+    def _validate_and_extract_model_from_prompt_blueprint(
+        prompt_blueprint, prompt_name
+    ):
+        if not prompt_blueprint["llm_kwargs"]:
+            raise ValueError(
+                f"Prompt '{prompt_name}' does not have any LLM kwargs associated with it."
+            )
+
+        prompt_blueprint_metadata = prompt_blueprint.get("metadata")
+
+        if not prompt_blueprint_metadata:
+            raise ValueError(
+                f"Prompt '{prompt_name}' does not have any metadata associated with it."
+            )
+
+        prompt_blueprint_model = prompt_blueprint_metadata.get("model")
+
+        if not prompt_blueprint_model:
+            raise ValueError(
+                f"Prompt '{prompt_name}' does not have a model parameters associated with it."
+            )
+
+        return prompt_blueprint_model
 
     def run(
         self,

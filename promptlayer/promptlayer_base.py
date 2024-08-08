@@ -26,6 +26,7 @@ class PromptLayerBase(object):
 
     def __getattr__(self, name):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
+
         if (
             name != "count_tokens"  # fix for anthropic count_tokens
             and not re.match(

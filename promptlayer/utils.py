@@ -51,8 +51,8 @@ def promptlayer_api_handler(
         ]
     ):
         return GeneratorProxy(
-            response,
-            {
+            generator=response,
+            api_request_arguments={
                 "function_name": function_name,
                 "provider_type": provider_type,
                 "args": args,
@@ -61,8 +61,9 @@ def promptlayer_api_handler(
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
                 "return_pl_id": return_pl_id,
+                "llm_request_span_id": llm_request_span_id,
             },
-            api_key,
+            api_key=api_key,
         )
     else:
         request_id = promptlayer_api_request(
@@ -450,6 +451,9 @@ class GeneratorProxy:
                 request_end_time=self.api_request_arugments["request_end_time"],
                 api_key=self.api_key,
                 return_pl_id=self.api_request_arugments["return_pl_id"],
+                llm_request_span_id=self.api_request_arugments.get(
+                    "llm_request_span_id"
+                ),
             )
 
             if self.api_request_arugments["return_pl_id"]:

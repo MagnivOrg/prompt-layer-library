@@ -572,11 +572,9 @@ async def async_wrapper(
     *args,
     **kwargs,
 ):
-    # Capture the current context before entering the async function
     current_context = context.get_current()
-
-    # Use contextvars to propagate the context
     token = context.attach(current_context)
+
     try:
         response = await coroutine_obj
         request_end_time = datetime.datetime.now().timestamp()

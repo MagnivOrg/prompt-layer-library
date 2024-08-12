@@ -888,3 +888,14 @@ def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
         prompt_blueprint["prompt_template"]["type"]
     ]
     return request_to_make(client, **kwargs)
+
+
+# do not remove! This is used in the langchain integration.
+def get_api_key():
+    # raise an error if the api key is not set
+    api_key = os.environ.get("PROMPTLAYER_API_KEY")
+    if not api_key:
+        raise Exception(
+            "Please set your PROMPTLAYER_API_KEY environment variable or set API KEY in code using 'promptlayer.api_key = <your_api_key>' "
+        )
+    return api_key

@@ -116,7 +116,15 @@ class PromptLayer:
         if self.tracer:
             with self.tracer.start_as_current_span("fetch_prompt_template") as span:
                 span.set_attribute("prompt_name", prompt_name)
-                return self.templates.get(prompt_name, template_params)
+                span.set_attribute(
+                    "function_input",
+                    str(
+                        {"prompt_name": prompt_name, "template_params": template_params}
+                    ),
+                )
+                result = self.templates.get(prompt_name, template_params)
+                span.set_attribute("function_output", str(result))
+                return result
         return self.templates.get(prompt_name, template_params)
 
     def _initialize_tracer(self, enable_tracing: bool):
@@ -140,10 +148,12 @@ class PromptLayer:
             with self.tracer.start_as_current_span("llm_request") as span:
                 span.set_attribute("provider", request_params["provider"])
                 span.set_attribute("function_name", request_params["function_name"])
+                span.set_attribute("function_input", str(request_params))
                 span_id = hex(span.context.span_id)[2:].zfill(16)
                 response = request_params["request_function"](
                     request_params["prompt_blueprint"], **request_params["kwargs"]
                 )
+                span.set_attribute("function_output", str(response))
         else:
             response = request_params["request_function"](
                 request_params["prompt_blueprint"], **request_params["kwargs"]
@@ -282,8 +292,11 @@ class PromptLayer:
             request_params, tags, input_variables, group_id, span_id, **body
         )
         if self.tracer:
-            with self.tracer.start_as_current_span("track_request"):
-                return track_request(**track_request_kwargs)
+            with self.tracer.start_as_current_span("track_request") as span:
+                span.set_attribute("function_input", str(track_request_kwargs))
+                result = track_request(**track_request_kwargs)
+                span.set_attribute("function_output", str(result))
+                return result
         return track_request(**track_request_kwargs)
 
     @staticmethod
@@ -337,7 +350,10 @@ class PromptLayer:
             with self.tracer.start_as_current_span("PromptLayer.run") as main_span:
                 main_span.set_attribute("prompt_name", prompt_name)
                 main_span.set_attribute("stream", stream)
-                return self._run_internal(**_run_internal_kwargs)
+                main_span.set_attribute("function_input", str(_run_internal_kwargs))
+                result = self._run_internal(**_run_internal_kwargs)
+                main_span.set_attribute("function_output", str(result))
+                return result
         else:
             return self._run_internal(**_run_internal_kwargs)
 
@@ -351,7 +367,12 @@ class PromptLayer:
                             for key, value in metadata.items():
                                 span.set_attribute(key, value)
 
+                        span.set_attribute(
+                            "function_input", str({"args": args, "kwargs": kwargs})
+                        )
                         result = func(*args, **kwargs)
+                        span.set_attribute("function_output", str(result))
+
                         return result
                 else:
                     return func(*args, **kwargs)
@@ -364,7 +385,12 @@ class PromptLayer:
                             for key, value in metadata.items():
                                 span.set_attribute(key, value)
 
+                        span.set_attribute(
+                            "function_input", str({"args": args, "kwargs": kwargs})
+                        )
                         result = await func(*args, **kwargs)
+                        span.set_attribute("function_output", str(result))
+
                         return result
                 else:
                     return await func(*args, **kwargs)

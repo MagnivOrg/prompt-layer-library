@@ -66,7 +66,6 @@ class PromptLayerBase(object):
 
     def __call__(self, *args, **kwargs):
         tags = kwargs.pop("pl_tags", None)
-
         if tags is not None and not isinstance(tags, list):
             raise Exception("pl_tags must be a list of strings.")
 
@@ -85,15 +84,20 @@ class PromptLayerBase(object):
                     "provider", object.__getattribute__(self, "_provider_type")
                 )
                 llm_request_span.set_attribute("function_name", function_name)
+                llm_request_span.set_attribute(
+                    "function_input", str({"args": args, "kwargs": kwargs})
+                )
 
                 if inspect.isclass(function_object):
-                    return PromptLayerBase(
+                    result = PromptLayerBase(
                         function_object(*args, **kwargs),
                         function_name=function_name,
                         provider_type=object.__getattribute__(self, "_provider_type"),
                         api_key=object.__getattribute__(self, "_api_key"),
                         tracer=tracer,
                     )
+                    llm_request_span.set_attribute("function_output", str(result))
+                    return result
 
                 function_response = function_object(*args, **kwargs)
 
@@ -109,12 +113,13 @@ class PromptLayerBase(object):
                         tags,
                         api_key=object.__getattribute__(self, "_api_key"),
                         llm_request_span_id=llm_request_span_id,
+                        tracer=tracer,  # Pass the tracer to async_wrapper
                         *args,
                         **kwargs,
                     )
 
                 request_end_time = datetime.datetime.now().timestamp()
-                return promptlayer_api_handler(
+                result = promptlayer_api_handler(
                     function_name,
                     object.__getattribute__(self, "_provider_type"),
                     args,
@@ -127,6 +132,8 @@ class PromptLayerBase(object):
                     return_pl_id=return_pl_id,
                     llm_request_span_id=llm_request_span_id,
                 )
+                llm_request_span.set_attribute("function_output", str(result))
+                return result
         else:
             # Without tracing
             if inspect.isclass(function_object):

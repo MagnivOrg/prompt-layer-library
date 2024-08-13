@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Callable, Generator, List, Union
 
 import requests
-from opentelemetry import context
+from opentelemetry import context, trace
 
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
@@ -569,6 +569,7 @@ async def async_wrapper(
     tags,
     api_key: str = None,
     llm_request_span_id: str = None,
+    tracer=None,
     *args,
     **kwargs,
 ):
@@ -578,7 +579,7 @@ async def async_wrapper(
     try:
         response = await coroutine_obj
         request_end_time = datetime.datetime.now().timestamp()
-        return await promptlayer_api_handler_async(
+        result = await promptlayer_api_handler_async(
             function_name,
             provider_type,
             args,
@@ -591,6 +592,13 @@ async def async_wrapper(
             return_pl_id=return_pl_id,
             llm_request_span_id=llm_request_span_id,
         )
+
+        if tracer:
+            current_span = trace.get_current_span()
+            if current_span:
+                current_span.set_attribute("function_output", str(result))
+
+        return result
     finally:
         context.detach(token)
 

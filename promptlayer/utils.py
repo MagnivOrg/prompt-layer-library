@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Callable, Generator, List, Union
 
 import requests
+from opentelemetry import context, trace
 
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
@@ -36,6 +37,7 @@ def promptlayer_api_handler(
     request_end_time,
     api_key,
     return_pl_id=False,
+    llm_request_span_id=None,
 ):
     if (
         isinstance(response, types.GeneratorType)
@@ -49,8 +51,8 @@ def promptlayer_api_handler(
         ]
     ):
         return GeneratorProxy(
-            response,
-            {
+            generator=response,
+            api_request_arguments={
                 "function_name": function_name,
                 "provider_type": provider_type,
                 "args": args,
@@ -59,21 +61,23 @@ def promptlayer_api_handler(
                 "request_start_time": request_start_time,
                 "request_end_time": request_end_time,
                 "return_pl_id": return_pl_id,
+                "llm_request_span_id": llm_request_span_id,
             },
-            api_key,
+            api_key=api_key,
         )
     else:
         request_id = promptlayer_api_request(
-            function_name,
-            provider_type,
-            args,
-            kwargs,
-            tags,
-            response,
-            request_start_time,
-            request_end_time,
-            api_key,
+            function_name=function_name,
+            provider_type=provider_type,
+            args=args,
+            kwargs=kwargs,
+            tags=tags,
+            response=response,
+            request_start_time=request_start_time,
+            request_end_time=request_end_time,
+            api_key=api_key,
             return_pl_id=return_pl_id,
+            llm_request_span_id=llm_request_span_id,
         )
         if return_pl_id:
             return response, request_id
@@ -91,6 +95,7 @@ async def promptlayer_api_handler_async(
     request_end_time,
     api_key,
     return_pl_id=False,
+    llm_request_span_id=None,
 ):
     return await run_in_thread_async(
         None,
@@ -105,6 +110,7 @@ async def promptlayer_api_handler_async(
         request_end_time,
         api_key,
         return_pl_id=return_pl_id,
+        llm_request_span_id=llm_request_span_id,
     )
 
 
@@ -124,6 +130,7 @@ def convert_native_object_to_dict(native_object):
 
 
 def promptlayer_api_request(
+    *,
     function_name,
     provider_type,
     args,
@@ -135,6 +142,7 @@ def promptlayer_api_request(
     api_key,
     return_pl_id=False,
     metadata=None,
+    llm_request_span_id=None,
 ):
     if isinstance(response, dict) and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
@@ -157,6 +165,7 @@ def promptlayer_api_request(
                 "request_end_time": request_end_time,
                 "metadata": metadata,
                 "api_key": api_key,
+                "span_id": llm_request_span_id,
             },
         )
         if not hasattr(request_response, "status_code"):
@@ -178,6 +187,26 @@ def promptlayer_api_request(
         return request_response.json().get("request_id")
 
 
+def track_request(**body):
+    try:
+        response = requests.post(
+            f"{URL_API_PROMPTLAYER}/track-request",
+            json=body,
+        )
+        if response.status_code != 200:
+            warn_on_bad_response(
+                response,
+                f"PromptLayer had the following error while tracking your request: {response.text}",
+            )
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(
+            f"WARNING: While logging your request PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return {}
+
+
 def promptlayer_api_request_async(
     function_name,
     provider_type,
@@ -193,15 +222,15 @@ def promptlayer_api_request_async(
     return run_in_thread_async(
         None,
         promptlayer_api_request,
-        function_name,
-        provider_type,
-        args,
-        kwargs,
-        tags,
-        response,
-        request_start_time,
-        request_end_time,
-        api_key,
+        function_name=function_name,
+        provider_type=provider_type,
+        args=args,
+        kwargs=kwargs,
+        tags=tags,
+        response=response,
+        request_start_time=request_start_time,
+        request_end_time=request_end_time,
+        api_key=api_key,
         return_pl_id=return_pl_id,
     )
 
@@ -396,6 +425,7 @@ class GeneratorProxy:
         self.results.append(result)
         provider_type = self.api_request_arugments["provider_type"]
         end_anthropic = False
+
         if provider_type == "anthropic":
             if hasattr(result, "stop_reason"):
                 end_anthropic = result.stop_reason
@@ -403,6 +433,7 @@ class GeneratorProxy:
                 end_anthropic = result.message.stop_reason
             elif hasattr(result, "type") and result.type == "message_stop":
                 end_anthropic = True
+
         end_openai = provider_type == "openai" and (
             result.choices[0].finish_reason == "stop"
             or result.choices[0].finish_reason == "length"
@@ -410,21 +441,27 @@ class GeneratorProxy:
 
         if end_anthropic or end_openai:
             request_id = promptlayer_api_request(
-                self.api_request_arugments["function_name"],
-                self.api_request_arugments["provider_type"],
-                self.api_request_arugments["args"],
-                self.api_request_arugments["kwargs"],
-                self.api_request_arugments["tags"],
-                self.cleaned_result(),
-                self.api_request_arugments["request_start_time"],
-                self.api_request_arugments["request_end_time"],
-                self.api_key,
+                function_name=self.api_request_arugments["function_name"],
+                provider_type=self.api_request_arugments["provider_type"],
+                args=self.api_request_arugments["args"],
+                kwargs=self.api_request_arugments["kwargs"],
+                tags=self.api_request_arugments["tags"],
+                response=self.cleaned_result(),
+                request_start_time=self.api_request_arugments["request_start_time"],
+                request_end_time=self.api_request_arugments["request_end_time"],
+                api_key=self.api_key,
                 return_pl_id=self.api_request_arugments["return_pl_id"],
+                llm_request_span_id=self.api_request_arugments.get(
+                    "llm_request_span_id"
+                ),
             )
+
             if self.api_request_arugments["return_pl_id"]:
                 return result, request_id
+
         if self.api_request_arugments["return_pl_id"]:
             return result, None
+
         return result
 
     def cleaned_result(self):
@@ -531,23 +568,39 @@ async def async_wrapper(
     provider_type,
     tags,
     api_key: str = None,
+    llm_request_span_id: str = None,
+    tracer=None,
     *args,
     **kwargs,
 ):
-    response = await coroutine_obj
-    request_end_time = datetime.datetime.now().timestamp()
-    return await promptlayer_api_handler_async(
-        function_name,
-        provider_type,
-        args,
-        kwargs,
-        tags,
-        response,
-        request_start_time,
-        request_end_time,
-        api_key,
-        return_pl_id=return_pl_id,
-    )
+    current_context = context.get_current()
+    token = context.attach(current_context)
+
+    try:
+        response = await coroutine_obj
+        request_end_time = datetime.datetime.now().timestamp()
+        result = await promptlayer_api_handler_async(
+            function_name,
+            provider_type,
+            args,
+            kwargs,
+            tags,
+            response,
+            request_start_time,
+            request_end_time,
+            api_key,
+            return_pl_id=return_pl_id,
+            llm_request_span_id=llm_request_span_id,
+        )
+
+        if tracer:
+            current_span = trace.get_current_span()
+            if current_span:
+                current_span.set_attribute("function_output", str(result))
+
+        return result
+    finally:
+        context.detach(token)
 
 
 def promptlayer_create_group(api_key: str = None):
@@ -663,26 +716,6 @@ def get_all_prompt_templates(
         raise Exception(
             f"PromptLayer had the following error while getting all your prompt templates: {e}"
         )
-
-
-def track_request(**body):
-    try:
-        response = requests.post(
-            f"{URL_API_PROMPTLAYER}/track-request",
-            json=body,
-        )
-        if response.status_code != 200:
-            warn_on_bad_response(
-                response,
-                f"PromptLayer had the following error while tracking your request: {response.text}",
-            )
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(
-            f"WARNING: While logging your request PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
-        return {}
 
 
 def openai_stream_chat(results: list):

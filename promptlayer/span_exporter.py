@@ -8,9 +8,10 @@ from promptlayer.utils import URL_API_PROMPTLAYER
 
 
 class PromptLayerSpanExporter(SpanExporter):
-    def __init__(self, api_key=None):
-        self.url = f"{URL_API_PROMPTLAYER}/spans-bulk"
+    def __init__(self, api_key: str = None, workspace_id: int = None):
         self.api_key = api_key
+        self.url = f"{URL_API_PROMPTLAYER}/spans-bulk"
+        self.workspace_id = workspace_id
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         request_data = []
@@ -64,7 +65,7 @@ class PromptLayerSpanExporter(SpanExporter):
                 },
                 json={
                     "spans": request_data,
-                    "workspace_id": 1,
+                    "workspace_id": self.workspace_id,
                 },
             )
             response.raise_for_status()

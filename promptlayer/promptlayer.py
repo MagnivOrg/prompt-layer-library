@@ -269,11 +269,11 @@ class PromptLayer:
             )
 
         request_log = self._track_request_log(
-            llm_request_params,
-            tags,
-            input_variables,
-            group_id,
-            pl_run_span_id,
+            request_params=llm_request_params,
+            tags=tags,
+            input_variables=input_variables,
+            group_id=group_id,
+            pl_run_span_id=pl_run_span_id,
             request_response=response.model_dump(),
         )
 
@@ -284,14 +284,21 @@ class PromptLayer:
         }
 
     def _track_request_log(
-        self, request_params, tags, input_variables, group_id, span_id, **body
+        self,
+        *,
+        request_params,
+        tags,
+        input_variables,
+        group_id,
+        pl_run_span_id: str | None = None,
+        **body,
     ):
         track_request_kwargs = self._prepare_track_request_kwargs(
             request_params=request_params,
             tags=tags,
             input_variables=input_variables,
             group_id=group_id,
-            span_id=span_id,
+            span_id=pl_run_span_id,
             **body,
         )
         return track_request(**track_request_kwargs)

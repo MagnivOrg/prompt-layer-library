@@ -105,28 +105,6 @@ class PromptLayer:
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 
-    def _create_track_request_callable(
-        self,
-        *,
-        request_params,
-        tags,
-        input_variables,
-        group_id,
-        pl_run_span_id: str | None = None,
-    ):
-        def _track_request(**body):
-            track_request_kwargs = self._prepare_track_request_kwargs(
-                request_params=request_params,
-                tags=tags,
-                input_variables=input_variables,
-                group_id=group_id,
-                pl_run_span_id=pl_run_span_id,
-                **body,
-            )
-            return track_request(**track_request_kwargs)
-
-        return _track_request
-
     @staticmethod
     def _initialize_tracer(api_key: str = None, enable_tracing: bool = False):
         if enable_tracing:
@@ -197,8 +175,8 @@ class PromptLayer:
         tags,
         input_variables,
         group_id,
+        request_response,
         pl_run_span_id: str | None = None,
-        **body,
     ):
         return {
             "function_name": request_params["function_name"],
@@ -219,8 +197,8 @@ class PromptLayer:
             "prompt_input_variables": input_variables,
             "group_id": group_id,
             "return_prompt_blueprint": True,
+            "request_response": request_response,
             "span_id": pl_run_span_id,
-            **body,
         }
 
     def _run_internal(
@@ -256,15 +234,21 @@ class PromptLayer:
         response = self._make_llm_request(llm_request_params)
 
         if stream:
-            return stream_response(
-                response,
-                self._create_track_request_callable(
+
+            def _track_request(**body):
+                track_request_kwargs = self._prepare_track_request_kwargs(
                     request_params=llm_request_params,
                     tags=tags,
                     input_variables=input_variables,
                     group_id=group_id,
                     pl_run_span_id=pl_run_span_id,
-                ),
+                    **body,
+                )
+                return track_request(**track_request_kwargs)
+
+            return stream_response(
+                response,
+                _track_request,
                 llm_request_params["stream_function"],
             )
 

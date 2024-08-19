@@ -185,6 +185,7 @@ class PromptLayer:
         input_variables,
         group_id,
         pl_run_span_id: str | None = None,
+        metadata: Dict[str, str] | None = None,
         **body,
     ):
         return {
@@ -200,7 +201,7 @@ class PromptLayer:
                 datetime.timezone.utc
             ).timestamp(),
             "api_key": self.api_key,
-            "metadata": request_params.get("metadata"),
+            "metadata": metadata,
             "prompt_id": request_params["prompt_blueprint"]["id"],
             "prompt_version": request_params["prompt_blueprint"]["version"],
             "prompt_input_variables": input_variables,
@@ -263,6 +264,7 @@ class PromptLayer:
             input_variables,
             group_id,
             pl_run_span_id,
+            metadata=metadata,
             request_response=response.model_dump(),
         )
 
@@ -279,6 +281,7 @@ class PromptLayer:
         input_variables,
         group_id,
         pl_run_span_id: str | None = None,
+        metadata: Dict[str, str] | None = None,
         **body,
     ):
         track_request_kwargs = self._prepare_track_request_kwargs(
@@ -287,6 +290,7 @@ class PromptLayer:
             input_variables,
             group_id,
             pl_run_span_id,
+            metadata=metadata,
             **body,
         )
         return track_request(**track_request_kwargs)

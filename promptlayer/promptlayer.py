@@ -298,7 +298,7 @@ class PromptLayer:
             tags=tags,
             input_variables=input_variables,
             group_id=group_id,
-            span_id=pl_run_span_id,
+            pl_run_span_id=pl_run_span_id,
             **body,
         )
         return track_request(**track_request_kwargs)

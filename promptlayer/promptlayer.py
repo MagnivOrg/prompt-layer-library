@@ -61,7 +61,6 @@ class PromptLayer:
         self,
         api_key: str = None,
         enable_tracing: bool = False,
-        workspace_id: int = None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -72,15 +71,11 @@ class PromptLayer:
                 "Please set the PROMPTLAYER_API_KEY environment variable or pass the api_key parameter."
             )
 
-        if enable_tracing and not workspace_id:
-            raise ValueError("Please set a workspace_id to enable tracing.")
-
         self.api_key = api_key
         self.templates = TemplateManager(api_key)
         self.group = GroupManager(api_key)
-        self.tracer = self._initialize_tracer(api_key, enable_tracing, workspace_id)
+        self.tracer = self._initialize_tracer(api_key, enable_tracing)
         self.track = TrackManager(api_key)
-        self.workspace_id = workspace_id
 
     def __getattr__(
         self,
@@ -140,17 +135,13 @@ class PromptLayer:
         return self.templates.get(prompt_name, template_params)
 
     @staticmethod
-    def _initialize_tracer(
-        api_key: str = None, enable_tracing: bool = False, workspace_id: int = None
-    ):
+    def _initialize_tracer(api_key: str = None, enable_tracing: bool = False):
         if enable_tracing:
             resource = Resource(
                 attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
             )
             tracer_provider = TracerProvider(resource=resource)
-            promptlayer_exporter = PromptLayerSpanExporter(
-                api_key=api_key, workspace_id=workspace_id
-            )
+            promptlayer_exporter = PromptLayerSpanExporter(api_key=api_key)
             span_processor = BatchSpanProcessor(promptlayer_exporter)
             tracer_provider.add_span_processor(span_processor)
             trace.set_tracer_provider(tracer_provider)

@@ -107,6 +107,7 @@ class PromptLayer:
 
     def _create_track_request_callable(
         self,
+        *,
         request_params,
         tags,
         input_variables,
@@ -247,7 +248,11 @@ class PromptLayer:
             return stream_response(
                 response,
                 self._create_track_request_callable(
-                    llm_request_params, tags, input_variables, group_id, pl_run_span_id
+                    request_params=llm_request_params,
+                    tags=tags,
+                    input_variables=input_variables,
+                    group_id=group_id,
+                    pl_run_span_id=pl_run_span_id,
                 ),
                 llm_request_params["stream_function"],
             )

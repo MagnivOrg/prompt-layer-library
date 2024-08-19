@@ -119,21 +119,6 @@ class PromptLayer:
 
         return _track_request
 
-    def _fetch_prompt_blueprint(self, *, prompt_name, template_params):
-        if self.tracer:
-            with self.tracer.start_as_current_span("fetch_prompt_template") as span:
-                span.set_attribute("prompt_name", prompt_name)
-                span.set_attribute(
-                    "function_input",
-                    str(
-                        {"prompt_name": prompt_name, "template_params": template_params}
-                    ),
-                )
-                result = self.templates.get(prompt_name, template_params)
-                span.set_attribute("function_output", str(result))
-                return result
-        return self.templates.get(prompt_name, template_params)
-
     @staticmethod
     def _initialize_tracer(api_key: str = None, enable_tracing: bool = False):
         if enable_tracing:
@@ -152,20 +137,9 @@ class PromptLayer:
     def _make_llm_request(self, request_params):
         span_id = None
 
-        if self.tracer:
-            with self.tracer.start_as_current_span("llm_request") as span:
-                span.set_attribute("provider", request_params["provider"])
-                span.set_attribute("function_name", request_params["function_name"])
-                span.set_attribute("function_input", str(request_params))
-                span_id = hex(span.context.span_id)[2:].zfill(16)
-                response = request_params["request_function"](
-                    request_params["prompt_blueprint"], **request_params["kwargs"]
-                )
-                span.set_attribute("function_output", str(response))
-        else:
-            response = request_params["request_function"](
-                request_params["prompt_blueprint"], **request_params["kwargs"]
-            )
+        response = request_params["request_function"](
+            request_params["prompt_blueprint"], **request_params["kwargs"]
+        )
 
         return response, span_id
 
@@ -254,9 +228,7 @@ class PromptLayer:
             input_variables=input_variables,
             metadata=metadata,
         )
-        prompt_blueprint = self._fetch_prompt_blueprint(
-            prompt_name=prompt_name, template_params=get_prompt_template_params
-        )
+        prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
@@ -355,9 +327,8 @@ class PromptLayer:
         }
 
         if self.tracer:
-            with self.tracer.start_as_current_span("PromptLayer.run") as main_span:
+            with self.tracer.start_as_current_span("PromptLayer Run") as main_span:
                 main_span.set_attribute("prompt_name", prompt_name)
-                main_span.set_attribute("stream", stream)
                 main_span.set_attribute("function_input", str(_run_internal_kwargs))
                 result = self._run_internal(**_run_internal_kwargs)
                 main_span.set_attribute("function_output", str(result))

@@ -12,11 +12,27 @@
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-toolsai.jupyter",
         "ms-python.isort",
         "ms-python.black-formatter@2023.6.0",
-        "esbenp.prettier-vscode"
-      ]
+        "charliermarsh.ruff@2023.38.0",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "python.analysis.autoImportCompletions": true,
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        },
+        "ruff.args": [
+          "--exclude",
+          "migrations",
+          "--ignore",
+          "E501,E711,E712",
+          "--fix",
+          "--exit-non-zero-on-fix"
+        ],
+        "isort.args": ["--profile", "black"]
+      }
     }
   },
 

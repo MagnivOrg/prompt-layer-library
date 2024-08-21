@@ -74,7 +74,7 @@ class PromptLayer:
         self.api_key = api_key
         self.templates = TemplateManager(api_key)
         self.group = GroupManager(api_key)
-        self.tracer = self._initialize_tracer(api_key, enable_tracing)
+        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, enable_tracing)
         self.track = TrackManager(api_key)
 
     def __getattr__(
@@ -132,10 +132,10 @@ class PromptLayer:
             promptlayer_exporter = PromptLayerSpanExporter(api_key=api_key)
             span_processor = BatchSpanProcessor(promptlayer_exporter)
             tracer_provider.add_span_processor(span_processor)
-            trace.set_tracer_provider(tracer_provider)
-            return trace.get_tracer(__name__)
+            tracer = tracer_provider.get_tracer(__name__)
+            return tracer_provider, tracer
         else:
-            return None
+            return None, None
 
     @staticmethod
     def _prepare_get_prompt_template_params(
@@ -321,15 +321,15 @@ class PromptLayer:
         return prompt_blueprint_model
 
     def run(
-        self,
-        prompt_name: str,
-        prompt_version: Union[int, None] = None,
-        prompt_release_label: Union[str, None] = None,
-        input_variables: Union[Dict[str, Any], None] = None,
-        tags: Union[List[str], None] = None,
-        metadata: Union[Dict[str, str], None] = None,
-        group_id: Union[int, None] = None,
-        stream: bool = False,
+            self,
+            prompt_name: str,
+            prompt_version: Union[int, None] = None,
+            prompt_release_label: Union[str, None] = None,
+            input_variables: Union[Dict[str, Any], None] = None,
+            tags: Union[List[str], None] = None,
+            metadata: Union[Dict[str, str], None] = None,
+            group_id: Union[int, None] = None,
+            stream: bool = False,
     ) -> Dict[str, Any]:
         _run_internal_kwargs = {
             "prompt_name": prompt_name,

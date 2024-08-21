@@ -126,8 +126,7 @@ class PromptLayer:
     def _initialize_tracer(api_key: str = None, enable_tracing: bool = False):
         if enable_tracing:
             resource = Resource(
-                attributes={
-                    ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
+                attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
             )
             tracer_provider = TracerProvider(resource=resource)
             promptlayer_exporter = PromptLayerSpanExporter(api_key=api_key)
@@ -231,8 +230,7 @@ class PromptLayer:
             input_variables=input_variables,
             metadata=metadata,
         )
-        prompt_blueprint = self.templates.get(
-            prompt_name, get_prompt_template_params)
+        prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
@@ -368,8 +366,7 @@ class PromptLayer:
                                 span.set_attribute(key, value)
 
                         span.set_attribute(
-                            "function_input", str(
-                                {"args": args, "kwargs": kwargs})
+                            "function_input", str({"args": args, "kwargs": kwargs})
                         )
                         result = func(*args, **kwargs)
                         span.set_attribute("function_output", str(result))
@@ -387,8 +384,7 @@ class PromptLayer:
                                 span.set_attribute(key, value)
 
                         span.set_attribute(
-                            "function_input", str(
-                                {"args": args, "kwargs": kwargs})
+                            "function_input", str({"args": args, "kwargs": kwargs})
                         )
                         result = await func(*args, **kwargs)
                         span.set_attribute("function_output", str(result))

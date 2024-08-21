@@ -112,7 +112,7 @@ class PromptLayer:
         tags,
         input_variables,
         group_id,
-        pl_run_span_id: str | None = None,
+        pl_run_span_id: Union[str, None] = None,
     ):
         def _track_request(**body):
             track_request_kwargs = self._prepare_track_request_kwargs(
@@ -184,8 +184,8 @@ class PromptLayer:
         tags,
         input_variables,
         group_id,
-        pl_run_span_id: str | None = None,
-        metadata: Dict[str, str] | None = None,
+        pl_run_span_id: Union[str, None] = None,
+        metadata: Union[Dict[str, str], None] = None,
         **body,
     ):
         return {
@@ -222,7 +222,7 @@ class PromptLayer:
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
         stream: bool = False,
-        pl_run_span_id: str | None = None,
+        pl_run_span_id: Union[str, None] = None,
     ) -> Dict[str, Any]:
         get_prompt_template_params = self._prepare_get_prompt_template_params(
             prompt_version=prompt_version,
@@ -280,8 +280,8 @@ class PromptLayer:
         tags,
         input_variables,
         group_id,
-        pl_run_span_id: str | None = None,
-        metadata: Dict[str, str] | None = None,
+        pl_run_span_id: Union[str, None] = None,
+        metadata: Union[Dict[str, str], None] = None,
         **body,
     ):
         track_request_kwargs = self._prepare_track_request_kwargs(

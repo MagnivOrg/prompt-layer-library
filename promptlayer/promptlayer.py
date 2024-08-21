@@ -5,7 +5,6 @@ from copy import deepcopy
 from functools import wraps
 from typing import Any, Dict, List, Literal, Union
 
-from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -74,7 +73,9 @@ class PromptLayer:
         self.api_key = api_key
         self.templates = TemplateManager(api_key)
         self.group = GroupManager(api_key)
-        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, enable_tracing)
+        self.tracer_provider, self.tracer = self._initialize_tracer(
+            api_key, enable_tracing
+        )
         self.track = TrackManager(api_key)
 
     def __getattr__(

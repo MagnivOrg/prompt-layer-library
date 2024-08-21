@@ -321,15 +321,15 @@ class PromptLayer:
         return prompt_blueprint_model
 
     def run(
-            self,
-            prompt_name: str,
-            prompt_version: Union[int, None] = None,
-            prompt_release_label: Union[str, None] = None,
-            input_variables: Union[Dict[str, Any], None] = None,
-            tags: Union[List[str], None] = None,
-            metadata: Union[Dict[str, str], None] = None,
-            group_id: Union[int, None] = None,
-            stream: bool = False,
+        self,
+        prompt_name: str,
+        prompt_version: Union[int, None] = None,
+        prompt_release_label: Union[str, None] = None,
+        input_variables: Union[Dict[str, Any], None] = None,
+        tags: Union[List[str], None] = None,
+        metadata: Union[Dict[str, str], None] = None,
+        group_id: Union[int, None] = None,
+        stream: bool = False,
     ) -> Dict[str, Any]:
         _run_internal_kwargs = {
             "prompt_name": prompt_name,

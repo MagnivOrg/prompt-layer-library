@@ -1,8 +1,23 @@
 import datetime
 import inspect
+import json
 import re
 
 from promptlayer.utils import async_wrapper, promptlayer_api_handler
+
+
+def filter_sensitive_data(data):
+    """
+    Recursively filter out sensitive data from the input.
+    """
+    if isinstance(data, dict):
+        return {k: filter_sensitive_data(v) for k, v in data.items() if k != "api_key"}
+    elif isinstance(data, list):
+        return [filter_sensitive_data(item) for item in data]
+    elif isinstance(data, str) and (data.startswith("sk-") or data.startswith("pl_")):
+        return "[FILTERED]"
+    else:
+        return data
 
 
 class PromptLayerBase(object):
@@ -84,8 +99,15 @@ class PromptLayerBase(object):
                     "provider", object.__getattribute__(self, "_provider_type")
                 )
                 llm_request_span.set_attribute("function_name", function_name)
+
                 llm_request_span.set_attribute(
-                    "function_input", str({"args": args, "kwargs": kwargs})
+                    "function_input",
+                    json.dumps(
+                        {
+                            "args": filter_sensitive_data(args),
+                            "kwargs": filter_sensitive_data(kwargs),
+                        }
+                    ),
                 )
 
                 if inspect.isclass(function_object):
@@ -113,7 +135,7 @@ class PromptLayerBase(object):
                         tags,
                         api_key=object.__getattribute__(self, "_api_key"),
                         llm_request_span_id=llm_request_span_id,
-                        tracer=tracer,  # Pass the tracer to async_wrapper
+                        tracer=tracer,
                         *args,
                         **kwargs,
                     )

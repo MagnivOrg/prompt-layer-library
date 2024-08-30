@@ -99,7 +99,6 @@ class PromptLayerBase(object):
                     "provider", object.__getattribute__(self, "_provider_type")
                 )
                 llm_request_span.set_attribute("function_name", function_name)
-
                 llm_request_span.set_attribute(
                     "function_input",
                     json.dumps(

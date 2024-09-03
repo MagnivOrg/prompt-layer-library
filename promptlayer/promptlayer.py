@@ -356,12 +356,13 @@ class PromptLayer:
         else:
             return self._run_internal(**_run_internal_kwargs)
 
-    def traceable(self, attributes=None):
+    def traceable(self, attributes=None, name=None):
         def decorator(func):
             @wraps(func)
             def sync_wrapper(*args, **kwargs):
                 if self.tracer:
-                    with self.tracer.start_as_current_span(func.__name__) as span:
+                    span_name = name or func.__name__
+                    with self.tracer.start_as_current_span(span_name) as span:
                         if attributes:
                             for key, value in attributes.items():
                                 span.set_attribute(key, value)
@@ -379,7 +380,8 @@ class PromptLayer:
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 if self.tracer:
-                    with self.tracer.start_as_current_span(func.__name__) as span:
+                    span_name = name or func.__name__
+                    with self.tracer.start_as_current_span(span_name) as span:
                         if attributes:
                             for key, value in attributes.items():
                                 span.set_attribute(key, value)

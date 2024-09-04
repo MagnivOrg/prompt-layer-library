@@ -157,13 +157,13 @@ class BasePromptTemplate(TypedDict, total=False):
     tags: List[str]
 
 
-class PromptVersion(TypedDict, total=False):
+class PromptBlueprint(TypedDict, total=False):
     prompt_template: PromptTemplate
     commit_message: str
     metadata: Metadata
 
 
-class PublishPromptTemplate(BasePromptTemplate, PromptVersion, total=False):
+class PublishPromptTemplate(BasePromptTemplate, PromptBlueprint, total=False):
     release_labels: Optional[List[str]] = None
 
 

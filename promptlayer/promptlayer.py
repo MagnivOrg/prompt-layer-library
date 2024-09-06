@@ -15,6 +15,7 @@ from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.span_exporter import PromptLayerSpanExporter
 from promptlayer.templates import TemplateManager
 from promptlayer.track import TrackManager
+from promptlayer.types.prompt_template import PromptTemplate
 from promptlayer.utils import (
     anthropic_request,
     anthropic_stream_completion,
@@ -24,6 +25,7 @@ from promptlayer.utils import (
     openai_stream_completion,
     stream_response,
     track_request,
+    util_log_request,
 )
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -399,3 +401,45 @@ class PromptLayer:
             return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
 
         return decorator
+
+    def log_request(
+        self,
+        *,
+        provider: str,
+        model: str,
+        input: PromptTemplate,
+        output: PromptTemplate,
+        request_start_time: float,
+        request_end_time: float,
+        parameters: Dict[str, Any] = {},
+        tags: List[str] = [],
+        metadata: Dict[str, str] = {},
+        prompt_name: Union[str, None] = None,
+        prompt_version_number: Union[int, None] = None,
+        prompt_input_variables: Dict[str, Any] = {},
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        price: float = 0.0,
+        function_name: str = "",
+        score: int = 0,
+    ):
+        return util_log_request(
+            self.api_key,
+            provider=provider,
+            model=model,
+            input=input,
+            output=output,
+            request_start_time=request_start_time,
+            request_end_time=request_end_time,
+            parameters=parameters,
+            tags=tags,
+            metadata=metadata,
+            prompt_name=prompt_name,
+            prompt_version_number=prompt_version_number,
+            prompt_input_variables=prompt_input_variables,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            price=price,
+            function_name=function_name,
+            score=score,
+        )

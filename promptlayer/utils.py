@@ -13,6 +13,7 @@ from typing import Callable, Generator, List, Union
 import requests
 from opentelemetry import context, trace
 
+from promptlayer.types import RequestLog
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
     GetPromptTemplateResponse,
@@ -907,3 +908,25 @@ def get_api_key():
             "Please set your PROMPTLAYER_API_KEY environment variable or set API KEY in code using 'promptlayer.api_key = <your_api_key>' "
         )
     return api_key
+
+
+def util_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
+    try:
+        response = requests.post(
+            f"{URL_API_PROMPTLAYER}/log-request",
+            headers={"X-API-KEY": api_key},
+            json=kwargs,
+        )
+        if response.status_code != 201:
+            warn_on_bad_response(
+                response,
+                "WARNING: While logging your request PromptLayer had the following error",
+            )
+            return None
+        return response.json()
+    except Exception as e:
+        print(
+            f"WARNING: While tracking your prompt PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return None

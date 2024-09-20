@@ -233,7 +233,10 @@ class PromptLayer:
             input_variables=input_variables,
             metadata=metadata,
         )
-        prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
+        prompt_blueprint_response = self.templates.get(
+            prompt_name, get_prompt_template_params)
+        prompt_blueprint = prompt_blueprint_response["prompt_blueprint"]
+        warning = prompt_blueprint_response["warning"]
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
@@ -275,6 +278,7 @@ class PromptLayer:
             "request_id": request_log.get("request_id", None),
             "raw_response": response,
             "prompt_blueprint": request_log.get("prompt_blueprint", None),
+            "warning": warning,
         }
 
     def _track_request_log(

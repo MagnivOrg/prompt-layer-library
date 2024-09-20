@@ -17,6 +17,7 @@ from promptlayer.types import RequestLog
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
     GetPromptTemplateResponse,
+    GetPromptTemplateWithWarningResponse,
     ListPromptTemplateResponse,
     PublishPromptTemplate,
     PublishPromptTemplateResponse,
@@ -652,7 +653,7 @@ def promptlayer_track_group(request_id, group_id, api_key: str = None):
 
 def get_prompt_template(
     prompt_name: str, params: Union[GetPromptTemplate, None] = None, api_key: str = None
-) -> GetPromptTemplateResponse:
+) -> GetPromptTemplateWithWarningResponse:
     try:
         json_body = {"api_key": api_key}
         if params:

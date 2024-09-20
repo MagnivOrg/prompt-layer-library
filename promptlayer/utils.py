@@ -673,7 +673,7 @@ def get_prompt_template(
                 warning,
                 "WARNING: While getting your prompt template",
             )
-        return response.json().get("prompt_blueprint", {})
+        return response.json()
     except requests.exceptions.RequestException as e:
         raise Exception(
             f"PromptLayer had the following error while getting your prompt template: {e}"

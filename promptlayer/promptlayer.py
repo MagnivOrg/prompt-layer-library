@@ -234,7 +234,8 @@ class PromptLayer:
             metadata=metadata,
         )
         prompt_blueprint_response = self.templates.get(
-            prompt_name, get_prompt_template_params)
+            prompt_name, get_prompt_template_params
+        )
         prompt_blueprint = prompt_blueprint_response["prompt_blueprint"]
         warning = prompt_blueprint_response["warning"]
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(

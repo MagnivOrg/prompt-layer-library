@@ -199,10 +199,5 @@ class GetPromptTemplateResponse(BasePromptTemplateResponse):
     version: int
 
 
-class GetPromptTemplateWithWarningResponse(TypedDict, total=False):
-    prompt_blueprint: GetPromptTemplateResponse
-    warning: str
-
-
 class ListPromptTemplateResponse(BasePromptTemplateResponse, total=False):
     version: int

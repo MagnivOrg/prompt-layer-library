@@ -666,6 +666,13 @@ def get_prompt_template(
             raise Exception(
                 f"PromptLayer had the following error while getting your prompt template: {response.text}"
             )
+
+        warning = response.json().get("warning", None)
+        if warning is not None:
+            warn_on_bad_response(
+                warning,
+                "WARNING: While getting your prompt template",
+            )
         return response.json()
     except requests.exceptions.RequestException as e:
         raise Exception(

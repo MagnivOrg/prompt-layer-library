@@ -8,7 +8,7 @@ import sys
 import types
 from copy import deepcopy
 from enum import Enum
-from typing import Callable, Generator, List, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Union
 
 import requests
 from opentelemetry import context, trace
@@ -25,6 +25,47 @@ from promptlayer.types.prompt_template import (
 URL_API_PROMPTLAYER = os.environ.setdefault(
     "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
 )
+
+
+def run_workflow_request(
+    *,
+    workflow_name: str,
+    input_variables: Dict[str, Any],
+    metadata: Optional[Dict[str, str]] = None,
+    workflow_label_name: Optional[str] = None,
+    workflow_version_number: Optional[int] = None,
+    api_key: str,
+) -> Dict[str, Any]:
+    payload = {
+        "input_variables": input_variables,
+        "metadata": metadata,
+        "workflow_label_name": workflow_label_name,
+        "workflow_version_number": workflow_version_number,
+    }
+
+    url = f"{URL_API_PROMPTLAYER}/workflows/{workflow_name}/run"
+    headers = {"X-API-KEY": api_key}
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+    except requests.exceptions.RequestException as e:
+        error_message = f"Failed to run workflow: {e}"
+        print(error_message, file=sys.stderr)
+        raise Exception(error_message)
+
+    if response.status_code != 201:
+        try:
+            error_details = response.json().get("error", "Unknown error")
+        except ValueError:
+            error_details = response.text or "Unknown error"
+
+        error_message = f"Failed to run workflow: {error_details}"
+        print(error_message, file=sys.stderr)
+        raise Exception(error_message)
+
+    result = response.json()
+
+    return result
 
 
 def promptlayer_api_handler(

@@ -3,7 +3,7 @@ import datetime
 import os
 from copy import deepcopy
 from functools import wraps
-from typing import Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -23,6 +23,7 @@ from promptlayer.utils import (
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
+    run_workflow_request,
     stream_response,
     track_request,
     util_log_request,
@@ -357,6 +358,27 @@ class PromptLayer:
                 return result
         else:
             return self._run_internal(**_run_internal_kwargs)
+
+    def run_workflow(
+        self,
+        workflow_name: str,
+        input_variables: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, str]] = None,
+        workflow_label_name: Optional[str] = None,
+        workflow_version_number: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        try:
+            result = run_workflow_request(
+                workflow_name=workflow_name,
+                input_variables=input_variables or {},
+                metadata=metadata,
+                workflow_label_name=workflow_label_name,
+                workflow_version_number=workflow_version_number,
+                api_key=self.api_key,
+            )
+            return result
+        except Exception as e:
+            raise Exception(f"Error running workflow: {str(e)}")
 
     def traceable(self, attributes=None, name=None):
         def decorator(func):

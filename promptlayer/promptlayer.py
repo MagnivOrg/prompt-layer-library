@@ -181,7 +181,7 @@ class PromptLayer:
             kwargs["base_url"] = provider_base_url["url"]
 
         kwargs["stream"] = stream
-        if stream and provider == "openai":
+        if stream and provider in ["openai", "openai.azure"]:
             kwargs["stream_options"] = {"include_usage": True}
 
         return {

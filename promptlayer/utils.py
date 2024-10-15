@@ -772,8 +772,10 @@ def openai_stream_chat(results: list):
         ChatCompletion,
         ChatCompletionChunk,
         ChatCompletionMessage,
+        ChatCompletionMessageToolCall,
     )
     from openai.types.chat.chat_completion import Choice
+    from openai.types.chat.chat_completion_message_tool_call import Function
 
     chat_completion_chunks: List[ChatCompletionChunk] = results
     response: ChatCompletion = ChatCompletion(
@@ -796,10 +798,42 @@ def openai_stream_chat(results: list):
     response.system_fingerprint = last_result.system_fingerprint
     response.usage = last_result.usage
     content = ""
+    tool_calls: Union[List[ChatCompletionMessageToolCall], None] = None
     for result in chat_completion_chunks:
-        if len(result.choices) > 0 and result.choices[0].delta.content:
+        choices = result.choices
+        if len(choices) == 0:
+            continue
+        if choices[0].delta.content:
             content = f"{content}{result.choices[0].delta.content}"
+
+        delta = choices[0].delta
+        if delta.tool_calls:
+            tool_calls = tool_calls or []
+            last_tool_call = None
+            if len(tool_calls) > 0:
+                last_tool_call = tool_calls[-1]
+            tool_call = delta.tool_calls[0]
+            if not tool_call.function:
+                continue
+            if not last_tool_call or tool_call.id:
+                tool_calls.append(
+                    ChatCompletionMessageToolCall(
+                        id=tool_call.id or "",
+                        function=Function(
+                            name=tool_call.function.name or "",
+                            arguments=tool_call.function.arguments or "",
+                        ),
+                        type=tool_call.type or "function",
+                    )
+                )
+                continue
+            last_tool_call.function.name = (
+                f"{last_tool_call.function.name}{tool_call.function.name or ''}"
+            )
+            last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
+
     response.choices[0].message.content = content
+    response.choices[0].message.tool_calls = tool_calls
     return response
 
 
@@ -917,6 +951,16 @@ def openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     from openai import OpenAI
 
     client = OpenAI(base_url=kwargs.pop("base_url", None))
+    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
+        prompt_blueprint["prompt_template"]["type"]
+    ]
+    return request_to_make(client, **kwargs)
+
+
+def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+    from openai import AzureOpenAI
+
+    client = AzureOpenAI(base_url=kwargs.pop("base_url", None))
     request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
         prompt_blueprint["prompt_template"]["type"]
     ]

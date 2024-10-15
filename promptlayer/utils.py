@@ -882,6 +882,16 @@ def openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     return request_to_make(client, **kwargs)
 
 
+def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+    from openai import AzureOpenAI
+
+    client = AzureOpenAI(base_url=kwargs.pop("base_url", None))
+    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
+        prompt_blueprint["prompt_template"]["type"]
+    ]
+    return request_to_make(client, **kwargs)
+
+
 def anthropic_chat_request(client, **kwargs):
     return client.messages.create(**kwargs)
 

@@ -20,6 +20,7 @@ from promptlayer.utils import (
     anthropic_request,
     anthropic_stream_completion,
     anthropic_stream_message,
+    azure_openai_request,
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
@@ -49,11 +50,22 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": anthropic_stream_completion,
         },
     },
+    "openai.azure": {
+        "chat": {
+            "function_name": "openai.AzureOpenAI.chat.completions.create",
+            "stream_function": openai_stream_chat,
+        },
+        "completion": {
+            "function_name": "openai.AzureOpenAI.completions.create",
+            "stream_function": openai_stream_completion,
+        },
+    },
 }
 
 MAP_PROVIDER_TO_FUNCTION = {
     "openai": openai_request,
     "anthropic": anthropic_request,
+    "openai.azure": azure_openai_request,
 }
 
 

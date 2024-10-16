@@ -377,7 +377,9 @@ class PromptLayer:
         input_variables: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, str]] = None,
         workflow_label_name: Optional[str] = None,
-        workflow_version: Optional[int] = None,  # This is the version number, not the version ID
+        workflow_version: Optional[
+            int
+        ] = None,  # This is the version number, not the version ID
     ) -> Dict[str, Any]:
         try:
             result = run_workflow_request(

@@ -24,7 +24,7 @@ from promptlayer.utils import (
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
-    run_workflow_request,
+    run_workflow_async,
     stream_response,
     track_request,
     util_log_request,
@@ -380,15 +380,17 @@ class PromptLayer:
         workflow_version: Optional[
             int
         ] = None,  # This is the version number, not the version ID
+        return_all_outputs: Optional[bool] = False,
     ) -> Dict[str, Any]:
         try:
-            result = run_workflow_request(
+            result = run_workflow_async(
                 workflow_name=workflow_name,
                 input_variables=input_variables or {},
                 metadata=metadata,
                 workflow_label_name=workflow_label_name,
                 workflow_version_number=workflow_version,
                 api_key=self.api_key,
+                return_all_outputs=return_all_outputs,
             )
             return result
         except Exception as e:

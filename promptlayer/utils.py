@@ -10,7 +10,9 @@ from copy import deepcopy
 from enum import Enum
 from typing import Any, Callable, Dict, Generator, List, Optional, Union
 
+import aiohttp
 import requests
+from ably import AblyRealtime
 from opentelemetry import context, trace
 
 from promptlayer.types import RequestLog
@@ -27,7 +29,7 @@ URL_API_PROMPTLAYER = os.environ.setdefault(
 )
 
 
-def run_workflow_request(
+def run_workflow_async(
     *,
     workflow_name: str,
     input_variables: Dict[str, Any],
@@ -35,37 +37,103 @@ def run_workflow_request(
     workflow_label_name: Optional[str] = None,
     workflow_version_number: Optional[int] = None,
     api_key: str,
+    return_all_outputs: Optional[bool] = False,
+    timeout: Optional[int] = 120,
+) -> Dict[str, Any]:
+    return asyncio.run(
+        run_workflow_request(
+            workflow_name=workflow_name,
+            input_variables=input_variables,
+            metadata=metadata,
+            workflow_label_name=workflow_label_name,
+            workflow_version_number=workflow_version_number,
+            api_key=api_key,
+            return_all_outputs=return_all_outputs,
+            timeout=timeout,
+        )
+    )
+
+
+async def run_workflow_request(
+    *,
+    workflow_name: str,
+    input_variables: Dict[str, Any],
+    metadata: Optional[Dict[str, str]] = None,
+    workflow_label_name: Optional[str] = None,
+    workflow_version_number: Optional[int] = None,
+    api_key: str,
+    return_all_outputs: Optional[bool] = None,
+    timeout: Optional[int] = 120,
 ) -> Dict[str, Any]:
     payload = {
         "input_variables": input_variables,
         "metadata": metadata,
         "workflow_label_name": workflow_label_name,
         "workflow_version_number": workflow_version_number,
+        "return_all_outputs": return_all_outputs,
     }
 
     url = f"{URL_API_PROMPTLAYER}/workflows/{workflow_name}/run"
     headers = {"X-API-KEY": api_key}
 
     try:
-        response = requests.post(url, json=payload, headers=headers)
-    except requests.exceptions.RequestException as e:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status != 201:
+                    error_message = f"Failed to run workflow: {response.status} {await response.text()}"
+                    print(error_message)
+                    raise Exception(error_message)
+                result = await response.json()
+    except Exception as e:
         error_message = f"Failed to run workflow: {e}"
-        print(error_message, file=sys.stderr)
+        print(error_message)
         raise Exception(error_message)
 
-    if response.status_code != 201:
-        try:
-            error_details = response.json().get("error", "Unknown error")
-        except ValueError:
-            error_details = response.text or "Unknown error"
+    execution_id = result.get("workflow_version_execution_id")
+    if not execution_id:
+        raise Exception("No execution ID returned from workflow run")
 
-        error_message = f"Failed to run workflow: {error_details}"
-        print(error_message, file=sys.stderr)
-        raise Exception(error_message)
+    channel_name = f"workflow_updates:{execution_id}"
 
-    result = response.json()
+    ws_response = requests.post(
+        f"{URL_API_PROMPTLAYER}/ws-token-request",
+        headers=headers,
+        params={"capability": channel_name},
+    )
+    token_details = ws_response.json()["token_details"]
 
-    return result
+    # Initialize Ably client
+    ably_client = AblyRealtime(token=token_details["token"])
+
+    # Subscribe to the channel named after the execution ID
+    channel = ably_client.channels.get(channel_name)
+
+    final_output = {}
+    message_received_event = asyncio.Event()
+
+    async def message_listener(message):
+        if message.name == "set_workflow_node_output":
+            data = json.loads(message.data)
+            if data.get("status") == "workflow_complete":
+                final_output.update(data.get("final_output", {}))
+                message_received_event.set()
+
+    # Subscribe to the channel
+    await channel.subscribe("set_workflow_node_output", message_listener)
+
+    # Wait for the message or timeout
+    try:
+        await asyncio.wait_for(message_received_event.wait(), timeout)
+    except asyncio.TimeoutError:
+        channel.unsubscribe("set_workflow_node_output", message_listener)
+        await ably_client.close()
+        raise Exception("Workflow execution did not complete properly")
+
+    # Unsubscribe from the channel
+    channel.unsubscribe("set_workflow_node_output", message_listener)
+    await ably_client.close()
+
+    return final_output
 
 
 def promptlayer_api_handler(

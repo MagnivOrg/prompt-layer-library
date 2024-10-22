@@ -96,7 +96,7 @@ async def run_workflow_request(
     channel_name = f"workflow_updates:{execution_id}"
 
     ws_response = requests.post(
-        f"{URL_API_PROMPTLAYER}/ws-token-request",
+        f"{URL_API_PROMPTLAYER}/ws-token-request-library",
         headers=headers,
         params={"capability": channel_name},
     )

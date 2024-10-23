@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.25"
+version = "1.0.26"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -12,6 +12,7 @@ requests = "^2.31.0"
 opentelemetry-api = "^1.26.0"
 opentelemetry-sdk = "^1.26.0"
 ably = "^2.0.6"
+aiohttp = "^3.10.10"
 
 [tool.poetry.group.dev.dependencies]
 langchain = "^0.0.260"

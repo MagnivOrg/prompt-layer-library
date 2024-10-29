@@ -4,7 +4,6 @@ from promptlayer.types.prompt_template import GetPromptTemplate, PublishPromptTe
 from promptlayer.utils import (
     aget_all_prompt_templates,
     aget_prompt_template,
-    apublish_prompt_template,
     get_all_prompt_templates,
     get_prompt_template,
     publish_prompt_template,
@@ -33,9 +32,6 @@ class AsyncTemplateManager:
         self, prompt_name: str, params: Union[GetPromptTemplate, None] = None
     ):
         return await aget_prompt_template(prompt_name, params, self.api_key)
-
-    async def publish(self, body: PublishPromptTemplate):
-        return await apublish_prompt_template(body, self.api_key)
 
     async def all(self, page: int = 1, per_page: int = 30):
         return await aget_all_prompt_templates(page, per_page, self.api_key)

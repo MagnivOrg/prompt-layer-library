@@ -450,20 +450,12 @@ async def apromptlayer_track_prompt(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload)
-        response.raise_for_status()
-        warning = response.json().get("warning", None)
-        if warning:
+        if response.status_code != 200:
             warn_on_bad_response(
-                warning,
+                response,
                 "WARNING: While tracking your prompt, PromptLayer had the following error",
             )
             return False
-    except httpx.HTTPStatusError as e:
-        print(
-            f"WARNING: While tracking your prompt PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
-        return False
     except httpx.RequestError as e:
         print(
             f"WARNING: While tracking your prompt PromptLayer had the following error: {e}",
@@ -511,20 +503,12 @@ async def apromptlayer_track_metadata(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload)
-        response.raise_for_status()
-        warning = response.json().get("warning", None)
-        if warning:
+        if response.status_code != 200:
             warn_on_bad_response(
-                warning,
+                response,
                 "WARNING: While tracking your metadata, PromptLayer had the following error",
             )
             return False
-    except httpx.HTTPStatusError as e:
-        print(
-            f"WARNING: While tracking your metadata PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
-        return False
     except httpx.RequestError as e:
         print(
             f"WARNING: While tracking your metadata PromptLayer had the following error: {e}",
@@ -576,23 +560,15 @@ async def apromptlayer_track_score(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=data)
-        response.raise_for_status()
-        warning = response.json().get("warning", None)
-        if warning:
+        if response.status_code != 200:
             warn_on_bad_response(
-                warning,
+                response,
                 "WARNING: While tracking your score, PromptLayer had the following error",
             )
             return False
-    except httpx.HTTPStatusError as e:
-        print(
-            f"WARNING: While tracking your score PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
-        return False
     except httpx.RequestError as e:
         print(
-            f"WARNING: While tracking your score PromptLayer had the following error: {e}",
+            f"WARNING: While tracking your score PromptLayer had the following error: {str(e)}",
             file=sys.stderr,
         )
         return False
@@ -866,18 +842,13 @@ async def apromptlayer_create_group(api_key: Optional[str] = None) -> str:
                     "api_key": api_key,
                 },
             )
-        response.raise_for_status()
-        warning = response.json().get("warning", None)
-        if warning:
+        if response.status_code != 200:
             warn_on_bad_response(
-                warning,
+                response,
                 "WARNING: While creating your group, PromptLayer had the following error",
             )
+            return False
         return response.json()["id"]
-    except httpx.HTTPStatusError as e:
-        raise Exception(
-            f"PromptLayer had the following error while creating your group: {e.response.text}"
-        ) from e
     except httpx.RequestError as e:
         raise Exception(
             f"PromptLayer had the following error while creating your group: {str(e)}"
@@ -921,19 +892,12 @@ async def apromptlayer_track_group(request_id, group_id, api_key: str = None):
                 headers={"X-API-KEY": api_key},
                 json=payload,
             )
-        response.raise_for_status()
         if response.status_code != 200:
             warn_on_bad_response(
-                response.text,
+                response,
                 "WARNING: While tracking your group, PromptLayer had the following error",
             )
             return False
-    except httpx.HTTPStatusError as e:
-        print(
-            f"WARNING: While tracking your group PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
-        return False
     except httpx.RequestError as e:
         print(
             f"WARNING: While tracking your group PromptLayer had the following error: {e}",
@@ -1349,6 +1313,29 @@ def util_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
             headers={"X-API-KEY": api_key},
             json=kwargs,
         )
+        if response.status_code != 201:
+            warn_on_bad_response(
+                response,
+                "WARNING: While logging your request PromptLayer had the following error",
+            )
+            return None
+        return response.json()
+    except Exception as e:
+        print(
+            f"WARNING: While tracking your prompt PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return None
+
+
+async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{URL_API_PROMPTLAYER}/log-request",
+                headers={"X-API-KEY": api_key},
+                json=kwargs,
+            )
         if response.status_code != 201:
             warn_on_bad_response(
                 response,

@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, Generator, List, Optional, Union
 
 import aiohttp
+import httpx
 import requests
 from ably import AblyRealtime
 from opentelemetry import context, trace
@@ -789,6 +790,39 @@ def get_prompt_template(
         )
 
 
+async def aget_prompt_template(
+    prompt_name: str,
+    params: Union[GetPromptTemplate, None] = None,
+    api_key: str = None,
+) -> GetPromptTemplateResponse:
+    try:
+        json_body = {"api_key": api_key}
+        if params:
+            json_body.update(params)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
+                headers={"X-API-KEY": api_key},
+                json=json_body,
+            )
+        response.raise_for_status()
+        warning = response.json().get("warning", None)
+        if warning:
+            warn_on_bad_response(
+                warning,
+                "WARNING: While getting your prompt template",
+            )
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting your prompt template: {e.response.text}"
+        ) from e
+    except httpx.RequestError as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting your prompt template: {str(e)}"
+        ) from e
+
+
 def publish_prompt_template(
     body: PublishPromptTemplate,
     api_key: str = None,
@@ -814,6 +848,37 @@ def publish_prompt_template(
         )
 
 
+async def apublish_prompt_template(
+    body: PublishPromptTemplate,
+    api_key: str = None,
+) -> PublishPromptTemplateResponse:
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{URL_API_PROMPTLAYER}/rest/prompt-templates",
+                headers={"X-API-KEY": api_key},
+                json={
+                    "prompt_template": {**body},
+                    "prompt_version": {**body},
+                    "release_labels": body.get("release_labels"),
+                },
+            )
+        if response.status_code == 400:
+            raise Exception(
+                f"PromptLayer had the following error while publishing your prompt template: {response.text}"
+            )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        raise Exception(
+            f"PromptLayer had the following error while publishing your prompt template: {e.response.text}"
+        ) from e
+    except httpx.RequestError as e:
+        raise Exception(
+            f"PromptLayer had the following error while publishing your prompt template: {str(e)}"
+        ) from e
+
+
 def get_all_prompt_templates(
     page: int = 1, per_page: int = 30, api_key: str = None
 ) -> List[ListPromptTemplateResponse]:
@@ -833,6 +898,29 @@ def get_all_prompt_templates(
         raise Exception(
             f"PromptLayer had the following error while getting all your prompt templates: {e}"
         )
+
+
+async def aget_all_prompt_templates(
+    page: int = 1, per_page: int = 30, api_key: str = None
+) -> List[ListPromptTemplateResponse]:
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{URL_API_PROMPTLAYER}/prompt-templates",
+                headers={"X-API-KEY": api_key},
+                params={"page": page, "per_page": per_page},
+            )
+        response.raise_for_status()
+        items = response.json().get("items", [])
+        return items
+    except httpx.HTTPStatusError as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting all your prompt templates: {e.response.text}"
+        ) from e
+    except httpx.RequestError as e:
+        raise Exception(
+            f"PromptLayer had the following error while getting all your prompt templates: {str(e)}"
+        ) from e
 
 
 def openai_stream_chat(results: list):

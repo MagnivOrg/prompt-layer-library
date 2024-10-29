@@ -13,7 +13,7 @@ from opentelemetry.semconv.resource import ResourceAttributes
 from promptlayer.groups import GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.span_exporter import PromptLayerSpanExporter
-from promptlayer.templates import TemplateManager
+from promptlayer.templates import AsyncTemplateManager, TemplateManager
 from promptlayer.track import TrackManager
 from promptlayer.types.prompt_template import PromptTemplate
 from promptlayer.utils import (
@@ -481,3 +481,21 @@ class PromptLayer:
             function_name=function_name,
             score=score,
         )
+
+
+class AsyncPromptLayer:
+    def __init__(
+        self,
+        api_key: str = None,
+    ):
+        if api_key is None:
+            api_key = os.environ.get("PROMPTLAYER_API_KEY")
+
+        if api_key is None:
+            raise ValueError(
+                "PromptLayer API key not provided. "
+                "Please set the PROMPTLAYER_API_KEY environment variable or pass the api_key parameter."
+            )
+
+        self.api_key = api_key
+        self.templates = AsyncTemplateManager(api_key)

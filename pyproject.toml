@@ -13,6 +13,7 @@ opentelemetry-api = "^1.26.0"
 opentelemetry-sdk = "^1.26.0"
 ably = "^2.0.6"
 aiohttp = "^3.10.10"
+httpx = "^0.27.2"
 
 [tool.poetry.group.dev.dependencies]
 langchain = "^0.0.260"

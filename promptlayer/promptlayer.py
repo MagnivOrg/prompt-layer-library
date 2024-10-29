@@ -10,11 +10,11 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
-from promptlayer.groups import GroupManager
+from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.span_exporter import PromptLayerSpanExporter
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
-from promptlayer.track import TrackManager
+from promptlayer.track import AsyncTrackManager, TrackManager
 from promptlayer.types.prompt_template import PromptTemplate
 from promptlayer.utils import (
     anthropic_request,
@@ -499,3 +499,5 @@ class AsyncPromptLayer:
 
         self.api_key = api_key
         self.templates = AsyncTemplateManager(api_key)
+        self.group = AsyncGroupManager(api_key)
+        self.track = AsyncTrackManager(api_key)

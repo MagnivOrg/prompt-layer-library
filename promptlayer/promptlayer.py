@@ -5,6 +5,7 @@ from copy import deepcopy
 from functools import wraps
 from typing import Any, Dict, List, Literal, Optional, Union
 
+import nest_asyncio
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -20,12 +21,12 @@ from promptlayer.utils import (
     anthropic_request,
     anthropic_stream_completion,
     anthropic_stream_message,
+    arun_workflow_request,
     autil_log_request,
     azure_openai_request,
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
-    run_workflow_async,
     stream_response,
     track_request,
     util_log_request,
@@ -384,16 +385,39 @@ class PromptLayer:
         return_all_outputs: Optional[bool] = False,
     ) -> Dict[str, Any]:
         try:
-            result = run_workflow_async(
-                workflow_name=workflow_name,
-                input_variables=input_variables or {},
-                metadata=metadata,
-                workflow_label_name=workflow_label_name,
-                workflow_version_number=workflow_version,
-                api_key=self.api_key,
-                return_all_outputs=return_all_outputs,
-            )
-            return result
+            try:
+                # Check if we're inside a running event loop
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                nest_asyncio.apply()
+                # If there's an active event loop, use `await` directly
+                return asyncio.run(
+                    arun_workflow_request(
+                        workflow_name=workflow_name,
+                        input_variables=input_variables or {},
+                        metadata=metadata,
+                        workflow_label_name=workflow_label_name,
+                        workflow_version_number=workflow_version,
+                        api_key=self.api_key,
+                        return_all_outputs=return_all_outputs,
+                    )
+                )
+            else:
+                # If there's no active event loop, use `asyncio.run()`
+                return asyncio.run(
+                    arun_workflow_request(
+                        workflow_name=workflow_name,
+                        input_variables=input_variables or {},
+                        metadata=metadata,
+                        workflow_label_name=workflow_label_name,
+                        workflow_version_number=workflow_version,
+                        api_key=self.api_key,
+                        return_all_outputs=return_all_outputs,
+                    )
+                )
         except Exception as e:
             raise Exception(f"Error running workflow: {str(e)}")
 
@@ -502,6 +526,31 @@ class AsyncPromptLayer:
         self.templates = AsyncTemplateManager(api_key)
         self.group = AsyncGroupManager(api_key)
         self.track = AsyncTrackManager(api_key)
+
+    async def run_workflow(
+        self,
+        workflow_name: str,
+        input_variables: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, str]] = None,
+        workflow_label_name: Optional[str] = None,
+        workflow_version: Optional[
+            int
+        ] = None,  # This is the version number, not the version ID
+        return_all_outputs: Optional[bool] = False,
+    ) -> Dict[str, Any]:
+        try:
+            result = await arun_workflow_request(
+                workflow_name=workflow_name,
+                input_variables=input_variables or {},
+                metadata=metadata,
+                workflow_label_name=workflow_label_name,
+                workflow_version_number=workflow_version,
+                api_key=self.api_key,
+                return_all_outputs=return_all_outputs,
+            )
+            return result
+        except Exception as e:
+            raise Exception(f"Error running workflow: {str(e)}")
 
     async def log_request(
         self,

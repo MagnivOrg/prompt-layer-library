@@ -55,7 +55,7 @@ async def arun_workflow_request(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
-            if response.status_code != 200:
+            if response.status_code != 201:
                 raise_on_bad_response(
                     response,
                     "PromptLayer had the following error while running your workflow",
@@ -81,7 +81,7 @@ async def arun_workflow_request(
                 headers=headers,
                 params={"capability": channel_name},
             )
-            if ws_response.status_code != 200:
+            if ws_response.status_code != 201:
                 raise_on_bad_response(
                     ws_response,
                     "PromptLayer had the following error while getting WebSocket token",
@@ -1006,7 +1006,7 @@ async def apublish_prompt_template(
             raise Exception(
                 f"PromptLayer had the following error while publishing your prompt template: {response.text}"
             )
-        if response.status_code != 200:
+        if response.status_code != 201:
             raise_on_bad_response(
                 response,
                 "PromptLayer had the following error while publishing your prompt template",

@@ -55,7 +55,12 @@ async def arun_workflow_request(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
+            if response.status_code != 201:
+                raise_on_bad_response(
+                    response,
+                    "PromptLayer had the following error while running your workflow",
+                )
+
             result = response.json()
     except Exception as e:
         error_message = f"Failed to run workflow: {str(e)}"
@@ -76,7 +81,11 @@ async def arun_workflow_request(
                 headers=headers,
                 params={"capability": channel_name},
             )
-            ws_response.raise_for_status()
+            if ws_response.status_code != 201:
+                raise_on_bad_response(
+                    ws_response,
+                    "PromptLayer had the following error while getting WebSocket token",
+                )
             token_details = ws_response.json()["token_details"]
     except Exception as e:
         error_message = f"Failed to get WebSocket token: {e}"
@@ -741,7 +750,9 @@ def warn_on_bad_response(request_response, main_message):
 def raise_on_bad_response(request_response, main_message):
     if hasattr(request_response, "json"):
         try:
-            raise Exception(f"{main_message}: {request_response.json().get('message')}")
+            raise Exception(
+                f"{main_message}: {request_response.json().get('message') or request_response.json().get('error')}"
+            )
         except json.JSONDecodeError:
             raise Exception(f"{main_message}: {request_response}")
     else:
@@ -933,7 +944,11 @@ async def aget_prompt_template(
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )
-        response.raise_for_status()
+            if response.status_code != 200:
+                raise_on_bad_response(
+                    response,
+                    "PromptLayer had the following error while getting your prompt template",
+                )
         warning = response.json().get("warning", None)
         if warning:
             warn_on_bad_response(
@@ -941,10 +956,6 @@ async def aget_prompt_template(
                 "WARNING: While getting your prompt template",
             )
         return response.json()
-    except httpx.HTTPStatusError as e:
-        raise Exception(
-            f"PromptLayer had the following error while getting your prompt template: {e.response.text}"
-        ) from e
     except httpx.RequestError as e:
         raise Exception(
             f"PromptLayer had the following error while getting your prompt template: {str(e)}"
@@ -995,12 +1006,12 @@ async def apublish_prompt_template(
             raise Exception(
                 f"PromptLayer had the following error while publishing your prompt template: {response.text}"
             )
-        response.raise_for_status()
+        if response.status_code != 201:
+            raise_on_bad_response(
+                response,
+                "PromptLayer had the following error while publishing your prompt template",
+            )
         return response.json()
-    except httpx.HTTPStatusError as e:
-        raise Exception(
-            f"PromptLayer had the following error while publishing your prompt template: {e.response.text}"
-        ) from e
     except httpx.RequestError as e:
         raise Exception(
             f"PromptLayer had the following error while publishing your prompt template: {str(e)}"
@@ -1038,13 +1049,13 @@ async def aget_all_prompt_templates(
                 headers={"X-API-KEY": api_key},
                 params={"page": page, "per_page": per_page},
             )
-        response.raise_for_status()
+        if response.status_code != 200:
+            raise_on_bad_response(
+                response,
+                "PromptLayer had the following error while getting all your prompt templates",
+            )
         items = response.json().get("items", [])
         return items
-    except httpx.HTTPStatusError as e:
-        raise Exception(
-            f"PromptLayer had the following error while getting all your prompt templates: {e.response.text}"
-        ) from e
     except httpx.RequestError as e:
         raise Exception(
             f"PromptLayer had the following error while getting all your prompt templates: {str(e)}"

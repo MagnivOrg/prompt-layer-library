@@ -62,6 +62,10 @@ async def arun_workflow_request(
                 )
 
             result = response.json()
+            warning = result.get("warning")
+            if warning:
+                print(f"WARNING: {warning}")
+
     except Exception as e:
         error_message = f"Failed to run workflow: {str(e)}"
         print(error_message)

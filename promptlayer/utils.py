@@ -2,13 +2,24 @@ import asyncio
 import contextvars
 import datetime
 import functools
+import inspect
 import json
 import os
 import sys
 import types
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, List, Optional, Union
+from typing import (
+    Any,
+    AsyncGenerator,
+    AsyncIterable,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Union,
+)
 
 import httpx
 import requests
@@ -304,6 +315,27 @@ def track_request(**body):
             )
         return response.json()
     except requests.exceptions.RequestException as e:
+        print(
+            f"WARNING: While logging your request PromptLayer had the following error: {e}",
+            file=sys.stderr,
+        )
+        return {}
+
+
+async def atrack_request(**body: Any) -> Dict[str, Any]:
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{URL_API_PROMPTLAYER}/track-request",
+                json=body,
+            )
+        if response.status_code != 200:
+            warn_on_bad_response(
+                response,
+                f"PromptLayer had the following error while tracking your request: {response.text}",
+            )
+        return response.json()
+    except httpx.RequestError as e:
         print(
             f"WARNING: While logging your request PromptLayer had the following error: {e}",
             file=sys.stderr,
@@ -1136,6 +1168,81 @@ def openai_stream_chat(results: list):
     return response
 
 
+async def aopenai_stream_chat(generator: AsyncIterable[Any]) -> Any:
+    from openai.types.chat import (
+        ChatCompletion,
+        ChatCompletionChunk,
+        ChatCompletionMessage,
+        ChatCompletionMessageToolCall,
+    )
+    from openai.types.chat.chat_completion import Choice
+    from openai.types.chat.chat_completion_message_tool_call import Function
+
+    chat_completion_chunks: List[ChatCompletionChunk] = []
+    response: ChatCompletion = ChatCompletion(
+        id="",
+        object="chat.completion",
+        choices=[
+            Choice(
+                finish_reason="stop",
+                index=0,
+                message=ChatCompletionMessage(role="assistant"),
+            )
+        ],
+        created=0,
+        model="",
+    )
+    content = ""
+    tool_calls: Union[List[ChatCompletionMessageToolCall], None] = None
+
+    async for result in generator:
+        chat_completion_chunks.append(result)
+        choices = result.choices
+        if len(choices) == 0:
+            continue
+        if choices[0].delta.content:
+            content = f"{content}{choices[0].delta.content}"
+
+        delta = choices[0].delta
+        if delta.tool_calls:
+            tool_calls = tool_calls or []
+            last_tool_call = None
+            if len(tool_calls) > 0:
+                last_tool_call = tool_calls[-1]
+            tool_call = delta.tool_calls[0]
+            if not tool_call.function:
+                continue
+            if not last_tool_call or tool_call.id:
+                tool_calls.append(
+                    ChatCompletionMessageToolCall(
+                        id=tool_call.id or "",
+                        function=Function(
+                            name=tool_call.function.name or "",
+                            arguments=tool_call.function.arguments or "",
+                        ),
+                        type=tool_call.type or "function",
+                    )
+                )
+                continue
+            last_tool_call.function.name = (
+                f"{last_tool_call.function.name}{tool_call.function.name or ''}"
+            )
+            last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
+
+    # After collecting all chunks, set the response attributes
+    if chat_completion_chunks:
+        last_result = chat_completion_chunks[-1]
+        response.id = last_result.id
+        response.created = last_result.created
+        response.model = last_result.model
+        response.system_fingerprint = getattr(last_result, "system_fingerprint", None)
+        response.usage = last_result.usage
+
+    response.choices[0].message.content = content
+    response.choices[0].message.tool_calls = tool_calls
+    return response
+
+
 def openai_stream_completion(results: list):
     from openai.types.completion import Completion, CompletionChoice
 
@@ -1158,6 +1265,41 @@ def openai_stream_completion(results: list):
             response.usage = usage
         if system_fingerprint:
             response.system_fingerprint = system_fingerprint
+    response.choices[0].text = text
+    return response
+
+
+async def aopenai_stream_completion(generator: AsyncIterable[Any]) -> Any:
+    from openai.types.completion import Completion, CompletionChoice
+
+    completions: List[Completion] = []
+    text = ""
+    response = Completion(
+        id="",
+        created=0,
+        model="",
+        object="text_completion",
+        choices=[CompletionChoice(finish_reason="stop", index=0, text="")],
+    )
+
+    async for completion in generator:
+        completions.append(completion)
+        usage = completion.usage
+        system_fingerprint = getattr(completion, "system_fingerprint", None)
+        if len(completion.choices) > 0 and completion.choices[0].text:
+            text = f"{text}{completion.choices[0].text}"
+        if usage:
+            response.usage = usage
+        if system_fingerprint:
+            response.system_fingerprint = system_fingerprint
+
+    # After collecting all completions, set the response attributes
+    if completions:
+        last_chunk = completions[-1]
+        response.id = last_chunk.id
+        response.created = last_chunk.created
+        response.model = last_chunk.model
+
     response.choices[0].text = text
     return response
 
@@ -1192,6 +1334,39 @@ def anthropic_stream_message(results: list):
     return response
 
 
+async def aanthropic_stream_message(generator: AsyncIterable[Any]) -> Any:
+    from anthropic.types import Message, MessageStreamEvent, TextBlock, Usage
+
+    message_stream_events: List[MessageStreamEvent] = []
+    response: Message = Message(
+        id="",
+        model="",
+        content=[],
+        role="assistant",
+        type="message",
+        stop_reason="stop_sequence",
+        stop_sequence=None,
+        usage=Usage(input_tokens=0, output_tokens=0),
+    )
+    content = ""
+
+    async for result in generator:
+        message_stream_events.append(result)
+        if result.type == "message_start":
+            response = result.message
+        elif result.type == "content_block_delta":
+            if result.delta.type == "text_delta":
+                content = f"{content}{result.delta.text}"
+        elif result.type == "message_delta":
+            if hasattr(result, "usage"):
+                response.usage.output_tokens = result.usage.output_tokens
+            if hasattr(result.delta, "stop_reason"):
+                response.stop_reason = result.delta.stop_reason
+
+    response.content.append(TextBlock(type="text", text=content))
+    return response
+
+
 def anthropic_stream_completion(results: list):
     from anthropic.types import Completion
 
@@ -1212,6 +1387,33 @@ def anthropic_stream_completion(results: list):
     return response
 
 
+async def aanthropic_stream_completion(generator: AsyncIterable[Any]) -> Any:
+    from anthropic.types import Completion
+
+    completions: List[Completion] = []
+    text = ""
+    response = Completion(
+        id="",
+        completion="",
+        model="",
+        stop_reason="stop",
+        type="completion",
+    )
+
+    async for completion in generator:
+        completions.append(completion)
+        text = f"{text}{completion.completion}"
+
+    # After collecting all completions, set the response attributes
+    if completions:
+        last_chunk = completions[-1]
+        response.id = last_chunk.id
+        response.model = last_chunk.model
+
+    response.completion = text
+    return response
+
+
 def stream_response(
     generator: Generator, after_stream: Callable, map_results: Callable
 ):
@@ -1227,6 +1429,33 @@ def stream_response(
         yield data
     request_response = map_results(results)
     response = after_stream(request_response=request_response.model_dump())
+    data["request_id"] = response.get("request_id")
+    data["prompt_blueprint"] = response.get("prompt_blueprint")
+    yield data
+
+
+async def astream_response(
+    generator: AsyncIterable[Any],
+    after_stream: Callable[..., Any],
+    map_results: Callable[[Any], Any],
+) -> AsyncGenerator[Dict[str, Any], None]:
+    data = {
+        "request_id": None,
+        "raw_response": None,
+        "prompt_blueprint": None,
+    }
+    results = []
+    async for result in generator:
+        results.append(result)
+        data["raw_response"] = result
+        yield data
+    request_response = await map_results(results)
+    if inspect.iscoroutinefunction(after_stream):
+        # after_stream is an async function
+        response = await after_stream(request_response=request_response.model_dump())
+    else:
+        # after_stream is synchronous
+        response = after_stream(request_response=request_response.model_dump())
     data["request_id"] = response.get("request_id")
     data["prompt_blueprint"] = response.get("prompt_blueprint")
     yield data
@@ -1256,6 +1485,30 @@ def openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     return request_to_make(client, **kwargs)
 
 
+async def aopenai_chat_request(client, **kwargs):
+    return await client.chat.completions.create(**kwargs)
+
+
+async def aopenai_completions_request(client, **kwargs):
+    return await client.completions.create(**kwargs)
+
+
+AMAP_TYPE_TO_OPENAI_FUNCTION = {
+    "chat": aopenai_chat_request,
+    "completion": aopenai_completions_request,
+}
+
+
+async def aopenai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(base_url=kwargs.pop("base_url", None))
+    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[
+        prompt_blueprint["prompt_template"]["type"]
+    ]
+    return await request_to_make(client, **kwargs)
+
+
 def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     from openai import AzureOpenAI
 
@@ -1264,6 +1517,16 @@ def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
         prompt_blueprint["prompt_template"]["type"]
     ]
     return request_to_make(client, **kwargs)
+
+
+async def aazure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+    from openai import AsyncAzureOpenAI
+
+    client = AsyncAzureOpenAI(azure_endpoint=kwargs.pop("base_url", None))
+    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[
+        prompt_blueprint["prompt_template"]["type"]
+    ]
+    return await request_to_make(client, **kwargs)
 
 
 def anthropic_chat_request(client, **kwargs):
@@ -1288,6 +1551,30 @@ def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
         prompt_blueprint["prompt_template"]["type"]
     ]
     return request_to_make(client, **kwargs)
+
+
+async def aanthropic_chat_request(client, **kwargs):
+    return await client.messages.create(**kwargs)
+
+
+async def aanthropic_completions_request(client, **kwargs):
+    return await client.completions.create(**kwargs)
+
+
+AMAP_TYPE_TO_ANTHROPIC_FUNCTION = {
+    "chat": aanthropic_chat_request,
+    "completion": aanthropic_completions_request,
+}
+
+
+async def aanthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+    from anthropic import AsyncAnthropic
+
+    client = AsyncAnthropic(base_url=kwargs.pop("base_url", None))
+    request_to_make = AMAP_TYPE_TO_ANTHROPIC_FUNCTION[
+        prompt_blueprint["prompt_template"]["type"]
+    ]
+    return await request_to_make(client, **kwargs)
 
 
 # do not remove! This is used in the langchain integration.

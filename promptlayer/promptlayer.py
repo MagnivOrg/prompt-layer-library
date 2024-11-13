@@ -171,6 +171,7 @@ class PromptLayer(PromptLayerMixin):
         **body,
     ):
         track_request_kwargs = self._prepare_track_request_kwargs(
+            self.api_key,
             request_params,
             tags,
             input_variables,

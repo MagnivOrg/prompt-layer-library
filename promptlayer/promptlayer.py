@@ -537,6 +537,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
             prompt_blueprint_model=prompt_blueprint_model,
+            model_parameter_overrides=model_parameter_overrides,
             stream=stream,
             is_async=True,
         )

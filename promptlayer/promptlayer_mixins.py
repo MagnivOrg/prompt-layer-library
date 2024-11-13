@@ -153,8 +153,6 @@ class PromptLayerMixin:
     ):
         provider = prompt_blueprint_model["provider"]
         kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
-        config = None
-        request_function = None
         if is_async:
             config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
             request_function = AMAP_PROVIDER_TO_FUNCTION[provider]

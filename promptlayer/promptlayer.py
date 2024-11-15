@@ -188,6 +188,9 @@ class PromptLayer:
         if provider_base_url := prompt_blueprint.get("provider_base_url"):
             kwargs["base_url"] = provider_base_url["url"]
 
+        if model_parameter_overrides:
+            kwargs.update(model_parameter_overrides)
+
         kwargs["stream"] = stream
         if stream and provider in ["openai", "openai.azure"]:
             kwargs["stream_options"] = {"include_usage": True}

@@ -174,7 +174,12 @@ class PromptLayer:
 
     @staticmethod
     def _prepare_llm_request_params(
-        *, prompt_blueprint, prompt_template, prompt_blueprint_model, stream
+        *,
+        prompt_blueprint,
+        prompt_template,
+        prompt_blueprint_model,
+        model_parameter_overrides,
+        stream,
     ):
         provider = prompt_blueprint_model["provider"]
         kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
@@ -182,6 +187,9 @@ class PromptLayer:
 
         if provider_base_url := prompt_blueprint.get("provider_base_url"):
             kwargs["base_url"] = provider_base_url["url"]
+
+        if model_parameter_overrides:
+            kwargs.update(model_parameter_overrides)
 
         kwargs["stream"] = stream
         if stream and provider in ["openai", "openai.azure"]:
@@ -236,6 +244,7 @@ class PromptLayer:
         prompt_version: Union[int, None] = None,
         prompt_release_label: Union[str, None] = None,
         input_variables: Union[Dict[str, Any], None] = None,
+        model_parameter_overrides: Union[Dict[str, Any], None] = None,
         tags: Union[List[str], None] = None,
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
@@ -256,6 +265,7 @@ class PromptLayer:
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
             prompt_blueprint_model=prompt_blueprint_model,
+            model_parameter_overrides=model_parameter_overrides,
             stream=stream,
         )
 
@@ -344,6 +354,7 @@ class PromptLayer:
         prompt_version: Union[int, None] = None,
         prompt_release_label: Union[str, None] = None,
         input_variables: Union[Dict[str, Any], None] = None,
+        model_parameter_overrides: Union[Dict[str, Any], None] = None,
         tags: Union[List[str], None] = None,
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
@@ -354,6 +365,7 @@ class PromptLayer:
             "prompt_version": prompt_version,
             "prompt_release_label": prompt_release_label,
             "input_variables": input_variables,
+            "model_parameter_overrides": model_parameter_overrides,
             "tags": tags,
             "metadata": metadata,
             "group_id": group_id,

@@ -10,12 +10,14 @@ def test_track_and_templates():
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
     template_name = f"test_template:{datetime.datetime.now()}"
     template_content = {
+        "dataset_examples": [],
         "function_call": "none",
         "functions": [],
         "input_variables": [],
         "messages": [
             {
                 "content": [{"text": "", "type": "text"}],
+                "dataset_examples": [],
                 "input_variables": [],
                 "name": None,
                 "raw_request_display_role": "",
@@ -24,6 +26,7 @@ def test_track_and_templates():
             },
             {
                 "content": [{"text": "what is the capital of Japan?", "type": "text"}],
+                "dataset_examples": [],
                 "input_variables": [],
                 "name": None,
                 "raw_request_display_role": "",

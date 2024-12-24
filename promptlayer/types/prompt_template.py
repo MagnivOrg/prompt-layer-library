@@ -28,7 +28,23 @@ class ImageContent(TypedDict, total=False):
     image_url: ImageUrl
 
 
-Content = Union[TextContent, ImageContent]
+class Media(TypedDict, total=False):
+    title: str
+    type: str
+    url: str
+
+
+class MediaContnt(TypedDict, total=False):
+    type: Literal["media"]
+    media: Media
+
+
+class MediaVariable(TypedDict, total=False):
+    type: Literal["media_variable"]
+    name: str
+
+
+Content = Union[TextContent, ImageContent, MediaContnt, MediaVariable]
 
 
 class Function(TypedDict, total=False):

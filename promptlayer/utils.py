@@ -1659,79 +1659,75 @@ async def amistral_request(
 
 
 def mistral_stream_chat(results: list):
-    #TODO: (JON) I just copied and pasted this from openai and it worked.
-    # This might need to be updated to work with mistral
-    print(results)
     from openai.types.chat import (
-        ChatCompletion,
-        ChatCompletionChunk,
+        ChatCompletion, 
         ChatCompletionMessage,
-        ChatCompletionMessageToolCall,
+        ChatCompletionMessageToolCall
     )
     from openai.types.chat.chat_completion import Choice
     from openai.types.chat.chat_completion_message_tool_call import Function
 
-    completion_chunks: List[ChatCompletionChunk] = results
-    response: ChatCompletion = ChatCompletion(
-        id="",
+    last_result = results[-1]
+    response = ChatCompletion(
+        id=last_result.data.id,
         object="chat.completion",
         choices=[
             Choice(
-                finish_reason="stop",
+                finish_reason=last_result.data.choices[0].finish_reason or "stop",
                 index=0,
                 message=ChatCompletionMessage(role="assistant"),
             )
         ],
-        created=0,
-        model="",
+        created=last_result.data.created,
+        model=last_result.data.model,
     )
-    last_result = completion_chunks[-1]
-    response.id = last_result.id
-    response.created = last_result.created
-    response.model = last_result.model
-    response.usage = last_result.usage
+    
     content = ""
-    tool_calls: Union[List[ChatCompletionMessageToolCall], None] = None
-    for result in completion_chunks:
-        choices = result.choices
+    tool_calls = None
+
+    for result in results:
+        choices = result.data.choices
         if len(choices) == 0:
             continue
-        if choices[0].delta.content:
-            content = f"{content}{result.choices[0].delta.content}"
-
+            
         delta = choices[0].delta
+        if delta.content is not None:
+            content = f"{content}{delta.content}"
+            
         if delta.tool_calls:
             tool_calls = tool_calls or []
-            last_tool_call = None
-            if len(tool_calls) > 0:
-                last_tool_call = tool_calls[-1]
-            tool_call = delta.tool_calls[0]
-            if not tool_call.function:
-                continue
-            if not last_tool_call or tool_call.id:
-                tool_calls.append(
-                    ChatCompletionMessageToolCall(
-                        id=tool_call.id or "",
-                        function=Function(
-                            name=tool_call.function.name or "",
-                            arguments=tool_call.function.arguments or "",
-                        ),
-                        type=tool_call.type or "function",
+            for tool_call in delta.tool_calls:
+                if len(tool_calls) == 0 or tool_call.id:
+                    tool_calls.append(
+                        ChatCompletionMessageToolCall(
+                            id=tool_call.id or "",
+                            function=Function(
+                                name=tool_call.function.name,
+                                arguments=tool_call.function.arguments
+                            ),
+                            type="function"
+                        )
                     )
-                )
-                continue
-            last_tool_call.function.name = (
-                f"{last_tool_call.function.name}{tool_call.function.name or ''}"
-            )
-            last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
+                else:
+                    last_tool_call = tool_calls[-1]
+                    if tool_call.function.name:
+                        last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name}"
+                    if tool_call.function.arguments:
+                        last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
 
     response.choices[0].message.content = content
     response.choices[0].message.tool_calls = tool_calls
+    response.usage = last_result.data.usage
     return response
 
 async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
-    from openai.types.chat import ChatCompletion, ChatCompletionMessage
+    from openai.types.chat import (
+        ChatCompletion, 
+        ChatCompletionMessage,
+        ChatCompletionMessageToolCall
+    )
     from openai.types.chat.chat_completion import Choice
+    from openai.types.chat.chat_completion_message_tool_call import Function
 
     completion_chunks = []
     response = ChatCompletion(
@@ -1748,14 +1744,37 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
         model="",
     )
     content = ""
+    tool_calls = None
 
     async for result in generator:
         completion_chunks.append(result)
         choices = result.data.choices
         if len(choices) == 0:
             continue
-        if choices[0].delta.content is not None:
-            content = f"{content}{choices[0].delta.content}"
+        delta = choices[0].delta
+        if delta.content is not None:
+            content = f"{content}{delta.content}"
+        
+        if delta.tool_calls:
+            tool_calls = tool_calls or []
+            for tool_call in delta.tool_calls:
+                if len(tool_calls) == 0 or tool_call.id:
+                    tool_calls.append(
+                        ChatCompletionMessageToolCall(
+                            id=tool_call.id or "",
+                            function=Function(
+                                name=tool_call.function.name,
+                                arguments=tool_call.function.arguments
+                            ),
+                            type="function"
+                        )
+                    )
+                else:
+                    last_tool_call = tool_calls[-1]
+                    if tool_call.function.name:
+                        last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name}"
+                    if tool_call.function.arguments:
+                        last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
 
     if completion_chunks:
         last_result = completion_chunks[-1]
@@ -1765,6 +1784,5 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
         response.usage = last_result.data.usage
 
     response.choices[0].message.content = content
+    response.choices[0].message.tool_calls = tool_calls
     return response
-
-

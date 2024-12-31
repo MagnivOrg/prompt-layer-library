@@ -68,9 +68,9 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": mistral_stream_chat,
         },
         "completion": {
-            "function_name":None,
-            "stream_function":None,
-        }
+            "function_name": None,
+            "stream_function": None,
+        },
     },
 }
 
@@ -119,11 +119,10 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": amistral_stream_chat,
         },
         "completion": {
-            "function_name":None,
-            "stream_function":None,
-        }
+            "function_name": None,
+            "stream_function": None,
+        },
     },
-
 }
 
 

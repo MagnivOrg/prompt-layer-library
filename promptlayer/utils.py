@@ -1633,6 +1633,7 @@ async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
         )
         return None
 
+
 def mistral_request(
     prompt_blueprint: GetPromptTemplateResponse,
     **kwargs,
@@ -1645,6 +1646,7 @@ def mistral_request(
         cleaned_kwargs.pop("stream")
         return client.chat.stream(**cleaned_kwargs)
     return client.chat.complete(**kwargs)
+
 
 async def amistral_request(
     prompt_blueprint: GetPromptTemplateResponse,
@@ -1660,9 +1662,9 @@ async def amistral_request(
 
 def mistral_stream_chat(results: list):
     from openai.types.chat import (
-        ChatCompletion, 
+        ChatCompletion,
         ChatCompletionMessage,
-        ChatCompletionMessageToolCall
+        ChatCompletionMessageToolCall,
     )
     from openai.types.chat.chat_completion import Choice
     from openai.types.chat.chat_completion_message_tool_call import Function
@@ -1681,7 +1683,7 @@ def mistral_stream_chat(results: list):
         created=last_result.data.created,
         model=last_result.data.model,
     )
-    
+
     content = ""
     tool_calls = None
 
@@ -1689,11 +1691,11 @@ def mistral_stream_chat(results: list):
         choices = result.data.choices
         if len(choices) == 0:
             continue
-            
+
         delta = choices[0].delta
         if delta.content is not None:
             content = f"{content}{delta.content}"
-            
+
         if delta.tool_calls:
             tool_calls = tool_calls or []
             for tool_call in delta.tool_calls:
@@ -1703,15 +1705,17 @@ def mistral_stream_chat(results: list):
                             id=tool_call.id or "",
                             function=Function(
                                 name=tool_call.function.name,
-                                arguments=tool_call.function.arguments
+                                arguments=tool_call.function.arguments,
                             ),
-                            type="function"
+                            type="function",
                         )
                     )
                 else:
                     last_tool_call = tool_calls[-1]
                     if tool_call.function.name:
-                        last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name}"
+                        last_tool_call.function.name = (
+                            f"{last_tool_call.function.name}{tool_call.function.name}"
+                        )
                     if tool_call.function.arguments:
                         last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
 
@@ -1720,11 +1724,12 @@ def mistral_stream_chat(results: list):
     response.usage = last_result.data.usage
     return response
 
+
 async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
     from openai.types.chat import (
-        ChatCompletion, 
+        ChatCompletion,
         ChatCompletionMessage,
-        ChatCompletionMessageToolCall
+        ChatCompletionMessageToolCall,
     )
     from openai.types.chat.chat_completion import Choice
     from openai.types.chat.chat_completion_message_tool_call import Function
@@ -1754,7 +1759,7 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
         delta = choices[0].delta
         if delta.content is not None:
             content = f"{content}{delta.content}"
-        
+
         if delta.tool_calls:
             tool_calls = tool_calls or []
             for tool_call in delta.tool_calls:
@@ -1764,15 +1769,17 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
                             id=tool_call.id or "",
                             function=Function(
                                 name=tool_call.function.name,
-                                arguments=tool_call.function.arguments
+                                arguments=tool_call.function.arguments,
                             ),
-                            type="function"
+                            type="function",
                         )
                     )
                 else:
                     last_tool_call = tool_calls[-1]
                     if tool_call.function.name:
-                        last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name}"
+                        last_tool_call.function.name = (
+                            f"{last_tool_call.function.name}{tool_call.function.name}"
+                        )
                     if tool_call.function.arguments:
                         last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
 

@@ -11,12 +11,12 @@ from opentelemetry.semconv.resource import ResourceAttributes
 
 from promptlayer.span_exporter import PromptLayerSpanExporter
 from promptlayer.utils import (
-    amistral_request,
-    amistral_stream_chat,
     aanthropic_request,
     aanthropic_stream_completion,
     aanthropic_stream_message,
     aazure_openai_request,
+    amistral_request,
+    amistral_stream_chat,
     anthropic_request,
     anthropic_stream_completion,
     anthropic_stream_message,
@@ -24,11 +24,11 @@ from promptlayer.utils import (
     aopenai_stream_chat,
     aopenai_stream_completion,
     azure_openai_request,
+    mistral_request,
+    mistral_stream_chat,
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
-    mistral_request,
-    mistral_stream_chat,
 )
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {

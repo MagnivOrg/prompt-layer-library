@@ -2,7 +2,6 @@ import asyncio
 import contextvars
 import datetime
 import functools
-import inspect
 import json
 import os
 import sys
@@ -1449,15 +1448,17 @@ async def astream_response(
         results.append(result)
         data["raw_response"] = result
         yield data
-    request_response = await map_results(results)
-    if inspect.iscoroutinefunction(after_stream):
-        # after_stream is an async function
-        response = await after_stream(request_response=request_response.model_dump())
-    else:
-        # after_stream is synchronous
-        response = after_stream(request_response=request_response.model_dump())
-    data["request_id"] = response.get("request_id")
-    data["prompt_blueprint"] = response.get("prompt_blueprint")
+
+    async def async_generator_from_list(lst):
+        for item in lst:
+            yield item
+
+    request_response = await map_results(async_generator_from_list(results))
+    after_stream_response = await after_stream(
+        request_response=request_response.model_dump()
+    )
+    data["request_id"] = after_stream_response.get("request_id")
+    data["prompt_blueprint"] = after_stream_response.get("prompt_blueprint")
     yield data
 
 
@@ -1631,3 +1632,164 @@ async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
             file=sys.stderr,
         )
         return None
+
+
+def mistral_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    **kwargs,
+):
+    from mistralai import Mistral
+
+    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+    if "stream" in kwargs and kwargs["stream"]:
+        cleaned_kwargs = kwargs.copy()
+        cleaned_kwargs.pop("stream")
+        return client.chat.stream(**cleaned_kwargs)
+    return client.chat.complete(**kwargs)
+
+
+async def amistral_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    **kwargs,
+):
+    from mistralai import Mistral
+
+    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+    if "stream" in kwargs and kwargs["stream"]:
+        return await client.chat.stream_async(**kwargs)
+    return await client.chat.complete_async(**kwargs)
+
+
+def mistral_stream_chat(results: list):
+    from openai.types.chat import (
+        ChatCompletion,
+        ChatCompletionMessage,
+        ChatCompletionMessageToolCall,
+    )
+    from openai.types.chat.chat_completion import Choice
+    from openai.types.chat.chat_completion_message_tool_call import Function
+
+    last_result = results[-1]
+    response = ChatCompletion(
+        id=last_result.data.id,
+        object="chat.completion",
+        choices=[
+            Choice(
+                finish_reason=last_result.data.choices[0].finish_reason or "stop",
+                index=0,
+                message=ChatCompletionMessage(role="assistant"),
+            )
+        ],
+        created=last_result.data.created,
+        model=last_result.data.model,
+    )
+
+    content = ""
+    tool_calls = None
+
+    for result in results:
+        choices = result.data.choices
+        if len(choices) == 0:
+            continue
+
+        delta = choices[0].delta
+        if delta.content is not None:
+            content = f"{content}{delta.content}"
+
+        if delta.tool_calls:
+            tool_calls = tool_calls or []
+            for tool_call in delta.tool_calls:
+                if len(tool_calls) == 0 or tool_call.id:
+                    tool_calls.append(
+                        ChatCompletionMessageToolCall(
+                            id=tool_call.id or "",
+                            function=Function(
+                                name=tool_call.function.name,
+                                arguments=tool_call.function.arguments,
+                            ),
+                            type="function",
+                        )
+                    )
+                else:
+                    last_tool_call = tool_calls[-1]
+                    if tool_call.function.name:
+                        last_tool_call.function.name = (
+                            f"{last_tool_call.function.name}{tool_call.function.name}"
+                        )
+                    if tool_call.function.arguments:
+                        last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
+
+    response.choices[0].message.content = content
+    response.choices[0].message.tool_calls = tool_calls
+    response.usage = last_result.data.usage
+    return response
+
+
+async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
+    from openai.types.chat import (
+        ChatCompletion,
+        ChatCompletionMessage,
+        ChatCompletionMessageToolCall,
+    )
+    from openai.types.chat.chat_completion import Choice
+    from openai.types.chat.chat_completion_message_tool_call import Function
+
+    completion_chunks = []
+    response = ChatCompletion(
+        id="",
+        object="chat.completion",
+        choices=[
+            Choice(
+                finish_reason="stop",
+                index=0,
+                message=ChatCompletionMessage(role="assistant"),
+            )
+        ],
+        created=0,
+        model="",
+    )
+    content = ""
+    tool_calls = None
+
+    async for result in generator:
+        completion_chunks.append(result)
+        choices = result.data.choices
+        if len(choices) == 0:
+            continue
+        delta = choices[0].delta
+        if delta.content is not None:
+            content = f"{content}{delta.content}"
+
+        if delta.tool_calls:
+            tool_calls = tool_calls or []
+            for tool_call in delta.tool_calls:
+                if len(tool_calls) == 0 or tool_call.id:
+                    tool_calls.append(
+                        ChatCompletionMessageToolCall(
+                            id=tool_call.id or "",
+                            function=Function(
+                                name=tool_call.function.name,
+                                arguments=tool_call.function.arguments,
+                            ),
+                            type="function",
+                        )
+                    )
+                else:
+                    last_tool_call = tool_calls[-1]
+                    if tool_call.function.name:
+                        last_tool_call.function.name = (
+                            f"{last_tool_call.function.name}{tool_call.function.name}"
+                        )
+                    if tool_call.function.arguments:
+                        last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
+
+    if completion_chunks:
+        last_result = completion_chunks[-1]
+        response.id = last_result.data.id
+        response.created = last_result.data.created
+        response.model = last_result.data.model
+        response.usage = last_result.data.usage
+
+    response.choices[0].message.content = content
+    response.choices[0].message.tool_calls = tool_calls
+    return response

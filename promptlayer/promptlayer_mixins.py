@@ -15,6 +15,8 @@ from promptlayer.utils import (
     aanthropic_stream_completion,
     aanthropic_stream_message,
     aazure_openai_request,
+    amistral_request,
+    amistral_stream_chat,
     anthropic_request,
     anthropic_stream_completion,
     anthropic_stream_message,
@@ -22,6 +24,8 @@ from promptlayer.utils import (
     aopenai_stream_chat,
     aopenai_stream_completion,
     azure_openai_request,
+    mistral_request,
+    mistral_stream_chat,
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
@@ -58,6 +62,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": openai_stream_completion,
         },
     },
+    "mistral": {
+        "chat": {
+            "function_name": "mistral.client.chat",
+            "stream_function": mistral_stream_chat,
+        },
+        "completion": {
+            "function_name": None,
+            "stream_function": None,
+        },
+    },
 }
 
 
@@ -65,6 +79,7 @@ MAP_PROVIDER_TO_FUNCTION = {
     "openai": openai_request,
     "anthropic": anthropic_request,
     "openai.azure": azure_openai_request,
+    "mistral": mistral_request,
 }
 
 AMAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -98,6 +113,16 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": aopenai_stream_completion,
         },
     },
+    "mistral": {
+        "chat": {
+            "function_name": "mistral.client.chat",
+            "stream_function": amistral_stream_chat,
+        },
+        "completion": {
+            "function_name": None,
+            "stream_function": None,
+        },
+    },
 }
 
 
@@ -105,6 +130,7 @@ AMAP_PROVIDER_TO_FUNCTION = {
     "openai": aopenai_request,
     "anthropic": aanthropic_request,
     "openai.azure": aazure_openai_request,
+    "mistral": amistral_request,
 }
 
 

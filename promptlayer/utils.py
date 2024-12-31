@@ -1631,3 +1631,139 @@ async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
             file=sys.stderr,
         )
         return None
+
+def mistral_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    **kwargs,
+):
+    from mistralai import Mistral
+
+    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+    if "stream" in kwargs and kwargs["stream"]:
+        cleaned_kwargs = kwargs.copy()
+        cleaned_kwargs.pop("stream")
+        return client.chat.stream(**cleaned_kwargs)
+    return client.chat.complete(**kwargs)
+
+async def amistral_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    **kwargs,
+):
+    from mistralai import Mistral
+
+    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+    if "stream" in kwargs and kwargs["stream"]:
+        return await client.chat.stream_async(**kwargs)
+    return await client.chat.complete_async(**kwargs)
+
+
+def mistral_stream_chat(results: list):
+    #TODO: (JON) I just copied and pasted this from openai and it worked.
+    # This might need to be updated to work with mistral
+    print(results)
+    from openai.types.chat import (
+        ChatCompletion,
+        ChatCompletionChunk,
+        ChatCompletionMessage,
+        ChatCompletionMessageToolCall,
+    )
+    from openai.types.chat.chat_completion import Choice
+    from openai.types.chat.chat_completion_message_tool_call import Function
+
+    completion_chunks: List[ChatCompletionChunk] = results
+    response: ChatCompletion = ChatCompletion(
+        id="",
+        object="chat.completion",
+        choices=[
+            Choice(
+                finish_reason="stop",
+                index=0,
+                message=ChatCompletionMessage(role="assistant"),
+            )
+        ],
+        created=0,
+        model="",
+    )
+    last_result = completion_chunks[-1]
+    response.id = last_result.id
+    response.created = last_result.created
+    response.model = last_result.model
+    response.usage = last_result.usage
+    content = ""
+    tool_calls: Union[List[ChatCompletionMessageToolCall], None] = None
+    for result in completion_chunks:
+        choices = result.choices
+        if len(choices) == 0:
+            continue
+        if choices[0].delta.content:
+            content = f"{content}{result.choices[0].delta.content}"
+
+        delta = choices[0].delta
+        if delta.tool_calls:
+            tool_calls = tool_calls or []
+            last_tool_call = None
+            if len(tool_calls) > 0:
+                last_tool_call = tool_calls[-1]
+            tool_call = delta.tool_calls[0]
+            if not tool_call.function:
+                continue
+            if not last_tool_call or tool_call.id:
+                tool_calls.append(
+                    ChatCompletionMessageToolCall(
+                        id=tool_call.id or "",
+                        function=Function(
+                            name=tool_call.function.name or "",
+                            arguments=tool_call.function.arguments or "",
+                        ),
+                        type=tool_call.type or "function",
+                    )
+                )
+                continue
+            last_tool_call.function.name = (
+                f"{last_tool_call.function.name}{tool_call.function.name or ''}"
+            )
+            last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
+
+    response.choices[0].message.content = content
+    response.choices[0].message.tool_calls = tool_calls
+    return response
+
+async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
+    from openai.types.chat import ChatCompletion, ChatCompletionMessage
+    from openai.types.chat.chat_completion import Choice
+
+    completion_chunks = []
+    response = ChatCompletion(
+        id="",
+        object="chat.completion",
+        choices=[
+            Choice(
+                finish_reason="stop",
+                index=0,
+                message=ChatCompletionMessage(role="assistant"),
+            )
+        ],
+        created=0,
+        model="",
+    )
+    content = ""
+
+    async for result in generator:
+        completion_chunks.append(result)
+        choices = result.data.choices
+        if len(choices) == 0:
+            continue
+        if choices[0].delta.content is not None:
+            content = f"{content}{choices[0].delta.content}"
+
+    if completion_chunks:
+        last_result = completion_chunks[-1]
+        response.id = last_result.data.id
+        response.created = last_result.data.created
+        response.model = last_result.data.model
+        response.usage = last_result.data.usage
+
+    response.choices[0].message.content = content
+    return response
+
+

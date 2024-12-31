@@ -11,6 +11,8 @@ from opentelemetry.semconv.resource import ResourceAttributes
 
 from promptlayer.span_exporter import PromptLayerSpanExporter
 from promptlayer.utils import (
+    amistral_request,
+    amistral_stream_chat,
     aanthropic_request,
     aanthropic_stream_completion,
     aanthropic_stream_message,
@@ -25,6 +27,8 @@ from promptlayer.utils import (
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
+    mistral_request,
+    mistral_stream_chat,
 )
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -58,6 +62,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": openai_stream_completion,
         },
     },
+    "mistral": {
+        "chat": {
+            "function_name": "mistral.client.chat",
+            "stream_function": mistral_stream_chat,
+        },
+        "completion": {
+            "function_name":None,
+            "stream_function":None,
+        }
+    },
 }
 
 
@@ -65,6 +79,7 @@ MAP_PROVIDER_TO_FUNCTION = {
     "openai": openai_request,
     "anthropic": anthropic_request,
     "openai.azure": azure_openai_request,
+    "mistral": mistral_request,
 }
 
 AMAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -98,6 +113,17 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": aopenai_stream_completion,
         },
     },
+    "mistral": {
+        "chat": {
+            "function_name": "mistral.client.chat",
+            "stream_function": amistral_stream_chat,
+        },
+        "completion": {
+            "function_name":None,
+            "stream_function":None,
+        }
+    },
+
 }
 
 
@@ -105,6 +131,7 @@ AMAP_PROVIDER_TO_FUNCTION = {
     "openai": aopenai_request,
     "anthropic": aanthropic_request,
     "openai.azure": aazure_openai_request,
+    "mistral": amistral_request,
 }
 
 

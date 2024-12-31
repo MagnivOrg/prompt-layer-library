@@ -483,7 +483,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             )
             return await atrack_request(**track_request_kwargs)
 
-        return await _track_request
+        return _track_request
 
     async def _track_request_log(
         self,
@@ -547,15 +547,16 @@ class AsyncPromptLayer(PromptLayerMixin):
         )
 
         if stream:
+            track_request_callable = await self._create_track_request_callable(
+                request_params=llm_request_params,
+                tags=tags,
+                input_variables=input_variables,
+                group_id=group_id,
+                pl_run_span_id=pl_run_span_id,
+            )
             return astream_response(
                 response,
-                self._create_track_request_callable(
-                    request_params=llm_request_params,
-                    tags=tags,
-                    input_variables=input_variables,
-                    group_id=group_id,
-                    pl_run_span_id=pl_run_span_id,
-                ),
+                track_request_callable,
                 llm_request_params["stream_function"],
             )
 

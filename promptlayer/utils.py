@@ -2,7 +2,6 @@ import asyncio
 import contextvars
 import datetime
 import functools
-import inspect
 import json
 import os
 import sys
@@ -1449,15 +1448,17 @@ async def astream_response(
         results.append(result)
         data["raw_response"] = result
         yield data
-    request_response = await map_results(results)
-    if inspect.iscoroutinefunction(after_stream):
-        # after_stream is an async function
-        response = await after_stream(request_response=request_response.model_dump())
-    else:
-        # after_stream is synchronous
-        response = after_stream(request_response=request_response.model_dump())
-    data["request_id"] = response.get("request_id")
-    data["prompt_blueprint"] = response.get("prompt_blueprint")
+
+    async def async_generator_from_list(lst):
+        for item in lst:
+            yield item
+
+    request_response = await map_results(async_generator_from_list(results))
+    after_stream_response = await after_stream(
+        request_response=request_response.model_dump()
+    )
+    data["request_id"] = after_stream_response.get("request_id")
+    data["prompt_blueprint"] = after_stream_response.get("prompt_blueprint")
     yield data
 
 

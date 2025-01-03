@@ -1642,9 +1642,10 @@ def mistral_request(
 
     client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
     if "stream" in kwargs and kwargs["stream"]:
-        cleaned_kwargs = kwargs.copy()
-        cleaned_kwargs.pop("stream")
-        return client.chat.stream(**cleaned_kwargs)
+        kwargs.pop("stream")
+        return client.chat.stream(**kwargs)
+    if "stream" in kwargs:
+        kwargs.pop("stream")
     return client.chat.complete(**kwargs)
 
 

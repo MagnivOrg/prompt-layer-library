@@ -117,6 +117,13 @@ class PlaceholderMessage(TypedDict, total=False):
     name: str
 
 
+class DeveloperMessage(TypedDict, total=False):
+    role: Literal["developer"]
+    input_variables: List[str]
+    template_format: TemplateFormat
+    content: Sequence[Content]
+
+
 class ChatFunctionCall(TypedDict, total=False):
     name: str
 
@@ -135,6 +142,7 @@ Message = Union[
     FunctionMessage,
     ToolMessage,
     PlaceholderMessage,
+    DeveloperMessage,
 ]
 
 

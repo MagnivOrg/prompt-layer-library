@@ -51,7 +51,7 @@ class PromptLayerBase(object):
         ):
             return PromptLayerBase(
                 attr,
-                function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
+                function_name=f"{object.__getattribute__(self, '_function_name')}.{name}",
                 provider_type=object.__getattribute__(self, "_provider_type"),
                 api_key=object.__getattribute__(self, "_api_key"),
                 tracer=object.__getattribute__(self, "_tracer"),

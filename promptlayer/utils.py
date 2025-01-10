@@ -51,7 +51,7 @@ async def arun_workflow_request(
     api_key: str,
     return_all_outputs: Optional[bool] = False,
     timeout: Optional[int] = 120,
-) -> Dict[str, Any]:
+):
     payload = {
         "input_variables": input_variables,
         "metadata": metadata,
@@ -113,32 +113,33 @@ async def arun_workflow_request(
     # Subscribe to the channel named after the execution ID
     channel = ably_client.channels.get(channel_name)
 
-    final_output = {}
+    results = None
     message_received_event = asyncio.Event()
 
     async def message_listener(message: Message):
-        if message.name == "set_workflow_node_output":
-            data = json.loads(message.data)
-            if data.get("status") == "workflow_complete":
-                final_output.update(data.get("final_output", {}))
-                message_received_event.set()
+        nonlocal results
+
+        if message.name == "SET_WORKFLOW_COMPLETE":
+            message_data = json.loads(message.data)
+            results = message_data['final_output']
+            message_received_event.set()
 
     # Subscribe to the channel
-    await channel.subscribe("set_workflow_node_output", message_listener)
+    await channel.subscribe("SET_WORKFLOW_COMPLETE", message_listener)
 
     # Wait for the message or timeout
     try:
         await asyncio.wait_for(message_received_event.wait(), timeout)
     except asyncio.TimeoutError:
-        channel.unsubscribe("set_workflow_node_output", message_listener)
+        channel.unsubscribe("SET_WORKFLOW_COMPLETE", message_listener)
         await ably_client.close()
         raise Exception("Workflow execution did not complete properly")
 
     # Unsubscribe from the channel and close the client
-    channel.unsubscribe("set_workflow_node_output", message_listener)
+    channel.unsubscribe("SET_WORKFLOW_COMPLETE", message_listener)
     await ably_client.close()
 
-    return final_output
+    return results
 
 
 def promptlayer_api_handler(

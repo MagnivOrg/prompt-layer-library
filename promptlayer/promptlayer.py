@@ -22,6 +22,27 @@ from promptlayer.utils import (
 )
 
 
+def is_workflow_results_dict(obj: Any) -> bool:
+    if not isinstance(obj, dict):
+        return False
+
+    required_keys = {
+        "status",
+        "value",
+        "error_message",
+        "raw_error_message",
+        "is_output_node",
+    }
+
+    for val in obj.values():
+        if not isinstance(val, dict):
+            return False
+        if not required_keys.issubset(val.keys()):
+            return False
+
+    return True
+
+
 class PromptLayer(PromptLayerMixin):
     def __init__(
         self,
@@ -263,7 +284,7 @@ class PromptLayer(PromptLayerMixin):
                 )
 
             if not return_all_outputs:
-                if isinstance(results, dict):
+                if is_workflow_results_dict(results):
                     output_nodes = [
                         node_data
                         for node_data in results.values()

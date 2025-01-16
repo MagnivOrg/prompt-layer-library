@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from typing import Any, Dict, List, Literal, Optional, Union
 
@@ -225,11 +226,9 @@ class PromptLayer(PromptLayerMixin):
         input_variables: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, str]] = None,
         workflow_label_name: Optional[str] = None,
-        workflow_version: Optional[
-            int
-        ] = None,  # This is the version number, not the version ID
+        workflow_version: Optional[int] = None,
         return_all_outputs: Optional[bool] = False,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], Any]:
         try:
             try:
                 # Check if we're inside a running event loop
@@ -239,8 +238,7 @@ class PromptLayer(PromptLayerMixin):
 
             if loop and loop.is_running():
                 nest_asyncio.apply()
-                # If there's an active event loop, use `await` directly
-                return asyncio.run(
+                results = asyncio.run(
                     arun_workflow_request(
                         workflow_name=workflow_name,
                         input_variables=input_variables or {},
@@ -252,8 +250,7 @@ class PromptLayer(PromptLayerMixin):
                     )
                 )
             else:
-                # If there's no active event loop, use `asyncio.run()`
-                return asyncio.run(
+                results = asyncio.run(
                     arun_workflow_request(
                         workflow_name=workflow_name,
                         input_variables=input_variables or {},
@@ -264,6 +261,24 @@ class PromptLayer(PromptLayerMixin):
                         return_all_outputs=return_all_outputs,
                     )
                 )
+
+            if not return_all_outputs:
+                if isinstance(results, dict):
+                    output_nodes = [
+                        node_data
+                        for node_data in results.values()
+                        if node_data.get("is_output_node")
+                    ]
+
+                    if not output_nodes:
+                        raise Exception(json.dumps(results, indent=4))
+
+                    if not any(
+                        node.get("status") == "SUCCESS" for node in output_nodes
+                    ):
+                        raise Exception(json.dumps(results, indent=4))
+
+            return results
         except Exception as e:
             raise Exception(f"Error running workflow: {str(e)}")
 

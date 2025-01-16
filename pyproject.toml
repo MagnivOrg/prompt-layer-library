@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.35"
+version = "1.0.36"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"

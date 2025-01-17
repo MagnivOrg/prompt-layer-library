@@ -1,6 +1,5 @@
-from promptlayer.track.track import agroup, ametadata, aprompt, ascore, group
+from promptlayer.track.track import agroup, ametadata, aprompt, ascore, group, prompt
 from promptlayer.track.track import metadata as metadata_
-from promptlayer.track.track import prompt
 from promptlayer.track.track import score as score_
 
 

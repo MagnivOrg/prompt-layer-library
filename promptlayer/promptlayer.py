@@ -173,7 +173,9 @@ class PromptLayer(PromptLayerMixin):
             group_id,
             pl_run_span_id,
             metadata=metadata,
-            request_response=response.model_dump() if hasattr(response, 'model_dump') else response,
+            request_response=response.model_dump()
+            if hasattr(response, "model_dump")
+            else response,
         )
 
         return {
@@ -603,7 +605,9 @@ class AsyncPromptLayer(PromptLayerMixin):
             group_id,
             pl_run_span_id,
             metadata=metadata,
-            request_response=response.model_dump() if hasattr(response, 'model_dump') else response,
+            request_response=response.model_dump()
+            if hasattr(response, "model_dump")
+            else response,
         )
 
         return {

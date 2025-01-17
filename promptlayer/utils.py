@@ -1428,7 +1428,7 @@ def stream_response(
         data["raw_response"] = result
         yield data
     request_response = map_results(results)
-    response = after_stream(request_response=request_response.model_dump())
+    response = after_stream(request_response=request_response.model_dump() if hasattr(request_response, 'model_dump') else request_response)
     data["request_id"] = response.get("request_id")
     data["prompt_blueprint"] = response.get("prompt_blueprint")
     yield data
@@ -1456,7 +1456,7 @@ async def astream_response(
 
     request_response = await map_results(async_generator_from_list(results))
     after_stream_response = await after_stream(
-        request_response=request_response.model_dump()
+        request_response=request_response.model_dump() if hasattr(request_response, 'model_dump') else request_response
     )
     data["request_id"] = after_stream_response.get("request_id")
     data["prompt_blueprint"] = after_stream_response.get("prompt_blueprint")
@@ -1794,4 +1794,180 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
 
     response.choices[0].message.content = content
     response.choices[0].message.tool_calls = tool_calls
+    return response
+
+def google_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    **kwargs,
+):
+    import google.generativeai as genai
+    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+
+    generation_config = genai.GenerationConfig(
+        candidate_count=kwargs.pop("candidateCount", 1),
+        max_output_tokens=kwargs.pop("maxOutputTokens", 256),
+        temperature=kwargs.pop("temperature", 0),
+        top_p=kwargs.pop("topP", 1),
+        top_k=kwargs.pop("topK", 0)
+    )
+
+    model_name = kwargs["model"]
+    message = kwargs['history'][0]['parts'][0]['text']
+    system_instruction = kwargs.pop("system_instruction", None)
+    model = genai.GenerativeModel(
+        model_name,
+        system_instruction=system_instruction
+    )
+
+    stream = kwargs.pop("stream", False)
+
+    response = model.generate_content(
+        message,
+        generation_config=generation_config,
+        stream=stream
+    )
+    if stream:
+        return response
+    return response.to_dict()
+
+
+async def agoogle_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    **kwargs,
+):
+    import google.generativeai as genai
+    genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+
+    generation_config = genai.GenerationConfig(
+        candidate_count=kwargs.pop("candidateCount", 1),
+        max_output_tokens=kwargs.pop("maxOutputTokens", 256),
+        temperature=kwargs.pop("temperature", 0),
+        top_p=kwargs.pop("topP", 1),
+        top_k=kwargs.pop("topK", 0)
+    )
+
+    model_name = kwargs["model"]
+    message = kwargs['history'][0]['parts'][0]['text']
+    system_instruction = kwargs.pop("system_instruction", None)
+    model = genai.GenerativeModel(
+        model_name,
+        system_instruction=system_instruction
+    )
+
+    stream = kwargs.pop("stream", False)
+    response = await model.generate_content_async(
+        message,
+        generation_config=generation_config,
+        stream=stream
+    )
+    
+    if stream:
+        return response
+    return response.to_dict()
+
+
+def google_stream_chat(results: list):
+    # Get the last chunk to access final state
+    last_result = results[-1]  # Remove .result access
+    
+    # Combine all content from the stream
+    content = ""
+    for chunk in results:
+        if hasattr(chunk, 'candidates'):
+            for candidate in chunk.candidates:
+                if hasattr(candidate, 'content'):
+                    for part in candidate.content.parts:
+                        content += part.text
+
+    # Create response in Google's format
+    response = {
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "text": content
+                }],
+                "role": "model"
+            },
+            "finish_reason": 1,
+            "safety_ratings": [],
+            "token_count": getattr(
+                last_result.usage_metadata if hasattr(last_result, 'usage_metadata') else None, 
+                'candidates_token_count', 
+                0
+            ),
+            "grounding_attributions": []
+        }],
+        "usage_metadata": {
+            "prompt_token_count": getattr(
+                last_result.usage_metadata if hasattr(last_result, 'usage_metadata') else None,
+                'prompt_token_count',
+                0
+            ),
+            "candidates_token_count": getattr(
+                last_result.usage_metadata if hasattr(last_result, 'usage_metadata') else None,
+                'candidates_token_count',
+                0
+            ),
+            "total_token_count": getattr(
+                last_result.usage_metadata if hasattr(last_result, 'usage_metadata') else None,
+                'total_token_count',
+                0
+            ),
+            "cached_content_token_count": 0
+        }
+    }
+
+    return response
+
+
+async def agoogle_stream_chat(generator: AsyncIterable[Any]) -> Any:
+    last_result = None
+    content = ""
+
+    async for chunk in generator:
+        last_result = chunk
+        if hasattr(chunk, 'candidates'):
+            for candidate in chunk.candidates:
+                if hasattr(candidate, 'content'):
+                    for part in candidate.content.parts:
+                        content += part.text
+
+    # Create response in Google's format using the final state
+    response = {
+        "candidates": [{
+            "content": {
+                "parts": [{
+                    "text": content
+                }],
+                "role": "model"
+            },
+            "finish_reason": 1,
+            "safety_ratings": [],
+            "token_count": getattr(
+                last_result.usage_metadata if last_result else None, 
+                'candidates_token_count', 
+                0
+            ),
+            "grounding_attributions": []
+        }],
+        "usage_metadata": {
+            "prompt_token_count": getattr(
+                last_result.usage_metadata if last_result else None,
+                'prompt_token_count',
+                0
+            ),
+            "candidates_token_count": getattr(
+                last_result.usage_metadata if last_result else None,
+                'candidates_token_count',
+                0
+            ),
+            "total_token_count": getattr(
+                last_result.usage_metadata if last_result else None,
+                'total_token_count',
+                0
+            ),
+            "cached_content_token_count": 0
+        }
+    }
+
     return response

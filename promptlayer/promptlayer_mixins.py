@@ -15,6 +15,8 @@ from promptlayer.utils import (
     aanthropic_stream_completion,
     aanthropic_stream_message,
     aazure_openai_request,
+    agoogle_request,
+    agoogle_stream_chat,
     amistral_request,
     amistral_stream_chat,
     anthropic_request,
@@ -24,6 +26,8 @@ from promptlayer.utils import (
     aopenai_stream_chat,
     aopenai_stream_completion,
     azure_openai_request,
+    google_request,
+    google_stream_chat,
     mistral_request,
     mistral_stream_chat,
     openai_request,
@@ -72,6 +76,12 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": None,
         },
     },
+    "google": {
+        "chat": {
+            "function_name": "google.convo.send_message",
+            "stream_function": google_stream_chat,
+        },
+    },
 }
 
 
@@ -80,6 +90,7 @@ MAP_PROVIDER_TO_FUNCTION = {
     "anthropic": anthropic_request,
     "openai.azure": azure_openai_request,
     "mistral": mistral_request,
+    "google": google_request,
 }
 
 AMAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -123,6 +134,12 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": None,
         },
     },
+    "google": {
+        "chat": {
+            "function_name": "google.convo.send_message",
+            "stream_function": agoogle_stream_chat,
+        },
+    },
 }
 
 
@@ -131,6 +148,7 @@ AMAP_PROVIDER_TO_FUNCTION = {
     "anthropic": aanthropic_request,
     "openai.azure": aazure_openai_request,
     "mistral": amistral_request,
+    "google": agoogle_request,
 }
 
 

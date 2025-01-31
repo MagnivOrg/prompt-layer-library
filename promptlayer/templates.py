@@ -28,9 +28,7 @@ class AsyncTemplateManager:
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    async def get(
-        self, prompt_name: str, params: Union[GetPromptTemplate, None] = None
-    ):
+    async def get(self, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
         return await aget_prompt_template(prompt_name, params, self.api_key)
 
     async def all(self, page: int = 1, per_page: int = 30):

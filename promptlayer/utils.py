@@ -35,9 +35,7 @@ from promptlayer.types.prompt_template import (
     PublishPromptTemplateResponse,
 )
 
-URL_API_PROMPTLAYER = os.environ.setdefault(
-    "URL_API_PROMPTLAYER", "https://api.promptlayer.com"
-)
+URL_API_PROMPTLAYER = os.environ.setdefault("URL_API_PROMPTLAYER", "https://api.promptlayer.com")
 
 
 async def arun_workflow_request(
@@ -237,10 +235,7 @@ def convert_native_object_to_dict(native_object):
     if isinstance(native_object, Enum):
         return native_object.value
     if hasattr(native_object, "__dict__"):
-        return {
-            k: convert_native_object_to_dict(v)
-            for k, v in native_object.__dict__.items()
-        }
+        return {k: convert_native_object_to_dict(v) for k, v in native_object.__dict__.items()}
     return native_object
 
 
@@ -262,9 +257,7 @@ def promptlayer_api_request(
     if isinstance(response, dict) and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
     request_response = None
-    if hasattr(
-        response, "dict"
-    ):  # added this for anthropic 3.0 changes, they return a completion object
+    if hasattr(response, "dict"):  # added this for anthropic 3.0 changes, they return a completion object
         response = response.dict()
     try:
         request_response = requests.post(
@@ -371,9 +364,7 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(
-    prompt_name, api_key, version: int = None, label: str = None
-):
+def promptlayer_get_prompt(prompt_name, api_key, version: int = None, label: str = None):
     """
     Get a prompt from the PromptLayer library
     version: version of the prompt to get, None for latest
@@ -386,9 +377,7 @@ def promptlayer_get_prompt(
             params={"prompt_name": prompt_name, "version": version, "label": label},
         )
     except Exception as e:
-        raise Exception(
-            f"PromptLayer had the following error while getting your prompt: {e}"
-        )
+        raise Exception(f"PromptLayer had the following error while getting your prompt: {e}")
     if request_response.status_code != 200:
         raise_on_bad_response(
             request_response,
@@ -398,9 +387,7 @@ def promptlayer_get_prompt(
     return request_response.json()
 
 
-def promptlayer_publish_prompt(
-    prompt_name, prompt_template, commit_message, tags, api_key, metadata=None
-):
+def promptlayer_publish_prompt(prompt_name, prompt_template, commit_message, tags, api_key, metadata=None):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-publish-prompt-template",
@@ -414,9 +401,7 @@ def promptlayer_publish_prompt(
             },
         )
     except Exception as e:
-        raise Exception(
-            f"PromptLayer had the following error while publishing your prompt: {e}"
-        )
+        raise Exception(f"PromptLayer had the following error while publishing your prompt: {e}")
     if request_response.status_code != 200:
         raise_on_bad_response(
             request_response,
@@ -425,9 +410,7 @@ def promptlayer_publish_prompt(
     return True
 
 
-def promptlayer_track_prompt(
-    request_id, prompt_name, input_variables, api_key, version, label
-):
+def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, version, label):
     try:
         request_response = requests.post(
             f"{URL_API_PROMPTLAYER}/library-track-prompt",
@@ -516,9 +499,7 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     return True
 
 
-async def apromptlayer_track_metadata(
-    request_id: str, metadata: Dict[str, Any], api_key: Optional[str] = None
-) -> bool:
+async def apromptlayer_track_metadata(request_id: str, metadata: Dict[str, Any], api_key: Optional[str] = None) -> bool:
     url = f"{URL_API_PROMPTLAYER}/library-track-metadata"
     payload = {
         "request_id": request_id,
@@ -649,9 +630,7 @@ class GeneratorProxy:
 
     def __getattr__(self, name):
         if name == "text_stream":  # anthropic async stream
-            return GeneratorProxy(
-                self.generator.text_stream, self.api_request_arugments, self.api_key
-            )
+            return GeneratorProxy(self.generator.text_stream, self.api_request_arugments, self.api_key)
         return getattr(self.generator, name)
 
     def _abstracted_next(self, result):
@@ -668,8 +647,7 @@ class GeneratorProxy:
                 end_anthropic = True
 
         end_openai = provider_type == "openai" and (
-            result.choices[0].finish_reason == "stop"
-            or result.choices[0].finish_reason == "length"
+            result.choices[0].finish_reason == "stop" or result.choices[0].finish_reason == "length"
         )
 
         if end_anthropic or end_openai:
@@ -684,9 +662,7 @@ class GeneratorProxy:
                 request_end_time=self.api_request_arugments["request_end_time"],
                 api_key=self.api_key,
                 return_pl_id=self.api_request_arugments["return_pl_id"],
-                llm_request_span_id=self.api_request_arugments.get(
-                    "llm_request_span_id"
-                ),
+                llm_request_span_id=self.api_request_arugments.get("llm_request_span_id"),
             )
 
             if self.api_request_arugments["return_pl_id"]:
@@ -716,8 +692,7 @@ class GeneratorProxy:
                 elif hasattr(result, "delta") and hasattr(result.delta, "text"):
                     response = f"{response}{result.delta.text}"
             if (
-                hasattr(self.results[-1], "type")
-                and self.results[-1].type == "message_stop"
+                hasattr(self.results[-1], "type") and self.results[-1].type == "message_stop"
             ):  # this is a message stream and not the correct event
                 final_result = deepcopy(self.results[0].message)
                 final_result.usage = None
@@ -735,23 +710,15 @@ class GeneratorProxy:
             final_result = deepcopy(self.results[-1])
             final_result.choices[0].text = response
             return final_result
-        elif hasattr(
-            self.results[0].choices[0], "delta"
-        ):  # this is completion with delta
+        elif hasattr(self.results[0].choices[0], "delta"):  # this is completion with delta
             response = {"role": "", "content": ""}
             for result in self.results:
-                if (
-                    hasattr(result.choices[0].delta, "role")
-                    and result.choices[0].delta.role is not None
-                ):
+                if hasattr(result.choices[0].delta, "role") and result.choices[0].delta.role is not None:
                     response["role"] = result.choices[0].delta.role
-                if (
-                    hasattr(result.choices[0].delta, "content")
-                    and result.choices[0].delta.content is not None
-                ):
-                    response["content"] = response[
-                        "content"
-                    ] = f"{response['content']}{result.choices[0].delta.content}"
+                if hasattr(result.choices[0].delta, "content") and result.choices[0].delta.content is not None:
+                    response["content"] = response["content"] = (
+                        f"{response['content']}{result.choices[0].delta.content}"
+                    )
             final_result = deepcopy(self.results[-1])
             final_result.choices[0] = response
             return final_result
@@ -854,9 +821,7 @@ def promptlayer_create_group(api_key: str = None):
             return False
     except requests.exceptions.RequestException as e:
         # I'm aiming for a more specific exception catch here
-        raise Exception(
-            f"PromptLayer had the following error while creating your group: {e}"
-        )
+        raise Exception(f"PromptLayer had the following error while creating your group: {e}")
     return request_response.json()["id"]
 
 
@@ -877,9 +842,7 @@ async def apromptlayer_create_group(api_key: Optional[str] = None) -> str:
             return False
         return response.json()["id"]
     except httpx.RequestError as e:
-        raise Exception(
-            f"PromptLayer had the following error while creating your group: {str(e)}"
-        ) from e
+        raise Exception(f"PromptLayer had the following error while creating your group: {str(e)}") from e
 
 
 def promptlayer_track_group(request_id, group_id, api_key: str = None):
@@ -900,9 +863,7 @@ def promptlayer_track_group(request_id, group_id, api_key: str = None):
             return False
     except requests.exceptions.RequestException as e:
         # I'm aiming for a more specific exception catch here
-        raise Exception(
-            f"PromptLayer had the following error while tracking your group: {e}"
-        )
+        raise Exception(f"PromptLayer had the following error while tracking your group: {e}")
     return True
 
 
@@ -948,9 +909,7 @@ def get_prompt_template(
             json=json_body,
         )
         if response.status_code != 200:
-            raise Exception(
-                f"PromptLayer had the following error while getting your prompt template: {response.text}"
-            )
+            raise Exception(f"PromptLayer had the following error while getting your prompt template: {response.text}")
 
         warning = response.json().get("warning", None)
         if warning is not None:
@@ -960,9 +919,7 @@ def get_prompt_template(
             )
         return response.json()
     except requests.exceptions.RequestException as e:
-        raise Exception(
-            f"PromptLayer had the following error while getting your prompt template: {e}"
-        )
+        raise Exception(f"PromptLayer had the following error while getting your prompt template: {e}")
 
 
 async def aget_prompt_template(
@@ -993,9 +950,7 @@ async def aget_prompt_template(
             )
         return response.json()
     except httpx.RequestError as e:
-        raise Exception(
-            f"PromptLayer had the following error while getting your prompt template: {str(e)}"
-        ) from e
+        raise Exception(f"PromptLayer had the following error while getting your prompt template: {str(e)}") from e
 
 
 def publish_prompt_template(
@@ -1018,9 +973,7 @@ def publish_prompt_template(
             )
         return response.json()
     except requests.exceptions.RequestException as e:
-        raise Exception(
-            f"PromptLayer had the following error while publishing your prompt template: {e}"
-        )
+        raise Exception(f"PromptLayer had the following error while publishing your prompt template: {e}")
 
 
 async def apublish_prompt_template(
@@ -1049,9 +1002,7 @@ async def apublish_prompt_template(
             )
         return response.json()
     except httpx.RequestError as e:
-        raise Exception(
-            f"PromptLayer had the following error while publishing your prompt template: {str(e)}"
-        ) from e
+        raise Exception(f"PromptLayer had the following error while publishing your prompt template: {str(e)}") from e
 
 
 def get_all_prompt_templates(
@@ -1070,9 +1021,7 @@ def get_all_prompt_templates(
         items = response.json().get("items", [])
         return items
     except requests.exceptions.RequestException as e:
-        raise Exception(
-            f"PromptLayer had the following error while getting all your prompt templates: {e}"
-        )
+        raise Exception(f"PromptLayer had the following error while getting all your prompt templates: {e}")
 
 
 async def aget_all_prompt_templates(
@@ -1093,9 +1042,7 @@ async def aget_all_prompt_templates(
         items = response.json().get("items", [])
         return items
     except httpx.RequestError as e:
-        raise Exception(
-            f"PromptLayer had the following error while getting all your prompt templates: {str(e)}"
-        ) from e
+        raise Exception(f"PromptLayer had the following error while getting all your prompt templates: {str(e)}") from e
 
 
 def openai_stream_chat(results: list):
@@ -1158,10 +1105,10 @@ def openai_stream_chat(results: list):
                     )
                 )
                 continue
-            last_tool_call.function.name = (
-                f"{last_tool_call.function.name}{tool_call.function.name or ''}"
+            last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name or ''}"
+            last_tool_call.function.arguments = (
+                f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
             )
-            last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
 
     response.choices[0].message.content = content
     response.choices[0].message.tool_calls = tool_calls
@@ -1224,10 +1171,10 @@ async def aopenai_stream_chat(generator: AsyncIterable[Any]) -> Any:
                     )
                 )
                 continue
-            last_tool_call.function.name = (
-                f"{last_tool_call.function.name}{tool_call.function.name or ''}"
+            last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name or ''}"
+            last_tool_call.function.arguments = (
+                f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
             )
-            last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments or ''}"
 
     # After collecting all chunks, set the response attributes
     if chat_completion_chunks:
@@ -1414,9 +1361,7 @@ async def aanthropic_stream_completion(generator: AsyncIterable[Any]) -> Any:
     return response
 
 
-def stream_response(
-    generator: Generator, after_stream: Callable, map_results: Callable
-):
+def stream_response(generator: Generator, after_stream: Callable, map_results: Callable):
     data = {
         "request_id": None,
         "raw_response": None,
@@ -1455,9 +1400,7 @@ async def astream_response(
             yield item
 
     request_response = await map_results(async_generator_from_list(results))
-    after_stream_response = await after_stream(
-        request_response=request_response.model_dump()
-    )
+    after_stream_response = await after_stream(request_response=request_response.model_dump())
     data["request_id"] = after_stream_response.get("request_id")
     data["prompt_blueprint"] = after_stream_response.get("prompt_blueprint")
     yield data
@@ -1481,9 +1424,7 @@ def openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     from openai import OpenAI
 
     client = OpenAI(base_url=kwargs.pop("base_url", None))
-    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **kwargs)
 
 
@@ -1505,9 +1446,7 @@ async def aopenai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs)
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(base_url=kwargs.pop("base_url", None))
-    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **kwargs)
 
 
@@ -1515,9 +1454,7 @@ def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     from openai import AzureOpenAI
 
     client = AzureOpenAI(azure_endpoint=kwargs.pop("base_url", None))
-    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **kwargs)
 
 
@@ -1525,9 +1462,7 @@ async def aazure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **k
     from openai import AsyncAzureOpenAI
 
     client = AsyncAzureOpenAI(azure_endpoint=kwargs.pop("base_url", None))
-    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **kwargs)
 
 
@@ -1549,9 +1484,7 @@ def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
     from anthropic import Anthropic
 
     client = Anthropic(base_url=kwargs.pop("base_url", None))
-    request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **kwargs)
 
 
@@ -1573,9 +1506,7 @@ async def aanthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwar
     from anthropic import AsyncAnthropic
 
     client = AsyncAnthropic(base_url=kwargs.pop("base_url", None))
-    request_to_make = AMAP_TYPE_TO_ANTHROPIC_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = AMAP_TYPE_TO_ANTHROPIC_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **kwargs)
 
 
@@ -1715,11 +1646,11 @@ def mistral_stream_chat(results: list):
                 else:
                     last_tool_call = tool_calls[-1]
                     if tool_call.function.name:
-                        last_tool_call.function.name = (
-                            f"{last_tool_call.function.name}{tool_call.function.name}"
-                        )
+                        last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name}"
                     if tool_call.function.arguments:
-                        last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
+                        last_tool_call.function.arguments = (
+                            f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
+                        )
 
     response.choices[0].message.content = content
     response.choices[0].message.tool_calls = tool_calls
@@ -1779,11 +1710,11 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
                 else:
                     last_tool_call = tool_calls[-1]
                     if tool_call.function.name:
-                        last_tool_call.function.name = (
-                            f"{last_tool_call.function.name}{tool_call.function.name}"
-                        )
+                        last_tool_call.function.name = f"{last_tool_call.function.name}{tool_call.function.name}"
                     if tool_call.function.arguments:
-                        last_tool_call.function.arguments = f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
+                        last_tool_call.function.arguments = (
+                            f"{last_tool_call.function.arguments}{tool_call.function.arguments}"
+                        )
 
     if completion_chunks:
         last_result = completion_chunks[-1]

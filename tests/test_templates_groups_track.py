@@ -38,12 +38,8 @@ def test_track_and_templates():
         "tools": None,
         "type": "chat",
     }
-    promptlayer.templates.publish(
-        {"prompt_name": template_name, "prompt_template": template_content}
-    )
-    get_response = promptlayer.templates.get(
-        template_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
-    )
+    promptlayer.templates.publish({"prompt_name": template_name, "prompt_template": template_content})
+    get_response = promptlayer.templates.get(template_name, {"provider": "openai", "model": "gpt-3.5-turbo"})
 
     assert get_response["prompt_name"] == template_name
     assert get_response["prompt_template"] == template_content

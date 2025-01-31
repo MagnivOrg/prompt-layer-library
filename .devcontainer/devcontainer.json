@@ -21,11 +21,10 @@
         "editor.formatOnSave": true,
         "python.analysis.autoImportCompletions": true,
         "[python]": {
-          "editor.defaultFormatter": "ms-python.black-formatter"
+          "editor.defaultFormatter": "charliermarsh.ruff"
         },
+        // TODO(dmu) HIGH: Make linter configuration consistent with .pre-commit-config.yaml
         "ruff.args": [
-          "--exclude",
-          "migrations",
           "--ignore",
           "E501,E711,E712",
           "--fix",

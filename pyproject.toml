@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.37"
+version = "1.0.38"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -28,3 +28,22 @@ openai = "^1.60.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4  # mimic Black
+target-version = "py38"
+
+[tool.ruff.lint]
+ignore = ["E501", "E711", "E712"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+relative-imports-order = "closest-to-furthest"
+known-first-party = ["promptlayer", "tests"]
+
+[tool.ruff.format]
+quote-style = "double"  # mimic Black
+indent-style = "space"  # also mimic Black
+skip-magic-trailing-comma = false  # also mimic Black
+line-ending = "auto"  # mimic Black

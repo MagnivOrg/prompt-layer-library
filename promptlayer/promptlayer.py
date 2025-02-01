@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 from typing import Any, Dict, List, Literal, Optional, Union
 
@@ -12,6 +13,7 @@ from promptlayer.templates import AsyncTemplateManager, TemplateManager
 from promptlayer.track import AsyncTrackManager, TrackManager
 from promptlayer.types.prompt_template import PromptTemplate
 from promptlayer.utils import (
+    RE_RAISE_ORIGINAL_EXCEPTION,
     arun_workflow_request,
     astream_response,
     atrack_request,
@@ -20,6 +22,8 @@ from promptlayer.utils import (
     track_request,
     util_log_request,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def is_workflow_results_dict(obj: Any) -> bool:
@@ -239,59 +243,51 @@ class PromptLayer(PromptLayerMixin):
 
     def run_workflow(
         self,
-        workflow_name: str,
+        workflow_id_or_name: Optional[Union[int, str]] = None,
         input_variables: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, str]] = None,
         workflow_label_name: Optional[str] = None,
         workflow_version: Optional[int] = None,
         return_all_outputs: Optional[bool] = False,
+        workflow_name: Optional[str] = None,  # Deprecated, kept for backward compatibility only
     ) -> Union[Dict[str, Any], Any]:
+        workflow_id_or_name = workflow_name if workflow_id_or_name is None else workflow_id_or_name
         try:
             try:
-                # Check if we're inside a running event loop
-                loop = asyncio.get_running_loop()
+                loop = asyncio.get_running_loop()  # Check if we're inside a running event loop
             except RuntimeError:
                 loop = None
 
             if loop and loop.is_running():
                 nest_asyncio.apply()
-                results = asyncio.run(
-                    arun_workflow_request(
-                        workflow_name=workflow_name,
-                        input_variables=input_variables or {},
-                        metadata=metadata,
-                        workflow_label_name=workflow_label_name,
-                        workflow_version_number=workflow_version,
-                        api_key=self.api_key,
-                        return_all_outputs=return_all_outputs,
-                    )
+
+            results = asyncio.run(
+                arun_workflow_request(
+                    workflow_id_or_name=workflow_id_or_name,
+                    input_variables=input_variables or {},
+                    metadata=metadata,
+                    workflow_label_name=workflow_label_name,
+                    workflow_version_number=workflow_version,
+                    api_key=self.api_key,
+                    return_all_outputs=return_all_outputs,
                 )
-            else:
-                results = asyncio.run(
-                    arun_workflow_request(
-                        workflow_name=workflow_name,
-                        input_variables=input_variables or {},
-                        metadata=metadata,
-                        workflow_label_name=workflow_label_name,
-                        workflow_version_number=workflow_version,
-                        api_key=self.api_key,
-                        return_all_outputs=return_all_outputs,
-                    )
-                )
+            )
 
-            if not return_all_outputs:
-                if is_workflow_results_dict(results):
-                    output_nodes = [node_data for node_data in results.values() if node_data.get("is_output_node")]
+            if not return_all_outputs and is_workflow_results_dict(results):
+                output_nodes = [node_data for node_data in results.values() if node_data.get("is_output_node")]
+                if not output_nodes:
+                    raise Exception("Output nodes not found: %S", json.dumps(results, indent=4))
 
-                    if not output_nodes:
-                        raise Exception(json.dumps(results, indent=4))
-
-                    if not any(node.get("status") == "SUCCESS" for node in output_nodes):
-                        raise Exception(json.dumps(results, indent=4))
+                if not any(node.get("status") == "SUCCESS" for node in output_nodes):
+                    raise Exception("None of the output nodes have succeeded", json.dumps(results, indent=4))
 
             return results
-        except Exception as e:
-            raise Exception(f"Error running workflow: {str(e)}")
+        except Exception as ex:
+            logger.exception("Error running workflow")
+            if RE_RAISE_ORIGINAL_EXCEPTION:
+                raise
+            else:
+                raise Exception(f"Error running workflow: {str(ex)}")
 
     def log_request(
         self,
@@ -302,6 +298,8 @@ class PromptLayer(PromptLayerMixin):
         output: PromptTemplate,
         request_start_time: float,
         request_end_time: float,
+        # TODO(dmu) MEDIUM: Avoid using mutable defaults
+        # TODO(dmu) MEDIUM: Deprecate and remove this wrapper function?
         parameters: Dict[str, Any] = {},
         tags: List[str] = [],
         metadata: Dict[str, str] = {},
@@ -382,16 +380,18 @@ class AsyncPromptLayer(PromptLayerMixin):
 
     async def run_workflow(
         self,
-        workflow_name: str,
+        workflow_id_or_name: Optional[Union[int, str]] = None,
         input_variables: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, str]] = None,
         workflow_label_name: Optional[str] = None,
         workflow_version: Optional[int] = None,  # This is the version number, not the version ID
         return_all_outputs: Optional[bool] = False,
+        workflow_name: Optional[str] = None,  # Deprecated, kept for backward compatibility only
     ) -> Dict[str, Any]:
+        workflow_id_or_name = workflow_name if workflow_id_or_name is None else workflow_id_or_name
         try:
-            result = await arun_workflow_request(
-                workflow_name=workflow_name,
+            return await arun_workflow_request(
+                workflow_id_or_name=workflow_id_or_name,
                 input_variables=input_variables or {},
                 metadata=metadata,
                 workflow_label_name=workflow_label_name,
@@ -399,9 +399,12 @@ class AsyncPromptLayer(PromptLayerMixin):
                 api_key=self.api_key,
                 return_all_outputs=return_all_outputs,
             )
-            return result
-        except Exception as e:
-            raise Exception(f"Error running workflow: {str(e)}")
+        except Exception as ex:
+            logger.exception("Error running workflow")
+            if RE_RAISE_ORIGINAL_EXCEPTION:
+                raise
+            else:
+                raise Exception(f"Error running workflow: {str(ex)}")
 
     async def run(
         self,

@@ -78,9 +78,7 @@ async def test_async_template_publish_and_get():
 
     # Retrieve template
     get_start = time.time()
-    get_response = await async_pl.templates.get(
-        template_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
-    )
+    get_response = await async_pl.templates.get(template_name, {"provider": "openai", "model": "gpt-3.5-turbo"})
     get_end = time.time()
     print(f"Template get latency: {get_end - get_start}")
 
@@ -98,9 +96,7 @@ async def test_async_run_method():
     # template_name = "Test"  # Assumes 'Test' template exists
 
     # Retrieve template details
-    template = await async_pl.templates.get(
-        template_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
-    )
+    template = await async_pl.templates.get(template_name, {"provider": "openai", "model": "gpt-3.5-turbo"})
     assert template is not None, f"Template '{template_name}' could not be found."
 
     # Run template

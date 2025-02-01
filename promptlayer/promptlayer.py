@@ -61,9 +61,7 @@ class PromptLayer(PromptLayerMixin):
         self.api_key = api_key
         self.templates = TemplateManager(api_key)
         self.group = GroupManager(api_key)
-        self.tracer_provider, self.tracer = self._initialize_tracer(
-            api_key, enable_tracing
-        )
+        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, enable_tracing)
         self.track = TrackManager(api_key)
 
     def __getattr__(
@@ -233,9 +231,7 @@ class PromptLayer(PromptLayerMixin):
                 span.set_attribute("prompt_name", prompt_name)
                 span.set_attribute("function_input", str(_run_internal_kwargs))
                 pl_run_span_id = hex(span.context.span_id)[2:].zfill(16)
-                result = self._run_internal(
-                    **_run_internal_kwargs, pl_run_span_id=pl_run_span_id
-                )
+                result = self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
                 span.set_attribute("function_output", str(result))
                 return result
         else:
@@ -285,18 +281,12 @@ class PromptLayer(PromptLayerMixin):
 
             if not return_all_outputs:
                 if is_workflow_results_dict(results):
-                    output_nodes = [
-                        node_data
-                        for node_data in results.values()
-                        if node_data.get("is_output_node")
-                    ]
+                    output_nodes = [node_data for node_data in results.values() if node_data.get("is_output_node")]
 
                     if not output_nodes:
                         raise Exception(json.dumps(results, indent=4))
 
-                    if not any(
-                        node.get("status") == "SUCCESS" for node in output_nodes
-                    ):
+                    if not any(node.get("status") == "SUCCESS" for node in output_nodes):
                         raise Exception(json.dumps(results, indent=4))
 
             return results
@@ -364,14 +354,10 @@ class AsyncPromptLayer(PromptLayerMixin):
         self.api_key = api_key
         self.templates = AsyncTemplateManager(api_key)
         self.group = AsyncGroupManager(api_key)
-        self.tracer_provider, self.tracer = self._initialize_tracer(
-            api_key, enable_tracing
-        )
+        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, enable_tracing)
         self.track = AsyncTrackManager(api_key)
 
-    def __getattr__(
-        self, name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]]
-    ):
+    def __getattr__(self, name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]]):
         if name == "openai":
             import openai as openai_module
 
@@ -400,9 +386,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         input_variables: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, str]] = None,
         workflow_label_name: Optional[str] = None,
-        workflow_version: Optional[
-            int
-        ] = None,  # This is the version number, not the version ID
+        workflow_version: Optional[int] = None,  # This is the version number, not the version ID
         return_all_outputs: Optional[bool] = False,
     ) -> Dict[str, Any]:
         try:
@@ -448,9 +432,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 span.set_attribute("prompt_name", prompt_name)
                 span.set_attribute("function_input", str(_run_internal_kwargs))
                 pl_run_span_id = hex(span.context.span_id)[2:].zfill(16)
-                result = await self._run_internal(
-                    **_run_internal_kwargs, pl_run_span_id=pl_run_span_id
-                )
+                result = await self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
                 span.set_attribute("function_output", str(result))
                 return result
         else:
@@ -563,9 +545,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             input_variables=input_variables,
             metadata=metadata,
         )
-        prompt_blueprint = await self.templates.get(
-            prompt_name, get_prompt_template_params
-        )
+        prompt_blueprint = await self.templates.get(prompt_name, get_prompt_template_params)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )

@@ -8,11 +8,11 @@
 <a href="https://docs.promptlayer.com"><img alt="Docs" src="https://custom-icon-badges.herokuapp.com/badge/docs-PL-green.svg?logo=cake&style=for-the-badge"></a>
 <a href="https://www.loom.com/share/196c42e43acd4a369d75e9a7374a0850"><img alt="Demo with Loom" src="https://img.shields.io/badge/Demo-loom-552586.svg?logo=loom&style=for-the-badge&labelColor=gray"></a>
 
----  
+---
 
 <div align="left">
 
-[PromptLayer](https://promptlayer.com/) is the first platform that allows you to track, manage, and share your GPT prompt engineering. PromptLayer acts a middleware between your code and OpenAI’s python library. 
+[PromptLayer](https://promptlayer.com/) is the first platform that allows you to track, manage, and share your GPT prompt engineering. PromptLayer acts a middleware between your code and OpenAI’s python library.
 
 PromptLayer records all your OpenAI API requests, allowing you to search and explore request history in the PromptLayer dashboard.
 
@@ -53,14 +53,14 @@ openai = promptlayer.openai
 
 ### Adding PromptLayer tags: `pl_tags`
 
-PromptLayer allows you to add tags through the `pl_tags` argument. This allows you to track and group requests in the dashboard. 
+PromptLayer allows you to add tags through the `pl_tags` argument. This allows you to track and group requests in the dashboard.
 
 *Tags are not required but we recommend them!*
 
 ```python
 openai.Completion.create(
-  engine="text-ada-001", 
-  prompt="My name is", 
+  engine="text-ada-001",
+  prompt="My name is",
   pl_tags=["name-guessing", "pipeline-2"]
 )
 ```
@@ -69,11 +69,11 @@ After making your first few requests, you should be able to see them in the Prom
 
 ## Using the REST API
 
-This Python library is a wrapper over PromptLayer's REST API. If you use another language, like Javascript, just interact directly with the API. 
+This Python library is a wrapper over PromptLayer's REST API. If you use another language, like Javascript, just interact directly with the API.
 
 Here is an example request below:
 
-```jsx
+```python
 import requests
 request_response = requests.post(
   "https://api.promptlayer.com/track-request",

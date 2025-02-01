@@ -15,9 +15,7 @@ class PromptLayerBase(object):
         "_tracer",
     ]
 
-    def __init__(
-        self, obj, function_name="", provider_type="openai", api_key=None, tracer=None
-    ):
+    def __init__(self, obj, function_name="", provider_type="openai", api_key=None, tracer=None):
         object.__setattr__(self, "_obj", obj)
         object.__setattr__(self, "_function_name", function_name)
         object.__setattr__(self, "_provider_type", provider_type)
@@ -29,29 +27,22 @@ class PromptLayerBase(object):
 
         if (
             name != "count_tokens"  # fix for anthropic count_tokens
-            and not re.match(
-                r"<class 'anthropic\..*Error'>", str(attr)
-            )  # fix for anthropic errors
-            and not re.match(
-                r"<class 'openai\..*Error'>", str(attr)
-            )  # fix for openai errors
+            and not re.match(r"<class 'anthropic\..*Error'>", str(attr))  # fix for anthropic errors
+            and not re.match(r"<class 'openai\..*Error'>", str(attr))  # fix for openai errors
             and (
                 inspect.isclass(attr)
                 or inspect.isfunction(attr)
                 or inspect.ismethod(attr)
-                or str(type(attr))
-                == "<class 'anthropic.resources.completions.Completions'>"
-                or str(type(attr))
-                == "<class 'anthropic.resources.completions.AsyncCompletions'>"
+                or str(type(attr)) == "<class 'anthropic.resources.completions.Completions'>"
+                or str(type(attr)) == "<class 'anthropic.resources.completions.AsyncCompletions'>"
                 or str(type(attr)) == "<class 'anthropic.resources.messages.Messages'>"
-                or str(type(attr))
-                == "<class 'anthropic.resources.messages.AsyncMessages'>"
+                or str(type(attr)) == "<class 'anthropic.resources.messages.AsyncMessages'>"
                 or re.match(r"<class 'openai\.resources.*'>", str(type(attr)))
             )
         ):
             return PromptLayerBase(
                 attr,
-                function_name=f'{object.__getattribute__(self, "_function_name")}.{name}',
+                function_name=f"{object.__getattribute__(self, '_function_name')}.{name}",
                 provider_type=object.__getattribute__(self, "_provider_type"),
                 api_key=object.__getattribute__(self, "_api_key"),
                 tracer=object.__getattribute__(self, "_tracer"),
@@ -77,16 +68,10 @@ class PromptLayerBase(object):
 
         if tracer:
             with tracer.start_as_current_span(function_name) as llm_request_span:
-                llm_request_span_id = hex(llm_request_span.context.span_id)[2:].zfill(
-                    16
-                )
-                llm_request_span.set_attribute(
-                    "provider", object.__getattribute__(self, "_provider_type")
-                )
+                llm_request_span_id = hex(llm_request_span.context.span_id)[2:].zfill(16)
+                llm_request_span.set_attribute("provider", object.__getattribute__(self, "_provider_type"))
                 llm_request_span.set_attribute("function_name", function_name)
-                llm_request_span.set_attribute(
-                    "function_input", str({"args": args, "kwargs": kwargs})
-                )
+                llm_request_span.set_attribute("function_input", str({"args": args, "kwargs": kwargs}))
 
                 if inspect.isclass(function_object):
                     result = PromptLayerBase(
@@ -101,9 +86,7 @@ class PromptLayerBase(object):
 
                 function_response = function_object(*args, **kwargs)
 
-                if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(
-                    function_response
-                ):
+                if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(function_response):
                     return async_wrapper(
                         function_response,
                         return_pl_id,
@@ -146,9 +129,7 @@ class PromptLayerBase(object):
 
             function_response = function_object(*args, **kwargs)
 
-            if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(
-                function_response
-            ):
+            if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(function_response):
                 return async_wrapper(
                     function_response,
                     return_pl_id,

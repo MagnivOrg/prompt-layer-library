@@ -20,9 +20,7 @@ def prompt(
 ):
     if not isinstance(prompt_input_variables, dict):
         raise Exception("Please provide a dictionary of input variables.")
-    return promptlayer_track_prompt(
-        request_id, prompt_name, prompt_input_variables, api_key, version, label
-    )
+    return promptlayer_track_prompt(request_id, prompt_name, prompt_input_variables, api_key, version, label)
 
 
 def metadata(request_id, metadata, api_key: str = None):
@@ -30,9 +28,7 @@ def metadata(request_id, metadata, api_key: str = None):
         raise Exception("Please provide a dictionary of metadata.")
     for key, value in metadata.items():
         if not isinstance(key, str) or not isinstance(value, str):
-            raise Exception(
-                "Please provide a dictionary of metadata with key value pair of strings."
-            )
+            raise Exception("Please provide a dictionary of metadata with key value pair of strings.")
     return promptlayer_track_metadata(request_id, metadata, api_key)
 
 
@@ -60,9 +56,7 @@ async def aprompt(
 ):
     if not isinstance(prompt_input_variables, dict):
         raise Exception("Please provide a dictionary of input variables.")
-    return await apromptlayer_track_prompt(
-        request_id, prompt_name, prompt_input_variables, api_key, version, label
-    )
+    return await apromptlayer_track_prompt(request_id, prompt_name, prompt_input_variables, api_key, version, label)
 
 
 async def ametadata(request_id, metadata, api_key: str = None):
@@ -70,9 +64,7 @@ async def ametadata(request_id, metadata, api_key: str = None):
         raise Exception("Please provide a dictionary of metadata.")
     for key, value in metadata.items():
         if not isinstance(key, str) or not isinstance(value, str):
-            raise Exception(
-                "Please provide a dictionary of metadata with key-value pairs of strings."
-            )
+            raise Exception("Please provide a dictionary of metadata with key-value pairs of strings.")
     return await apromptlayer_track_metadata(request_id, metadata, api_key)
 
 

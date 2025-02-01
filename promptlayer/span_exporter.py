@@ -19,12 +19,8 @@ class PromptLayerSpanExporter(SpanExporter):
             span_info = {
                 "name": span.name,
                 "context": {
-                    "trace_id": hex(span.context.trace_id)[2:].zfill(
-                        32
-                    ),  # Ensure 32 characters
-                    "span_id": hex(span.context.span_id)[2:].zfill(
-                        16
-                    ),  # Ensure 16 characters
+                    "trace_id": hex(span.context.trace_id)[2:].zfill(32),  # Ensure 32 characters
+                    "span_id": hex(span.context.span_id)[2:].zfill(16),  # Ensure 16 characters
                     "trace_state": str(span.context.trace_state),
                 },
                 "kind": str(span.kind),
@@ -44,10 +40,7 @@ class PromptLayerSpanExporter(SpanExporter):
                     }
                     for event in span.events
                 ],
-                "links": [
-                    {"context": link.context, "attributes": dict(link.attributes)}
-                    for link in span.links
-                ],
+                "links": [{"context": link.context, "attributes": dict(link.attributes)} for link in span.links],
                 "resource": {
                     "attributes": dict(span.resource.attributes),
                     "schema_url": span.resource.schema_url,

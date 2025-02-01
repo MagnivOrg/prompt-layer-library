@@ -138,9 +138,7 @@ class PromptLayerMixin:
     @staticmethod
     def _initialize_tracer(api_key: str = None, enable_tracing: bool = False):
         if enable_tracing:
-            resource = Resource(
-                attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"}
-            )
+            resource = Resource(attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"})
             tracer_provider = TracerProvider(resource=resource)
             promptlayer_exporter = PromptLayerSpanExporter(api_key=api_key)
             span_processor = BatchSpanProcessor(promptlayer_exporter)
@@ -151,9 +149,7 @@ class PromptLayerMixin:
             return None, None
 
     @staticmethod
-    def _prepare_get_prompt_template_params(
-        *, prompt_version, prompt_release_label, input_variables, metadata
-    ):
+    def _prepare_get_prompt_template_params(*, prompt_version, prompt_release_label, input_variables, metadata):
         params = {}
 
         if prompt_version:
@@ -206,27 +202,19 @@ class PromptLayerMixin:
         }
 
     @staticmethod
-    def _validate_and_extract_model_from_prompt_blueprint(
-        *, prompt_blueprint, prompt_name
-    ):
+    def _validate_and_extract_model_from_prompt_blueprint(*, prompt_blueprint, prompt_name):
         if not prompt_blueprint["llm_kwargs"]:
-            raise ValueError(
-                f"Prompt '{prompt_name}' does not have any LLM kwargs associated with it."
-            )
+            raise ValueError(f"Prompt '{prompt_name}' does not have any LLM kwargs associated with it.")
 
         prompt_blueprint_metadata = prompt_blueprint.get("metadata")
 
         if not prompt_blueprint_metadata:
-            raise ValueError(
-                f"Prompt '{prompt_name}' does not have any metadata associated with it."
-            )
+            raise ValueError(f"Prompt '{prompt_name}' does not have any metadata associated with it.")
 
         prompt_blueprint_model = prompt_blueprint_metadata.get("model")
 
         if not prompt_blueprint_model:
-            raise ValueError(
-                f"Prompt '{prompt_name}' does not have a model parameters associated with it."
-            )
+            raise ValueError(f"Prompt '{prompt_name}' does not have a model parameters associated with it.")
 
         return prompt_blueprint_model
 
@@ -247,12 +235,8 @@ class PromptLayerMixin:
             "args": [],
             "kwargs": request_params["kwargs"],
             "tags": tags,
-            "request_start_time": datetime.datetime.now(
-                datetime.timezone.utc
-            ).timestamp(),
-            "request_end_time": datetime.datetime.now(
-                datetime.timezone.utc
-            ).timestamp(),
+            "request_start_time": datetime.datetime.now(datetime.timezone.utc).timestamp(),
+            "request_end_time": datetime.datetime.now(datetime.timezone.utc).timestamp(),
             "api_key": api_key,
             "metadata": metadata,
             "prompt_id": request_params["prompt_blueprint"]["id"],
@@ -275,9 +259,7 @@ class PromptLayerMixin:
                             for key, value in attributes.items():
                                 span.set_attribute(key, value)
 
-                        span.set_attribute(
-                            "function_input", str({"args": args, "kwargs": kwargs})
-                        )
+                        span.set_attribute("function_input", str({"args": args, "kwargs": kwargs}))
                         result = func(*args, **kwargs)
                         span.set_attribute("function_output", str(result))
 
@@ -294,9 +276,7 @@ class PromptLayerMixin:
                             for key, value in attributes.items():
                                 span.set_attribute(key, value)
 
-                        span.set_attribute(
-                            "function_input", str({"args": args, "kwargs": kwargs})
-                        )
+                        span.set_attribute("function_input", str({"args": args, "kwargs": kwargs}))
                         result = await func(*args, **kwargs)
                         span.set_attribute("function_output", str(result))
 

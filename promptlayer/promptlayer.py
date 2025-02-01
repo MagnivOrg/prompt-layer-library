@@ -239,7 +239,7 @@ class PromptLayer(PromptLayerMixin):
 
     def run_workflow(
         self,
-        workflow_name: str,
+        workflow_id_or_name: Union[int, str],
         input_variables: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, str]] = None,
         workflow_label_name: Optional[str] = None,
@@ -248,46 +248,32 @@ class PromptLayer(PromptLayerMixin):
     ) -> Union[Dict[str, Any], Any]:
         try:
             try:
-                # Check if we're inside a running event loop
-                loop = asyncio.get_running_loop()
+                loop = asyncio.get_running_loop()  # Check if we're inside a running event loop
             except RuntimeError:
                 loop = None
 
             if loop and loop.is_running():
                 nest_asyncio.apply()
-                results = asyncio.run(
-                    arun_workflow_request(
-                        workflow_name=workflow_name,
-                        input_variables=input_variables or {},
-                        metadata=metadata,
-                        workflow_label_name=workflow_label_name,
-                        workflow_version_number=workflow_version,
-                        api_key=self.api_key,
-                        return_all_outputs=return_all_outputs,
-                    )
+
+            results = asyncio.run(
+                arun_workflow_request(
+                    workflow_id_or_name=workflow_id_or_name,
+                    input_variables=input_variables or {},
+                    metadata=metadata,
+                    workflow_label_name=workflow_label_name,
+                    workflow_version_number=workflow_version,
+                    api_key=self.api_key,
+                    return_all_outputs=return_all_outputs,
                 )
-            else:
-                results = asyncio.run(
-                    arun_workflow_request(
-                        workflow_name=workflow_name,
-                        input_variables=input_variables or {},
-                        metadata=metadata,
-                        workflow_label_name=workflow_label_name,
-                        workflow_version_number=workflow_version,
-                        api_key=self.api_key,
-                        return_all_outputs=return_all_outputs,
-                    )
-                )
+            )
 
-            if not return_all_outputs:
-                if is_workflow_results_dict(results):
-                    output_nodes = [node_data for node_data in results.values() if node_data.get("is_output_node")]
+            if not return_all_outputs and is_workflow_results_dict(results):
+                output_nodes = [node_data for node_data in results.values() if node_data.get("is_output_node")]
+                if not output_nodes:
+                    raise Exception(json.dumps(results, indent=4))
 
-                    if not output_nodes:
-                        raise Exception(json.dumps(results, indent=4))
-
-                    if not any(node.get("status") == "SUCCESS" for node in output_nodes):
-                        raise Exception(json.dumps(results, indent=4))
+                if not any(node.get("status") == "SUCCESS" for node in output_nodes):
+                    raise Exception(json.dumps(results, indent=4))
 
             return results
         except Exception as e:
@@ -382,7 +368,7 @@ class AsyncPromptLayer(PromptLayerMixin):
 
     async def run_workflow(
         self,
-        workflow_name: str,
+        workflow_id_or_name: Union[int, str],
         input_variables: Optional[Dict[str, Any]] = None,
         metadata: Optional[Dict[str, str]] = None,
         workflow_label_name: Optional[str] = None,
@@ -391,7 +377,7 @@ class AsyncPromptLayer(PromptLayerMixin):
     ) -> Dict[str, Any]:
         try:
             result = await arun_workflow_request(
-                workflow_name=workflow_name,
+                workflow_id_or_name=workflow_id_or_name,
                 input_variables=input_variables or {},
                 metadata=metadata,
                 workflow_label_name=workflow_label_name,

@@ -51,13 +51,8 @@ class PromptLayerSpanExporter(SpanExporter):
         try:
             response = requests.post(
                 self.url,
-                headers={
-                    "X-Api-Key": self.api_key,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "spans": request_data,
-                },
+                headers={"X-Api-Key": self.api_key, "Content-Type": "application/json"},
+                json={"spans": request_data},
             )
             response.raise_for_status()
             return SpanExportResult.SUCCESS

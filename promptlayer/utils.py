@@ -3,12 +3,14 @@ import contextvars
 import datetime
 import functools
 import json
+import logging
 import os
 import sys
 import types
 from copy import deepcopy
 from enum import Enum
 from typing import Any, AsyncGenerator, AsyncIterable, Callable, Dict, Generator, List, Optional, Union
+from uuid import uuid4
 
 import httpx
 import requests
@@ -25,16 +27,44 @@ from promptlayer.types.prompt_template import (
     PublishPromptTemplateResponse,
 )
 
+# Configuration
+# TODO(dmu) MEDIUM: Use `PROMPTLAYER_` prefix instead of `_PROMPTLAYER` suffix
 URL_API_PROMPTLAYER = os.environ.setdefault("URL_API_PROMPTLAYER", "https://api.promptlayer.com")
-WORKFLOWS_RUN_URL = URL_API_PROMPTLAYER + "/workflows/{}/run"
+RERAISE_ORIGINAL_EXCEPTION = os.getenv("PROMPTLAYER_RE_RAISE_ORIGINAL_EXCEPTION", "False").lower() == "true"
+RAISE_FOR_STATUS = os.getenv("PROMPTLAYER_RAISE_FOR_STATUS", "False").lower() == "true"
+DEFAULT_HTTP_TIMEOUT = 5
+
+WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
+WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
+SET_WORKFLOW_COMPLETE_MESSAGE = "SET_WORKFLOW_COMPLETE"
 WS_TOKEN_REQUEST_LIBRARY_URL = URL_API_PROMPTLAYER + "/ws-token-request-library"
 
-SET_WORKFLOW_COMPLETE_MESSAGE = "SET_WORKFLOW_COMPLETE"
+
+logger = logging.getLogger(__name__)
 
 
 class FinalOutputCode(Enum):
     OK = "OK"
     EXCEEDS_SIZE_LIMIT = "EXCEEDS_SIZE_LIMIT"
+
+
+def _get_http_timeout():
+    try:
+        return float(os.getenv("PROMPTLAYER_HTTP_TIMEOUT", DEFAULT_HTTP_TIMEOUT))
+    except (ValueError, TypeError):
+        return DEFAULT_HTTP_TIMEOUT
+
+
+def _make_httpx_client():
+    return httpx.AsyncClient(timeout=_get_http_timeout())
+
+
+def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
+    # This is backward compatibility code
+    if (workflow_id_or_name := workflow_name if workflow_id_or_name is None else workflow_id_or_name) is None:
+        raise ValueError('Either "workflow_id_or_name" or "workflow_name" must be provided')
+
+    return workflow_id_or_name
 
 
 async def _get_final_output(execution_id: int, return_all_outputs: bool, *, headers: Dict[str, str]) -> Dict[str, Any]:
@@ -48,14 +78,62 @@ async def _get_final_output(execution_id: int, return_all_outputs: bool, *, head
         return response.json()
 
 
-def _make_message_listener(results_future, execution_id, return_all_outputs, headers):
+# TODO(dmu) MEDIUM: Consider putting all these functions into a class, so we do not have to pass
+#                   `authorization_headers` into each function
+async def _resolve_workflow_id(workflow_id_or_name: Union[int, str], headers):
+    if isinstance(workflow_id_or_name, int):
+        return workflow_id_or_name
+
+    # TODO(dmu) LOW: Should we warn user here to avoid using workflow names in favor of workflow id?
+    async with _make_httpx_client() as client:
+        # TODO(dmu) MEDIUM: Generalize the way we make async calls to PromptLayer API and reuse it everywhere
+        response = await client.get(f"{URL_API_PROMPTLAYER}/workflows/{workflow_id_or_name}", headers=headers)
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code != 200:
+            raise_on_bad_response(response, "PromptLayer had the following error while running your workflow")
+
+        return response.json()["workflow"]["id"]
+
+
+async def _get_ably_token(channel_name, authentication_headers):
+    try:
+        async with _make_httpx_client() as client:
+            response = await client.post(
+                f"{URL_API_PROMPTLAYER}/ws-token-request-library",
+                headers=authentication_headers,
+                params={"capability": channel_name},
+            )
+            if RAISE_FOR_STATUS:
+                response.raise_for_status()
+            elif response.status_code != 201:
+                raise_on_bad_response(
+                    response,
+                    "PromptLayer had the following error while getting WebSocket token",
+                )
+            return response.json()["token_details"]["token"]
+    except Exception as ex:
+        error_message = f"Failed to get WebSocket token: {ex}"
+        print(error_message)  # TODO(dmu) MEDIUM: Remove prints in favor of logging
+        logger.exception(error_message)
+        if RERAISE_ORIGINAL_EXCEPTION:
+            raise
+        else:
+            raise Exception(error_message)
+
+
+def _make_message_listener(results_future, execution_id_future, return_all_outputs, headers):
+    # We need this function to be mocked by unittests
     async def message_listener(message: Message):
-        if message.name != SET_WORKFLOW_COMPLETE_MESSAGE:  # TODO(dmu) LOW: Do we really need this check?
+        if results_future.cancelled() or message.name != SET_WORKFLOW_COMPLETE_MESSAGE:
+            return  # TODO(dmu) LOW: Do we really need this check?
+
+        execution_id = await asyncio.wait_for(execution_id_future, _get_http_timeout() * 1.1)
+        message_data = json.loads(message.data)
+        if message_data["workflow_version_execution_id"] != execution_id:
             return
 
-        message_data = json.loads(message.data)
-        result_code = message_data.get("result_code")
-        if result_code in (FinalOutputCode.OK.value, None):
+        if (result_code := message_data.get("result_code")) in (FinalOutputCode.OK.value, None):
             results = message_data["final_output"]
         elif result_code == FinalOutputCode.EXCEEDS_SIZE_LIMIT.value:
             results = await _get_final_output(execution_id, return_all_outputs, headers=headers)
@@ -67,25 +145,75 @@ def _make_message_listener(results_future, execution_id, return_all_outputs, hea
     return message_listener
 
 
-async def _wait_for_workflow_completion(*, token, channel_name, execution_id, return_all_outputs, headers, timeout):
-    results = asyncio.Future()
-    message_listener = _make_message_listener(results, execution_id, return_all_outputs, headers)
-
-    client = AblyRealtime(token=token)
-    channel = client.channels.get(channel_name)
+async def _subscribe_to_workflow_completion_channel(channel, execution_id_future, return_all_outputs, headers):
+    results_future = asyncio.Future()
+    message_listener = _make_message_listener(results_future, execution_id_future, return_all_outputs, headers)
     await channel.subscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
+    return results_future, message_listener
+
+
+async def _post_workflow_id_run(
+    *,
+    authentication_headers,
+    workflow_id,
+    input_variables: Dict[str, Any],
+    metadata: Dict[str, Any],
+    workflow_label_name: str,
+    workflow_version_number: int,
+    return_all_outputs: bool,
+    channel_name_suffix: str,
+    _url_template: str = WORKFLOW_RUN_URL_TEMPLATE,
+):
+    url = _url_template.format(base_url=URL_API_PROMPTLAYER, workflow_id=workflow_id)
+    payload = {
+        "input_variables": input_variables,
+        "metadata": metadata,
+        "workflow_label_name": workflow_label_name,
+        "workflow_version_number": workflow_version_number,
+        "return_all_outputs": return_all_outputs,
+        "channel_name_suffix": channel_name_suffix,
+    }
     try:
-        return await asyncio.wait_for(results, timeout)
-    except asyncio.TimeoutError as ex:
-        raise Exception("Workflow execution did not complete properly") from ex
+        async with _make_httpx_client() as client:
+            response = await client.post(url, json=payload, headers=authentication_headers)
+            if RAISE_FOR_STATUS:
+                response.raise_for_status()
+            elif response.status_code != 201:
+                raise_on_bad_response(response, "PromptLayer had the following error while running your workflow")
+
+            result = response.json()
+            if warning := result.get("warning"):
+                print(f"WARNING: {warning}")
+    except Exception as ex:
+        error_message = f"Failed to run workflow: {str(ex)}"
+        print(error_message)  # TODO(dmu) MEDIUM: Remove prints in favor of logging
+        logger.exception(error_message)
+        if RERAISE_ORIGINAL_EXCEPTION:
+            raise
+        else:
+            raise Exception(error_message)
+
+    return result.get("workflow_version_execution_id")
+
+
+async def _wait_for_workflow_completion(channel, results_future, message_listener, timeout):
+    # We need this function for mocking in unittests
+    try:
+        return await asyncio.wait_for(results_future, timeout)
+    except asyncio.TimeoutError:
+        raise Exception("Workflow execution did not complete properly")
     finally:
         channel.unsubscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
-        await client.close()
+
+
+def _make_channel_name_suffix():
+    # We need this function for mocking in unittests
+    return uuid4().hex
 
 
 async def arun_workflow_request(
     *,
-    workflow_name: str,
+    workflow_id_or_name: Optional[Union[int, str]] = None,
     input_variables: Dict[str, Any],
     metadata: Optional[Dict[str, Any]] = None,
     workflow_label_name: Optional[str] = None,
@@ -93,61 +221,39 @@ async def arun_workflow_request(
     api_key: str,
     return_all_outputs: Optional[bool] = False,
     timeout: Optional[int] = 3600,
+    # `workflow_name` deprecated, kept for backward compatibility only.
+    workflow_name: Optional[str] = None,
 ):
-    payload = {
-        "input_variables": input_variables,
-        "metadata": metadata,
-        "workflow_label_name": workflow_label_name,
-        "workflow_version_number": workflow_version_number,
-        "return_all_outputs": return_all_outputs,
-    }
     headers = {"X-API-KEY": api_key}
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(WORKFLOWS_RUN_URL.format(workflow_name), json=payload, headers=headers)
-            if response.status_code != 201:
-                raise_on_bad_response(
-                    response,
-                    "PromptLayer had the following error while running your workflow",
-                )
-
-            result = response.json()
-            if warning := result.get("warning"):
-                print(f"WARNING: {warning}")
-
-    except Exception as ex:
-        error_message = f"Failed to run workflow: {str(ex)}"
-        print(error_message)
-        raise Exception(error_message)
-
-    if not (execution_id := result.get("workflow_version_execution_id")):
-        raise Exception("No execution ID returned from workflow run")
-
-    channel_name = f"workflow_updates:{execution_id}"
-    try:
-        async with httpx.AsyncClient() as client:
-            ws_response = await client.post(
-                WS_TOKEN_REQUEST_LIBRARY_URL, headers=headers, params={"capability": channel_name}
-            )
-            if ws_response.status_code != 201:
-                raise_on_bad_response(
-                    ws_response,
-                    "PromptLayer had the following error while getting WebSocket token",
-                )
-            token_details = ws_response.json()["token_details"]
-    except Exception as ex:
-        error_message = f"Failed to get WebSocket token: {ex}"
-        print(error_message)
-        raise Exception(error_message) from ex
-
-    return await _wait_for_workflow_completion(
-        token=token_details["token"],
-        channel_name=channel_name,
-        execution_id=execution_id,
-        return_all_outputs=return_all_outputs,
-        headers=headers,
-        timeout=timeout,
+    workflow_id = await _resolve_workflow_id(
+        _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name), headers
     )
+    channel_name_suffix = _make_channel_name_suffix()
+    channel_name = WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE.format(
+        workflow_id=workflow_id, channel_name_suffix=channel_name_suffix
+    )
+    ably_token = await _get_ably_token(channel_name, headers)
+    async with AblyRealtime(token=ably_token) as ably_client:
+        # It is crucial to subscribe before running a workflow, otherwise we may miss a completion message
+        channel = ably_client.channels.get(channel_name)
+        execution_id_future = asyncio.Future()
+        results_future, message_listener = await _subscribe_to_workflow_completion_channel(
+            channel, execution_id_future, return_all_outputs, headers
+        )
+
+        execution_id = await _post_workflow_id_run(
+            authentication_headers=headers,
+            workflow_id=workflow_id,
+            input_variables=input_variables,
+            metadata=metadata,
+            workflow_label_name=workflow_label_name,
+            workflow_version_number=workflow_version_number,
+            return_all_outputs=return_all_outputs,
+            channel_name_suffix=channel_name_suffix,
+        )
+        execution_id_future.set_result(execution_id)
+
+        return await _wait_for_workflow_completion(channel, results_future, message_listener, timeout)
 
 
 def promptlayer_api_handler(
@@ -166,13 +272,7 @@ def promptlayer_api_handler(
     if (
         isinstance(response, types.GeneratorType)
         or isinstance(response, types.AsyncGeneratorType)
-        or type(response).__name__
-        in [
-            "Stream",
-            "AsyncStream",
-            "AsyncMessageStreamManager",
-            "MessageStreamManager",
-        ]
+        or type(response).__name__ in ["Stream", "AsyncStream", "AsyncMessageStreamManager", "MessageStreamManager"]
     ):
         return GeneratorProxy(
             generator=response,
@@ -289,19 +389,14 @@ def promptlayer_api_request(
         )
         if not hasattr(request_response, "status_code"):
             warn_on_bad_response(
-                request_response,
-                "WARNING: While logging your request PromptLayer had the following issue",
+                request_response, "WARNING: While logging your request PromptLayer had the following issue"
             )
         elif request_response.status_code != 200:
             warn_on_bad_response(
-                request_response,
-                "WARNING: While logging your request PromptLayer had the following error",
+                request_response, "WARNING: While logging your request PromptLayer had the following error"
             )
     except Exception as e:
-        print(
-            f"WARNING: While logging your request PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
+        print(f"WARNING: While logging your request PromptLayer had the following error: {e}", file=sys.stderr)
     if request_response is not None and return_pl_id:
         return request_response.json().get("request_id")
 
@@ -314,36 +409,30 @@ def track_request(**body):
         )
         if response.status_code != 200:
             warn_on_bad_response(
-                response,
-                f"PromptLayer had the following error while tracking your request: {response.text}",
+                response, f"PromptLayer had the following error while tracking your request: {response.text}"
             )
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(
-            f"WARNING: While logging your request PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
+        print(f"WARNING: While logging your request PromptLayer had the following error: {e}", file=sys.stderr)
         return {}
 
 
 async def atrack_request(**body: Any) -> Dict[str, Any]:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(
                 f"{URL_API_PROMPTLAYER}/track-request",
                 json=body,
             )
-        if response.status_code != 200:
-            warn_on_bad_response(
-                response,
-                f"PromptLayer had the following error while tracking your request: {response.text}",
-            )
+            if RAISE_FOR_STATUS:
+                response.raise_for_status()
+            elif response.status_code != 200:
+                warn_on_bad_response(
+                    response, f"PromptLayer had the following error while tracking your request: {response.text}"
+                )
         return response.json()
     except httpx.RequestError as e:
-        print(
-            f"WARNING: While logging your request PromptLayer had the following error: {e}",
-            file=sys.stderr,
-        )
+        print(f"WARNING: While logging your request PromptLayer had the following error: {e}", file=sys.stderr)
         return {}
 
 
@@ -467,9 +556,12 @@ async def apromptlayer_track_prompt(
         "label": label,
     }
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(url, json=payload)
-        if response.status_code != 200:
+
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code != 200:
             warn_on_bad_response(
                 response,
                 "WARNING: While tracking your prompt, PromptLayer had the following error",
@@ -518,9 +610,12 @@ async def apromptlayer_track_metadata(request_id: str, metadata: Dict[str, Any],
         "api_key": api_key,
     }
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(url, json=payload)
-        if response.status_code != 200:
+
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code != 200:
             warn_on_bad_response(
                 response,
                 "WARNING: While tracking your metadata, PromptLayer had the following error",
@@ -575,9 +670,12 @@ async def apromptlayer_track_score(
     if score_name is not None:
         data["name"] = score_name
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(url, json=data)
-        if response.status_code != 200:
+
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code != 200:
             warn_on_bad_response(
                 response,
                 "WARNING: While tracking your score, PromptLayer had the following error",
@@ -838,14 +936,17 @@ def promptlayer_create_group(api_key: str = None):
 
 async def apromptlayer_create_group(api_key: Optional[str] = None) -> str:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(
                 f"{URL_API_PROMPTLAYER}/create-group",
                 json={
                     "api_key": api_key,
                 },
             )
-        if response.status_code != 200:
+
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code != 200:
             warn_on_bad_response(
                 response,
                 "WARNING: While creating your group, PromptLayer had the following error",
@@ -885,13 +986,16 @@ async def apromptlayer_track_group(request_id, group_id, api_key: str = None):
             "request_id": request_id,
             "group_id": group_id,
         }
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(
                 f"{URL_API_PROMPTLAYER}/track-group",
                 headers={"X-API-KEY": api_key},
                 json=payload,
             )
-        if response.status_code != 200:
+
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code != 200:
             warn_on_bad_response(
                 response,
                 "WARNING: While tracking your group, PromptLayer had the following error",
@@ -942,13 +1046,16 @@ async def aget_prompt_template(
         json_body = {"api_key": api_key}
         if params:
             json_body.update(params)
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(
                 f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )
-            if response.status_code != 200:
+
+            if RAISE_FOR_STATUS:
+                response.raise_for_status()
+            elif response.status_code != 200:
                 raise_on_bad_response(
                     response,
                     "PromptLayer had the following error while getting your prompt template",
@@ -992,7 +1099,7 @@ async def apublish_prompt_template(
     api_key: str = None,
 ) -> PublishPromptTemplateResponse:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(
                 f"{URL_API_PROMPTLAYER}/rest/prompt-templates",
                 headers={"X-API-KEY": api_key},
@@ -1002,7 +1109,10 @@ async def apublish_prompt_template(
                     "release_labels": body.get("release_labels"),
                 },
             )
-        if response.status_code == 400:
+
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code == 400:
             raise Exception(
                 f"PromptLayer had the following error while publishing your prompt template: {response.text}"
             )
@@ -1039,13 +1149,16 @@ async def aget_all_prompt_templates(
     page: int = 1, per_page: int = 30, api_key: str = None
 ) -> List[ListPromptTemplateResponse]:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.get(
                 f"{URL_API_PROMPTLAYER}/prompt-templates",
                 headers={"X-API-KEY": api_key},
                 params={"page": page, "per_page": per_page},
             )
-        if response.status_code != 200:
+
+        if RAISE_FOR_STATUS:
+            response.raise_for_status()
+        elif response.status_code != 200:
             raise_on_bad_response(
                 response,
                 "PromptLayer had the following error while getting all your prompt templates",
@@ -1556,7 +1669,7 @@ def util_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
 
 async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _make_httpx_client() as client:
             response = await client.post(
                 f"{URL_API_PROMPTLAYER}/log-request",
                 headers={"X-API-KEY": api_key},
@@ -1814,7 +1927,7 @@ async def agoogle_completions_request(client, **kwargs):
     stream = kwargs.pop("stream", False)
     if stream:
         return await client.aio.models.generate_content_stream(model=model, contents=contents, config=config)
-    return await client.aio.models.generate_content(model=model, contents=contents, config=config)
+        return await client.aio.models.generate_content(model=model, contents=contents, config=config)
 
 
 AMAP_TYPE_TO_GOOGLE_FUNCTION = {

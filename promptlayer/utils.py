@@ -47,7 +47,7 @@ async def arun_workflow_request(
     workflow_version_number: Optional[int] = None,
     api_key: str,
     return_all_outputs: Optional[bool] = False,
-    timeout: Optional[int] = 120,
+    timeout: Optional[int] = 3600,
 ):
     payload = {
         "input_variables": input_variables,

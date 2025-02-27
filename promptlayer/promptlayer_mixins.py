@@ -204,7 +204,9 @@ class PromptLayerMixin:
     @staticmethod
     def _validate_and_extract_model_from_prompt_blueprint(*, prompt_blueprint, prompt_name):
         if not prompt_blueprint["llm_kwargs"]:
-            raise ValueError(f"Prompt '{prompt_name}' does not have any LLM kwargs associated with it.")
+            raise ValueError(
+                f"Prompt '{prompt_name}' does not have any LLM kwargs associated with it. Please set your model parameters in the registry in the PromptLayer dashbaord."
+            )
 
         prompt_blueprint_metadata = prompt_blueprint.get("metadata")
 

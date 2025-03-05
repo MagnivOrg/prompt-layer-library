@@ -5,6 +5,30 @@ description = "PromptLayer is a platform for prompt engineering and tracks your 
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
 readme = "README.md"
+homepage = "https://promptlayer.com"
+repository = "https://github.com/yourorg/promptlayer"
+documentation = "https://docs.promptlayer.com"
+
+keywords = [
+    "OpenAI",
+    "Prompt Engineering",
+    "LLM",
+    "LangChain",
+    "Anthropic",
+    "AI",
+    "Machine Learning",
+]
+
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"

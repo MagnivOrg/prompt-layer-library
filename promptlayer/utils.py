@@ -8,17 +8,7 @@ import sys
 import types
 from copy import deepcopy
 from enum import Enum
-from typing import (
-    Any,
-    AsyncGenerator,
-    AsyncIterable,
-    Callable,
-    Dict,
-    Generator,
-    List,
-    Optional,
-    Union,
-)
+from typing import Any, AsyncGenerator, AsyncIterable, Callable, Dict, Generator, List, Optional, Union
 
 import httpx
 import requests
@@ -1594,11 +1584,7 @@ async def amistral_request(
 
 
 def mistral_stream_chat(results: list):
-    from openai.types.chat import (
-        ChatCompletion,
-        ChatCompletionMessage,
-        ChatCompletionMessageToolCall,
-    )
+    from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionMessageToolCall
     from openai.types.chat.chat_completion import Choice
     from openai.types.chat.chat_completion_message_tool_call import Function
 
@@ -1659,11 +1645,7 @@ def mistral_stream_chat(results: list):
 
 
 async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
-    from openai.types.chat import (
-        ChatCompletion,
-        ChatCompletionMessage,
-        ChatCompletionMessageToolCall,
-    )
+    from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionMessageToolCall
     from openai.types.chat.chat_completion import Choice
     from openai.types.chat.chat_completion_message_tool_call import Function
 
@@ -1726,3 +1708,124 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
     response.choices[0].message.content = content
     response.choices[0].message.tool_calls = tool_calls
     return response
+
+
+def google_chat_request(client, **kwargs):
+    from google.genai.chats import Content
+
+    stream = kwargs.pop("stream", False)
+    model = kwargs.get("model", "gemini-2.0-flash")
+    history = [Content(**item) for item in kwargs.get("history", [])]
+    generation_config = kwargs.get("generation_config", {})
+    chat = client.chats.create(model=model, history=history, config=generation_config)
+    last_message = history[-1] if history else None
+    if stream:
+        return chat.send_message_stream(message=last_message)
+    return chat.send_message(message=last_message)
+
+
+def google_completions_request(client, **kwargs):
+    config = kwargs.pop("generation_config", {})
+    model = kwargs.get("model", "gemini-2.0-flash")
+    contents = kwargs.get("contents", [])
+    stream = kwargs.pop("stream", False)
+    if stream:
+        return client.models.generate_content_stream(model=model, contents=contents, config=config)
+    return client.models.generate_content(model=model, contents=contents, config=config)
+
+
+def map_google_stream_response(results: list):
+    from google.genai.chats import GenerateContentResponse
+
+    response = GenerateContentResponse()
+    if not results:
+        return response
+    results: List[GenerateContentResponse] = results
+    content = ""
+    for result in results:
+        content = f"{content}{result.candidates[0].content.parts[0].text}"
+    last_result = results[-1]
+    response = last_result.model_copy()
+    response.candidates[0].content.parts[0].text = content
+    return response
+
+
+def google_stream_chat(results: list):
+    return map_google_stream_response(results)
+
+
+def google_stream_completion(results: list):
+    return map_google_stream_response(results)
+
+
+MAP_TYPE_TO_GOOGLE_FUNCTION = {
+    "chat": google_chat_request,
+    "completion": google_completions_request,
+}
+
+
+def google_request(request: GetPromptTemplateResponse, **kwargs):
+    from google import genai
+
+    client = genai.Client()
+    request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
+    return request_to_make(client, **kwargs)
+
+
+async def agoogle_chat_request(client, **kwargs):
+    from google.genai.chats import Content
+
+    stream = kwargs.pop("stream", False)
+    model = kwargs.get("model", "gemini-2.0-flash")
+    history = [Content(**item) for item in kwargs.get("history", [])]
+    generation_config = kwargs.get("generation_config", {})
+    chat = client.aio.chats.create(model=model, history=history, config=generation_config)
+    last_message = history[-1] if history else None
+    if stream:
+        return await chat.send_message_stream(message=last_message)
+    return await chat.send_message(message=last_message)
+
+
+async def agoogle_completions_request(client, **kwargs):
+    config = kwargs.pop("generation_config", {})
+    model = kwargs.get("model", "gemini-2.0-flash")
+    contents = kwargs.get("contents", [])
+    stream = kwargs.pop("stream", False)
+    if stream:
+        return await client.aio.models.generate_content_stream(model=model, contents=contents, config=config)
+    return await client.aio.models.generate_content(model=model, contents=contents, config=config)
+
+
+AMAP_TYPE_TO_GOOGLE_FUNCTION = {
+    "chat": agoogle_chat_request,
+    "completion": agoogle_completions_request,
+}
+
+
+async def agoogle_request(request: GetPromptTemplateResponse, **kwargs):
+    from google import genai
+
+    client = genai.Client()
+    request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
+    return await request_to_make(client, **kwargs)
+
+
+async def amap_google_stream_response(generator: AsyncIterable[Any]):
+    from google.genai.chats import GenerateContentResponse
+
+    response = GenerateContentResponse()
+    content = ""
+    async for result in generator:
+        content = f"{content}{result.candidates[0].content.parts[0].text}"
+    last_result = result
+    response = last_result.model_copy()
+    response.candidates[0].content.parts[0].text = content
+    return response
+
+
+async def agoogle_stream_chat(generator: AsyncIterable[Any]):
+    return await amap_google_stream_response(generator)
+
+
+async def agoogle_stream_completion(generator: AsyncIterable[Any]):
+    return await amap_google_stream_response(generator)

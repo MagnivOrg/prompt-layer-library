@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.41"
+version = "1.0.42"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -20,9 +20,9 @@ nest-asyncio = "^1.6.0"
 behave = "^1.2.6"
 pytest = "^8.2.0"
 pytest-asyncio = "^0.23.6"
-anyio = "^4.3.0"
 anthropic = "^0.25.8"
 openai = "^1.60.1"
+google-genai = {version = "^1.5.0", python = ">=3.9"}
 
 [build-system]
 requires = ["poetry-core"]

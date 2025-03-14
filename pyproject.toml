@@ -7,7 +7,7 @@ license = "Apache-2.0"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.8.1,<4.0"
+python = ">=3.9,<4.0"
 requests = "^2.31.0"
 opentelemetry-api = "^1.26.0"
 opentelemetry-sdk = "^1.26.0"
@@ -22,7 +22,7 @@ pytest = "^8.2.0"
 pytest-asyncio = "^0.23.6"
 anthropic = "^0.25.8"
 openai = "^1.60.1"
-google-genai = {version = "^1.5.0", python = ">=3.9"}
+google-genai = "^1.5.0"
 
 [build-system]
 requires = ["poetry-core"]

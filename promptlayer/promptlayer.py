@@ -365,6 +365,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 openai_module,
                 function_name="openai",
                 api_key=self.api_key,
+                tracer=self.tracer,
             )
             return openai
         elif name == "anthropic":
@@ -375,6 +376,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 function_name="anthropic",
                 provider_type="anthropic",
                 api_key=self.api_key,
+                tracer=self.tracer,
             )
             return anthropic
         else:

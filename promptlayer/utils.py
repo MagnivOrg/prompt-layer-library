@@ -1718,7 +1718,7 @@ def google_chat_request(client, **kwargs):
     history = [Content(**item) for item in kwargs.get("history", [])]
     generation_config = kwargs.get("generation_config", {})
     chat = client.chats.create(model=model, history=history, config=generation_config)
-    last_message = history[-1] if history else None
+    last_message = history[-1].parts[0] if history else None
     if stream:
         return chat.send_message_stream(message=last_message)
     return chat.send_message(message=last_message)
@@ -1780,7 +1780,7 @@ async def agoogle_chat_request(client, **kwargs):
     history = [Content(**item) for item in kwargs.get("history", [])]
     generation_config = kwargs.get("generation_config", {})
     chat = client.aio.chats.create(model=model, history=history, config=generation_config)
-    last_message = history[-1] if history else None
+    last_message = history[-1].parts[0] if history else None
     if stream:
         return await chat.send_message_stream(message=last_message)
     return await chat.send_message(message=last_message)

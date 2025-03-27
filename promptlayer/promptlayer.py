@@ -218,7 +218,7 @@ class PromptLayer(PromptLayerMixin):
             "prompt_name": prompt_name,
             "prompt_version": prompt_version,
             "prompt_release_label": prompt_release_label,
-            "input_variables": input_variables,
+            "input_variables": input_variables or {},
             "model_parameter_overrides": model_parameter_overrides,
             "tags": tags,
             "metadata": metadata,

@@ -1767,7 +1767,9 @@ MAP_TYPE_TO_GOOGLE_FUNCTION = {
 def google_request(request: GetPromptTemplateResponse, **kwargs):
     from google import genai
 
-    client = genai.Client()
+    # First look for env variable "GOOGLE_API_KEY". Default to "GEMINI_API_KEY" if that doesn't exist
+    api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
+    client = genai.Client(api_key=api_key)
     request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
     return request_to_make(client, **kwargs)
 

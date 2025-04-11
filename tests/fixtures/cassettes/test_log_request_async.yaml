@@ -1,0 +1,107 @@
+interactions:
+- request:
+    body: '{"api_key": "sanitized"}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '49'
+      content-type:
+      - application/json
+      host:
+      - localhost:8000
+      user-agent:
+      - python-httpx/0.28.1
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/prompt-templates/sample_template
+  response:
+    body:
+      string: '{"id":4,"prompt_name":"sample_template","tags":["test"],"workspace_id":1,"commit_message":"test","metadata":{"model":{"provider":"openai","name":"gpt-4o-mini","parameters":{"frequency_penalty":0,"max_tokens":256,"messages":[{"content":"Hello","role":"system"}],"model":"gpt-4o","presence_penalty":0,"seed":0,"temperature":1,"top_p":1}}},"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":[],"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"llm_kwargs":{"messages":[{"content":"Hello","role":"system"}],"model":"gpt-4o","frequency_penalty":0,"max_tokens":256,"presence_penalty":0,"seed":0,"temperature":1,"top_p":1},"provider_base_url":null,"version":1,"snippets":[],"warning":null}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '1107'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:21:52 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"provider": "openai", "model": "gpt-4-mini", "input": {"messages": [{"input_variables":
+      [], "template_format": "f-string", "content": [{"type": "text", "text": ""}],
+      "raw_request_display_role": "", "dataset_examples": [], "role": "system", "name":
+      null}, {"input_variables": [], "template_format": "f-string", "content": [{"type":
+      "text", "text": "What is the capital of Japan?"}], "raw_request_display_role":
+      "", "dataset_examples": [], "role": "user", "name": null}], "functions": [],
+      "tools": null, "function_call": "none", "tool_choice": null, "type": "chat",
+      "input_variables": [], "dataset_examples": []}, "output": {"messages": [{"input_variables":
+      [], "template_format": "f-string", "content": [{"type": "text", "text": ""}],
+      "raw_request_display_role": "", "dataset_examples": [], "role": "system", "name":
+      null}, {"input_variables": [], "template_format": "f-string", "content": [{"type":
+      "text", "text": "What is the capital of Japan?"}], "raw_request_display_role":
+      "", "dataset_examples": [], "role": "user", "name": null}], "functions": [],
+      "tools": null, "function_call": "none", "tool_choice": null, "type": "chat",
+      "input_variables": [], "dataset_examples": []}, "request_start_time": 1744626112.7601638,
+      "request_end_time": 1744626112.7601643, "parameters": {}, "tags": [], "metadata":
+      {}, "prompt_name": null, "prompt_version_number": null, "prompt_input_variables":
+      {}, "input_tokens": 0, "output_tokens": 0, "price": 0.0, "function_name": "",
+      "score": 0}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '1347'
+      content-type:
+      - application/json
+      host:
+      - localhost:8000
+      user-agent:
+      - python-httpx/0.28.1
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/log-request
+  response:
+    body:
+      string: '{"id":130,"user_id":1,"prompt_id":null,"prompt_version_number":null,"prompt_input_variables":{},"provider_type":"openai","function_name":"","function_args":[],"function_kwargs":{"input":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":[],"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"parameters":{}},"request_response":{"output":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":[],"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]}},"request_start_time":"2025-04-14T10:21:52.760164","request_end_time":"2025-04-14T10:21:52.760164","is_sharable":false,"share_hash":"561672cb688836ec113a19469a75aa40","share_view_count":0,"is_starred":false,"price":0.0,"score":0,"engine":"gpt-4-mini","tokens":0,"input_tokens":0,"output_tokens":0,"workspace_id":1,"span_id":null,"created_at":"Mon,
+        14 Apr 2025 10:21:52 GMT","metadata":[],"scores":[],"type":"request","tags_array":[],"prompt_string":"","response_string":"What
+        is the capital of Japan?","prompt_version":{"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":[],"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"commit_message":null,"metadata":{"model":{"provider":"openai","name":"gpt-4-mini","parameters":{}}},"provider_base_url_name":null,"report_id":null,"inference_client_name":null}}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '2843'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:21:52 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 201
+      message: CREATED
+version: 1

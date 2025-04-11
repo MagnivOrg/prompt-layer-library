@@ -71,24 +71,17 @@ class PromptLayer(PromptLayerMixin):
         if name == "openai":
             import openai as openai_module
 
-            openai = PromptLayerBase(
-                openai_module,
-                function_name="openai",
-                api_key=self.api_key,
-                tracer=self.tracer,
-            )
-            return openai
+            return PromptLayerBase(openai_module, function_name="openai", api_key=self.api_key, tracer=self.tracer)
         elif name == "anthropic":
             import anthropic as anthropic_module
 
-            anthropic = PromptLayerBase(
+            return PromptLayerBase(
                 anthropic_module,
                 function_name="anthropic",
                 provider_type="anthropic",
                 api_key=self.api_key,
                 tracer=self.tracer,
             )
-            return anthropic
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 
@@ -290,8 +283,8 @@ class PromptLayer(PromptLayerMixin):
                         raise Exception(json.dumps(results, indent=4))
 
             return results
-        except Exception as e:
-            raise Exception(f"Error running workflow: {str(e)}")
+        except Exception as ex:
+            raise Exception(f"Error running workflow: {str(ex)}") from ex
 
     def log_request(
         self,

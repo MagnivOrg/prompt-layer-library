@@ -26,6 +26,61 @@ from promptlayer.types.prompt_template import (
 )
 
 URL_API_PROMPTLAYER = os.environ.setdefault("URL_API_PROMPTLAYER", "https://api.promptlayer.com")
+WORKFLOWS_RUN_URL = URL_API_PROMPTLAYER + "/workflows/{}/run"
+WS_TOKEN_REQUEST_LIBRARY_URL = URL_API_PROMPTLAYER + "/ws-token-request-library"
+
+SET_WORKFLOW_COMPLETE_MESSAGE = "SET_WORKFLOW_COMPLETE"
+
+
+class FinalOutputCode(Enum):
+    OK = "OK"
+    EXCEEDS_SIZE_LIMIT = "EXCEEDS_SIZE_LIMIT"
+
+
+async def _get_final_output(execution_id: int, return_all_outputs: bool, *, headers: Dict[str, str]) -> Dict[str, Any]:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{URL_API_PROMPTLAYER}/workflow-version-execution-results",
+            headers=headers,
+            params={"workflow_version_execution_id": execution_id, "return_all_outputs": return_all_outputs},
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def _make_message_listener(results_future, execution_id, return_all_outputs, headers):
+    async def message_listener(message: Message):
+        if message.name != SET_WORKFLOW_COMPLETE_MESSAGE:  # TODO(dmu) LOW: Do we really need this check?
+            return
+
+        message_data = json.loads(message.data)
+        result_code = message_data.get("result_code")
+        if result_code in (FinalOutputCode.OK.value, None):
+            results = message_data["final_output"]
+        elif result_code == FinalOutputCode.EXCEEDS_SIZE_LIMIT.value:
+            results = await _get_final_output(execution_id, return_all_outputs, headers=headers)
+        else:
+            raise NotImplementedError(f"Unsupported final output code: {result_code}")
+
+        results_future.set_result(results)
+
+    return message_listener
+
+
+async def _wait_for_workflow_completion(*, token, channel_name, execution_id, return_all_outputs, headers, timeout):
+    results = asyncio.Future()
+    message_listener = _make_message_listener(results, execution_id, return_all_outputs, headers)
+
+    client = AblyRealtime(token=token)
+    channel = client.channels.get(channel_name)
+    await channel.subscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
+    try:
+        return await asyncio.wait_for(results, timeout)
+    except asyncio.TimeoutError as ex:
+        raise Exception("Workflow execution did not complete properly") from ex
+    finally:
+        channel.unsubscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
+        await client.close()
 
 
 async def arun_workflow_request(
@@ -46,13 +101,10 @@ async def arun_workflow_request(
         "workflow_version_number": workflow_version_number,
         "return_all_outputs": return_all_outputs,
     }
-
-    url = f"{URL_API_PROMPTLAYER}/workflows/{workflow_name}/run"
     headers = {"X-API-KEY": api_key}
-
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=headers)
+            response = await client.post(WORKFLOWS_RUN_URL.format(workflow_name), json=payload, headers=headers)
             if response.status_code != 201:
                 raise_on_bad_response(
                     response,
@@ -60,28 +112,22 @@ async def arun_workflow_request(
                 )
 
             result = response.json()
-            warning = result.get("warning")
-            if warning:
+            if warning := result.get("warning"):
                 print(f"WARNING: {warning}")
 
-    except Exception as e:
-        error_message = f"Failed to run workflow: {str(e)}"
+    except Exception as ex:
+        error_message = f"Failed to run workflow: {str(ex)}"
         print(error_message)
         raise Exception(error_message)
 
-    execution_id = result.get("workflow_version_execution_id")
-    if not execution_id:
+    if not (execution_id := result.get("workflow_version_execution_id")):
         raise Exception("No execution ID returned from workflow run")
 
     channel_name = f"workflow_updates:{execution_id}"
-
-    # Get WebSocket token
     try:
         async with httpx.AsyncClient() as client:
             ws_response = await client.post(
-                f"{URL_API_PROMPTLAYER}/ws-token-request-library",
-                headers=headers,
-                params={"capability": channel_name},
+                WS_TOKEN_REQUEST_LIBRARY_URL, headers=headers, params={"capability": channel_name}
             )
             if ws_response.status_code != 201:
                 raise_on_bad_response(
@@ -89,44 +135,19 @@ async def arun_workflow_request(
                     "PromptLayer had the following error while getting WebSocket token",
                 )
             token_details = ws_response.json()["token_details"]
-    except Exception as e:
-        error_message = f"Failed to get WebSocket token: {e}"
+    except Exception as ex:
+        error_message = f"Failed to get WebSocket token: {ex}"
         print(error_message)
-        raise Exception(error_message)
+        raise Exception(error_message) from ex
 
-    # Initialize Ably client
-    ably_client = AblyRealtime(token=token_details["token"])
-
-    # Subscribe to the channel named after the execution ID
-    channel = ably_client.channels.get(channel_name)
-
-    results = None
-    message_received_event = asyncio.Event()
-
-    async def message_listener(message: Message):
-        nonlocal results
-
-        if message.name == "SET_WORKFLOW_COMPLETE":
-            message_data = json.loads(message.data)
-            results = message_data["final_output"]
-            message_received_event.set()
-
-    # Subscribe to the channel
-    await channel.subscribe("SET_WORKFLOW_COMPLETE", message_listener)
-
-    # Wait for the message or timeout
-    try:
-        await asyncio.wait_for(message_received_event.wait(), timeout)
-    except asyncio.TimeoutError:
-        channel.unsubscribe("SET_WORKFLOW_COMPLETE", message_listener)
-        await ably_client.close()
-        raise Exception("Workflow execution did not complete properly")
-
-    # Unsubscribe from the channel and close the client
-    channel.unsubscribe("SET_WORKFLOW_COMPLETE", message_listener)
-    await ably_client.close()
-
-    return results
+    return await _wait_for_workflow_completion(
+        token=token_details["token"],
+        channel_name=channel_name,
+        execution_id=execution_id,
+        return_all_outputs=return_all_outputs,
+        headers=headers,
+        timeout=timeout,
+    )
 
 
 def promptlayer_api_handler(
@@ -1813,7 +1834,7 @@ async def agoogle_request(request: GetPromptTemplateResponse, **kwargs):
 async def amap_google_stream_response(generator: AsyncIterable[Any]):
     from google.genai.chats import GenerateContentResponse
 
-    response = GenerateContentResponse()
+    GenerateContentResponse()
     content = ""
     async for result in generator:
         content = f"{content}{result.candidates[0].content.parts[0].text}"

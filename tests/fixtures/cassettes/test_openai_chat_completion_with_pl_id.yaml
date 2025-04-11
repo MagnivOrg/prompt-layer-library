@@ -1,0 +1,158 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of France?"}], "model": "gpt-3.5-turbo"}'
+    headers:
+      Authorization:
+      - sanitized
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '156'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.60.1
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.60.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.9.21
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n  \"id\": \"chatcmpl-BMF5LwsMO72CHnWgcbAnjfEmQBNrD\",\n  \"object\":
+        \"chat.completion\",\n  \"created\": 1744640903,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
+        \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
+        \"assistant\",\n        \"content\": \"The capital of France is Paris.\",\n
+        \       \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\":
+        null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\":
+        24,\n    \"completion_tokens\": 8,\n    \"total_tokens\": 32,\n    \"prompt_tokens_details\":
+        {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
+        {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\":
+        0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\":
+        \"default\",\n  \"system_fingerprint\": null\n}\n"
+    headers:
+      CF-RAY:
+      - 9303e3af6cd8c400-WAW
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 14:28:23 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=3wdOjuuM.rHpXdeK0QVNlO.JyHD39oAGuAxMasU_8rc-1744640903-1.0.1.1-NvlYqk5oPAdrFZJu1tWMvL4rOSpdI6WJPSWsurF81AfhH7_.ziZoBDXdqdkQOwWfUgiIg3N0LPq8fWmJReEi1UbFFf_yj8m_o.T.XP7SRUw;
+        path=/; expires=Mon, 14-Apr-25 14:58:23 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=3H5YNE.WZQDluf1GCd9NICuuD7ok1n__xYmXczeaUr0-1744640903981-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '822'
+      openai-organization:
+      - promptlayer-qcpdch
+      openai-processing-ms:
+      - '198'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '50000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '49999981'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_75c76b62b338f2dcbef3efa1fed3ad8f
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"function_name": "openai.OpenAI.chat.completions.create", "provider_type":
+      "openai", "args": [], "kwargs": {"model": "gpt-3.5-turbo", "messages": [{"role":
+      "system", "content": "You are a helpful assistant."}, {"role": "user", "content":
+      "What is the capital of France?"}]}, "tags": null, "request_response": {"id":
+      "chatcmpl-BMF5LwsMO72CHnWgcbAnjfEmQBNrD", "choices": [{"finish_reason": "stop",
+      "index": 0, "logprobs": null, "message": {"content": "The capital of France
+      is Paris.", "refusal": null, "role": "assistant", "audio": null, "function_call":
+      null, "tool_calls": null, "annotations": []}}], "created": 1744640903, "model":
+      "gpt-3.5-turbo-0125", "object": "chat.completion", "service_tier": "default",
+      "system_fingerprint": null, "usage": {"completion_tokens": 8, "prompt_tokens":
+      24, "total_tokens": 32, "completion_tokens_details": {"accepted_prediction_tokens":
+      0, "audio_tokens": 0, "reasoning_tokens": 0, "rejected_prediction_tokens": 0},
+      "prompt_tokens_details": {"audio_tokens": 0, "cached_tokens": 0}}}, "request_start_time":
+      1744640903.246829, "request_end_time": 1744640904.11391, "metadata": null, "span_id":
+      null, "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1186'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/track-request
+  response:
+    body:
+      string: '{"success":true,"request_id":143,"prompt_blueprint":null,"message":"Request
+        tracked successfully"}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '99'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 14:28:24 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

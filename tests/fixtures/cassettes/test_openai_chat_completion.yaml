@@ -1,0 +1,160 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of the United States?"}], "model":
+      "gpt-3.5-turbo"}'
+    headers:
+      Authorization:
+      - sanitized
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '167'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.60.1
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.60.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.9.21
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n  \"id\": \"chatcmpl-BMF5JYzBZVfT2ZlGYxqkF28JzXY40\",\n  \"object\":
+        \"chat.completion\",\n  \"created\": 1744640901,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
+        \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
+        \"assistant\",\n        \"content\": \"The capital of the United States is
+        Washington, D.C.\",\n        \"refusal\": null,\n        \"annotations\":
+        []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n
+        \   }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 26,\n    \"completion_tokens\":
+        13,\n    \"total_tokens\": 39,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\":
+        0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
+        {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\":
+        0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\":
+        \"default\",\n  \"system_fingerprint\": null\n}\n"
+    headers:
+      CF-RAY:
+      - 9303e3a389b7b2ae-WAW
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 14:28:22 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=asAq5.fAzn4GN3d3Clf7SMYh5fKPdxOfRtkg19TS.9s-1744640902-1.0.1.1-6GeWxM_pNOewi6QQm3ZMnQpdGNSsbKSpsCLUsOWp5SSzQFdqAO6AS2uDvRfde4.0faNtH5S88bAhahhTEA7rtCZ4TUXC0dKKy3Q2Uzbz5s8;
+        path=/; expires=Mon, 14-Apr-25 14:58:22 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=ssFq5AKYbNGAntlXKXazI26GSxiccoFDtBHzwfl2eSk-1744640902280-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '844'
+      openai-organization:
+      - promptlayer-qcpdch
+      openai-processing-ms:
+      - '378'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '50000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '49999979'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_06c8c965862225f458b19e76bf93ddad
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"function_name": "openai.OpenAI.chat.completions.create", "provider_type":
+      "openai", "args": [], "kwargs": {"model": "gpt-3.5-turbo", "messages": [{"role":
+      "system", "content": "You are a helpful assistant."}, {"role": "user", "content":
+      "What is the capital of the United States?"}]}, "tags": null, "request_response":
+      {"id": "chatcmpl-BMF5JYzBZVfT2ZlGYxqkF28JzXY40", "choices": [{"finish_reason":
+      "stop", "index": 0, "logprobs": null, "message": {"content": "The capital of
+      the United States is Washington, D.C.", "refusal": null, "role": "assistant",
+      "audio": null, "function_call": null, "tool_calls": null, "annotations": []}}],
+      "created": 1744640901, "model": "gpt-3.5-turbo-0125", "object": "chat.completion",
+      "service_tier": "default", "system_fingerprint": null, "usage": {"completion_tokens":
+      13, "prompt_tokens": 26, "total_tokens": 39, "completion_tokens_details": {"accepted_prediction_tokens":
+      0, "audio_tokens": 0, "reasoning_tokens": 0, "rejected_prediction_tokens": 0},
+      "prompt_tokens_details": {"audio_tokens": 0, "cached_tokens": 0}}}, "request_start_time":
+      1744640901.32603, "request_end_time": 1744640902.440252, "metadata": null, "span_id":
+      null, "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1219'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/track-request
+  response:
+    body:
+      string: '{"success":true,"request_id":142,"prompt_blueprint":null,"message":"Request
+        tracked successfully"}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '99'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 14:28:23 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

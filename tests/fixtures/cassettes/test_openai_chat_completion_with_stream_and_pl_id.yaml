@@ -1,0 +1,177 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of Italy?"}], "model": "gpt-3.5-turbo",
+      "stream": true}'
+    headers:
+      Authorization:
+      - sanitized
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '169'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.60.1
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.60.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.9.21
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: 'data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"role":"assistant","content":"","refusal":null},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"The"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"
+        capital"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"
+        of"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"
+        Italy"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"
+        is"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"
+        Rome"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{"content":"."},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR","object":"chat.completion.chunk","created":1744735149,"model":"gpt-3.5-turbo-0125","service_tier":"default","system_fingerprint":null,"choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":"stop"}]}
+
+
+        data: [DONE]
+
+
+        '
+    headers:
+      CF-RAY:
+      - 930ce09aae13bfbc-WAW
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 15 Apr 2025 16:39:09 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=iGtr_.vGSmOCmTF9hbdxNTjlcDfcQehHfMag920d_aQ-1744735149-1.0.1.1-wCMVcusdGOgqys.g9R5OpprsTBuGJMzZGe_BKMH1Or.Mb_mf11xbysmuTSlkmgQA0cuOtNbGm_3ORj2agRByRKu.QBLhMBd4NMOUlKYK.B4;
+        path=/; expires=Tue, 15-Apr-25 17:09:09 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=8PlnNLIPphAcygLXAO0anovDq9JtTy5Ct6To3J2Vbwo-1744735149686-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - promptlayer-qcpdch
+      openai-processing-ms:
+      - '157'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '50000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '49999982'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_1b7e6816013de365ec635a31eeb2da14
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"function_name": "openai.OpenAI.chat.completions.create", "provider_type":
+      "openai", "args": [], "kwargs": {"model": "gpt-3.5-turbo", "messages": [{"role":
+      "system", "content": "You are a helpful assistant."}, {"role": "user", "content":
+      "What is the capital of Italy?"}], "stream": true}, "tags": null, "request_response":
+      {"id": "chatcmpl-BMdbRwh3IezC3YV86Kga7wqbM1eTR", "choices": [{"role": "assistant",
+      "content": "The capital of Italy is Rome."}], "created": 1744735149, "model":
+      "gpt-3.5-turbo-0125", "object": "chat.completion.chunk", "service_tier": "default",
+      "system_fingerprint": null, "usage": null}, "request_start_time": 1744735148.737197,
+      "request_end_time": 1744735149.818011, "metadata": null, "span_id": null, "api_key":
+      "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '778'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/track-request
+  response:
+    body:
+      string: '{"success":true,"request_id":193,"prompt_blueprint":null,"message":"Request
+        tracked successfully"}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '99'
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 15 Apr 2025 16:39:09 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

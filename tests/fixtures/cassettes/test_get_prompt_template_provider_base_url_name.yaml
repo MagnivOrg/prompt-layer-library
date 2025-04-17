@@ -1,0 +1,98 @@
+interactions:
+- request:
+    body: '{"prompt_template": {"provider_base_url_name": "does_not_exist", "prompt_name":
+      "test_template:test", "prompt_template": {"type": "chat", "provider_base_url_name":
+      "does_not_exist", "messages": [{"content": [{"text": "You are an AI.", "type":
+      "text"}], "input_variables": [], "name": null, "raw_request_display_role": "",
+      "role": "system", "template_format": "f-string"}, {"content": [{"text": "What
+      is the capital of Japan?", "type": "text"}], "input_variables": [], "name":
+      null, "raw_request_display_role": "", "role": "user", "template_format": "f-string"}]}},
+      "prompt_version": {"provider_base_url_name": "does_not_exist", "prompt_name":
+      "test_template:test", "prompt_template": {"type": "chat", "provider_base_url_name":
+      "does_not_exist", "messages": [{"content": [{"text": "You are an AI.", "type":
+      "text"}], "input_variables": [], "name": null, "raw_request_display_role": "",
+      "role": "system", "template_format": "f-string"}, {"content": [{"text": "What
+      is the capital of Japan?", "type": "text"}], "input_variables": [], "name":
+      null, "raw_request_display_role": "", "role": "user", "template_format": "f-string"}]}},
+      "release_labels": null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1151'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/rest/prompt-templates
+  response:
+    body:
+      string: '{"id":5,"prompt_name":"test_template:test","tags":[],"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"You
+        are an AI."}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":null,"tools":null,"function_call":null,"tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"commit_message":null,"metadata":null,"release_labels":null}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '655'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 11:27:33 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 201
+      message: CREATED
+- request:
+    body: '{"provider": "openai", "model": "gpt-3.5-turbo", "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '98'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/prompt-templates/test_template:test
+  response:
+    body:
+      string: '{"id":5,"prompt_name":"test_template:test","tags":[],"workspace_id":1,"commit_message":null,"metadata":null,"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"You
+        are an AI."}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":null,"tools":null,"function_call":null,"tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"llm_kwargs":{"messages":[{"role":"system","content":"You
+        are an AI."},{"role":"user","content":[{"type":"text","text":"What is the
+        capital of Japan?"}]}]},"provider_base_url":null,"version":1,"snippets":[],"warning":null}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '872'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 11:27:33 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

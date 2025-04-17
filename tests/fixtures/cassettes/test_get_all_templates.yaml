@@ -1,0 +1,55 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.31.0
+      x-api-key:
+      - sanitized
+    method: GET
+    uri: http://localhost:8000/prompt-templates?page=1&per_page=30
+  response:
+    body:
+      string: '{"items":[{"id":4,"prompt_name":"sample_template","tags":["test"],"folder_id":null,"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":[],"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"version":1,"commit_message":"test","metadata":{"model":{"provider":"openai","name":"gpt-4o-mini","parameters":{"frequency_penalty":0,"max_tokens":256,"messages":[{"content":"Hello","role":"system"}],"model":"gpt-4o","presence_penalty":0,"seed":0,"temperature":1,"top_p":1}}},"parent_folder_name":null,"full_folder_path":null},{"id":3,"prompt_name":"simple","tags":[],"folder_id":null,"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"You
+        are helpful assistant"}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"Reply
+        with Hey"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":null,"tools":null,"function_call":null,"tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"version":1,"commit_message":null,"metadata":null,"parent_folder_name":null,"full_folder_path":null},{"id":1,"prompt_name":"Example:
+        page_title","tags":[],"folder_id":null,"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"You
+        are a helpful AI assistant. You work for an online media organization called
+        BuzzFeed.\n\nYour task is to create catchy article titles based on a summary.
+        The titles should be no more than 10 words. The titles should have no emojis.\n\nThe
+        goal is to write catchy & easy to write blog post titles. These titles should
+        be \"clickbait\" and encourage users to click on the blog.\n\nThe user will
+        provide a blog post abstract summary as well as a topic keyword. You will
+        respond with a title. Don''t use quotes in the title."}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"#
+        Topic\nTravel\n\n# Summary\nWanderlust calling? Check out our curated list
+        of 10 awe-inspiring travel destinations that should be on every adventurer''s
+        bucket list. From tropical paradises to historic cities, these places offer
+        unforgettable experiences. Get ready to fuel your wanderlust and start planning
+        your next getaway!"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"The
+        Ultimate Travel Bucket List: 10 Breathtaking Destinations to Visit"}],"raw_request_display_role":"","dataset_examples":[],"role":"assistant","function_call":null,"name":null,"tool_calls":null},{"input_variables":["article","topic"],"template_format":"f-string","content":[{"type":"text","text":"#
+        Topic\n{topic}\n\n# Summary\n{article}"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":null,"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":["article","topic"],"dataset_examples":[]},"version":6,"commit_message":"No
+        quotes, higher temp","metadata":{"model":{"provider":"openai","name":"gpt-3.5-turbo","parameters":{"best_of":1,"frequency_penalty":0,"max_tokens":256,"presence_penalty":0,"temperature":1.2,"top_p":1}}},"parent_folder_name":null,"full_folder_path":null}],"has_prev":false,"has_next":false,"prev_num":null,"next_num":null,"page":1,"pages":1,"per_page":30,"total":3}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '3977'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:53:02 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

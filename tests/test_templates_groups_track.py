@@ -1,66 +1,92 @@
-import datetime
-import os
-
-from promptlayer import PromptLayer
+from tests.utils.vcr import assert_played
 
 
-def test_track_and_templates():
-    promptlayer = PromptLayer(api_key=os.environ.get("PROMPTLAYER_API_KEY"))
-    OpenAI = promptlayer.openai.OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-    template_name = f"test_template:{datetime.datetime.now()}"
-    template_content = {
-        "dataset_examples": [],
-        "function_call": "none",
-        "functions": [],
-        "input_variables": [],
-        "messages": [
-            {
-                "content": [{"text": "", "type": "text"}],
-                "dataset_examples": [],
-                "input_variables": [],
-                "name": None,
-                "raw_request_display_role": "",
-                "role": "system",
-                "template_format": "f-string",
+def test_track_and_templates(sample_template_name, promptlayer_client, openai_client):
+    # TODO(dmu) HIGH: Improve asserts in this test
+    with assert_played("test_track_and_templates.yaml"):
+        response = promptlayer_client.templates.get(
+            sample_template_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
+        )
+        assert response == {
+            "id": 4,
+            "prompt_name": "sample_template",
+            "tags": ["test"],
+            "workspace_id": 1,
+            "commit_message": "test",
+            "metadata": {
+                "model": {
+                    "provider": "openai",
+                    "name": "gpt-4o-mini",
+                    "parameters": {
+                        "frequency_penalty": 0,
+                        "max_tokens": 256,
+                        "messages": [{"content": "Hello", "role": "system"}],
+                        "model": "gpt-4o",
+                        "presence_penalty": 0,
+                        "seed": 0,
+                        "temperature": 1,
+                        "top_p": 1,
+                    },
+                }
             },
-            {
-                "content": [{"text": "what is the capital of Japan?", "type": "text"}],
-                "dataset_examples": [],
+            "prompt_template": {
+                "messages": [
+                    {
+                        "input_variables": [],
+                        "template_format": "f-string",
+                        "content": [{"type": "text", "text": ""}],
+                        "raw_request_display_role": "",
+                        "dataset_examples": [],
+                        "role": "system",
+                        "name": None,
+                    },
+                    {
+                        "input_variables": [],
+                        "template_format": "f-string",
+                        "content": [{"type": "text", "text": "What is the capital of Japan?"}],
+                        "raw_request_display_role": "",
+                        "dataset_examples": [],
+                        "role": "user",
+                        "name": None,
+                    },
+                ],
+                "functions": [],
+                "tools": None,
+                "function_call": "none",
+                "tool_choice": None,
+                "type": "chat",
                 "input_variables": [],
-                "name": None,
-                "raw_request_display_role": "",
-                "role": "user",
-                "template_format": "f-string",
+                "dataset_examples": [],
             },
-        ],
-        "tool_choice": None,
-        "tools": None,
-        "type": "chat",
-    }
-    promptlayer.templates.publish({"prompt_name": template_name, "prompt_template": template_content})
-    get_response = promptlayer.templates.get(template_name, {"provider": "openai", "model": "gpt-3.5-turbo"})
+            "llm_kwargs": {
+                "messages": [{"content": "Hello", "role": "system"}],
+                "model": "gpt-4o",
+                "frequency_penalty": 0,
+                "max_tokens": 256,
+                "presence_penalty": 0,
+                "seed": 0,
+                "temperature": 1,
+                "top_p": 1,
+            },
+            "provider_base_url": None,
+            "version": 1,
+            "snippets": [],
+            "warning": None,
+        }
 
-    assert get_response["prompt_name"] == template_name
-    assert get_response["prompt_template"] == template_content
-    completion, pl_id = client.chat.completions.create(
-        return_pl_id=True, model="gpt-3.5-turbo", **get_response["llm_kwargs"]
-    )
-    score = promptlayer.track.score(request_id=pl_id, score_name="accuracy", score=10)
-    metadata = promptlayer.track.metadata(request_id=pl_id, metadata={"test": "test"})
-    assert score is not None
-    assert metadata is not None
+        llm_kwargs = response["llm_kwargs"].copy()
+        llm_kwargs.pop("model", None)
+        _, pl_id = openai_client.chat.completions.create(return_pl_id=True, model="gpt-3.5-turbo", **llm_kwargs)
+        assert promptlayer_client.track.score(request_id=pl_id, score_name="accuracy", score=10) is not None
+        assert promptlayer_client.track.metadata(request_id=pl_id, metadata={"test": "test"})
 
-    group_id = promptlayer.group.create()
-    assert isinstance(group_id, int)
-
-    track_group = promptlayer.track.group(request_id=pl_id, group_id=group_id)
-    assert track_group is not None
+        group_id = promptlayer_client.group.create()
+        assert isinstance(group_id, int)
+        assert promptlayer_client.track.group(request_id=pl_id, group_id=group_id)
 
 
-def test_get_all_templates():
-    promptlayer = PromptLayer(api_key=os.getenv("PROMPTLAYER_API_KEY"))
-    all_templates = promptlayer.templates.all()
-
+def test_get_all_templates(promptlayer_client):
+    with assert_played("test_get_all_templates.yaml"):
+        all_templates = promptlayer_client.templates.all()
     assert isinstance(all_templates, list)
     assert len(all_templates) > 0

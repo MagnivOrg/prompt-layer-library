@@ -1,0 +1,158 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of Spain?"}], "model": "gpt-3.5-turbo"}'
+    headers:
+      Authorization:
+      - sanitized
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '155'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.60.1
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.60.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.9.21
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n  \"id\": \"chatcmpl-BMF5PSareXOsQYsC6m0ZnUiZe9zRF\",\n  \"object\":
+        \"chat.completion\",\n  \"created\": 1744640907,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
+        \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
+        \"assistant\",\n        \"content\": \"The capital of Spain is Madrid.\",\n
+        \       \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\":
+        null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\":
+        24,\n    \"completion_tokens\": 8,\n    \"total_tokens\": 32,\n    \"prompt_tokens_details\":
+        {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
+        {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\":
+        0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\":
+        \"default\",\n  \"system_fingerprint\": null\n}\n"
+    headers:
+      CF-RAY:
+      - 9303e3c84eaf028d-WAW
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 14:28:28 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=yGQsBej6ZdooDKD3nbgyNAc7HEQhihhK43OTMSdmmUw-1744640908-1.0.1.1-arrO5aZwzfXaxJ0G7s6zelVqazVdgZArOdj67sqyAGAv2ksu.9g46pt.mjl37VojQV8bx0mkAYirbBsKKyvDAhRBmy2yQXK7C5AMLSv.skE;
+        path=/; expires=Mon, 14-Apr-25 14:58:28 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=o9lJW29lcd4Vmp0bHZ190SPyYzO4etEkW68VLJZynO8-1744640908222-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '822'
+      openai-organization:
+      - promptlayer-qcpdch
+      openai-processing-ms:
+      - '490'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '50000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '49999982'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_49da8b49147700184eec1d3835fff43f
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"function_name": "openai.AsyncOpenAI.chat.completions.create", "provider_type":
+      "openai", "args": [], "kwargs": {"model": "gpt-3.5-turbo", "messages": [{"role":
+      "system", "content": "You are a helpful assistant."}, {"role": "user", "content":
+      "What is the capital of Spain?"}]}, "tags": null, "request_response": {"id":
+      "chatcmpl-BMF5PSareXOsQYsC6m0ZnUiZe9zRF", "choices": [{"finish_reason": "stop",
+      "index": 0, "logprobs": null, "message": {"content": "The capital of Spain is
+      Madrid.", "refusal": null, "role": "assistant", "audio": null, "function_call":
+      null, "tool_calls": null, "annotations": []}}], "created": 1744640907, "model":
+      "gpt-3.5-turbo-0125", "object": "chat.completion", "service_tier": "default",
+      "system_fingerprint": null, "usage": {"completion_tokens": 8, "prompt_tokens":
+      24, "total_tokens": 32, "completion_tokens_details": {"accepted_prediction_tokens":
+      0, "audio_tokens": 0, "reasoning_tokens": 0, "rejected_prediction_tokens": 0},
+      "prompt_tokens_details": {"audio_tokens": 0, "cached_tokens": 0}}}, "request_start_time":
+      1744640907.141194, "request_end_time": 1744640908.310717, "metadata": null,
+      "span_id": null, "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1191'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/track-request
+  response:
+    body:
+      string: '{"success":true,"request_id":146,"prompt_blueprint":null,"message":"Request
+        tracked successfully"}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '99'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 14:28:28 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

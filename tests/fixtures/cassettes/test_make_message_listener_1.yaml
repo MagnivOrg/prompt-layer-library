@@ -1,0 +1,38 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - localhost:8000
+      user-agent:
+      - python-httpx/0.28.1
+      x-api-key:
+      - sanitized
+    method: GET
+    uri: http://localhost:8000/workflow-version-execution-results?workflow_version_execution_id=717&return_all_outputs=true
+  response:
+    body:
+      string: '{"Node 1":{"status":"SUCCESS","value":"AAA","error_message":null,"raw_error_message":null,"is_output_node":true}}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '114'
+      Content-Type:
+      - application/json
+      Date:
+      - Fri, 11 Apr 2025 17:44:48 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

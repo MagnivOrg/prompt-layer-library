@@ -1,0 +1,64 @@
+interactions:
+- request:
+    body: '{"prompt_template": {"prompt_name": "sample_template", "prompt_template":
+      {"dataset_examples": [], "function_call": "none", "functions": [], "input_variables":
+      [], "messages": [{"content": [{"text": "", "type": "text"}], "dataset_examples":
+      [], "input_variables": [], "name": null, "raw_request_display_role": "", "role":
+      "system", "template_format": "f-string"}, {"content": [{"text": "What is the
+      capital of Japan?", "type": "text"}], "dataset_examples": [], "input_variables":
+      [], "name": null, "raw_request_display_role": "", "role": "user", "template_format":
+      "f-string"}], "tool_choice": null, "tools": null, "type": "chat"}, "tags": ["test"],
+      "commit_message": "test", "metadata": {"model": {"name": "gpt-4o-mini", "provider":
+      "openai", "parameters": {"frequency_penalty": 0, "max_tokens": 256, "messages":
+      [{"content": "Hello", "role": "system"}], "model": "gpt-4o", "presence_penalty":
+      0, "seed": 0, "temperature": 1, "top_p": 1}}}}, "prompt_version": {"prompt_name":
+      "sample_template", "prompt_template": {"dataset_examples": [], "function_call":
+      "none", "functions": [], "input_variables": [], "messages": [{"content": [{"text":
+      "", "type": "text"}], "dataset_examples": [], "input_variables": [], "name":
+      null, "raw_request_display_role": "", "role": "system", "template_format": "f-string"},
+      {"content": [{"text": "What is the capital of Japan?", "type": "text"}], "dataset_examples":
+      [], "input_variables": [], "name": null, "raw_request_display_role": "", "role":
+      "user", "template_format": "f-string"}], "tool_choice": null, "tools": null,
+      "type": "chat"}, "tags": ["test"], "commit_message": "test", "metadata": {"model":
+      {"name": "gpt-4o-mini", "provider": "openai", "parameters": {"frequency_penalty":
+      0, "max_tokens": 256, "messages": [{"content": "Hello", "role": "system"}],
+      "model": "gpt-4o", "presence_penalty": 0, "seed": 0, "temperature": 1, "top_p":
+      1}}}}, "release_labels": null}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1907'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/rest/prompt-templates
+  response:
+    body:
+      string: '{"id":4,"prompt_name":"sample_template","tags":["test"],"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":[],"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"commit_message":"test","metadata":{"model":{"provider":"openai","name":"gpt-4o-mini","parameters":{"frequency_penalty":0,"max_tokens":256,"messages":[{"content":"Hello","role":"system"}],"model":"gpt-4o","presence_penalty":0,"seed":0,"temperature":1,"top_p":1}}},"release_labels":null}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '870'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 08:48:13 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 201
+      message: CREATED
+version: 1

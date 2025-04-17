@@ -1,0 +1,342 @@
+interactions:
+- request:
+    body: '{"provider": "openai", "model": "gpt-3.5-turbo", "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '98'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/prompt-templates/sample_template
+  response:
+    body:
+      string: '{"id":4,"prompt_name":"sample_template","tags":["test"],"workspace_id":1,"commit_message":"test","metadata":{"model":{"provider":"openai","name":"gpt-4o-mini","parameters":{"frequency_penalty":0,"max_tokens":256,"messages":[{"content":"Hello","role":"system"}],"model":"gpt-4o","presence_penalty":0,"seed":0,"temperature":1,"top_p":1}}},"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":""}],"raw_request_display_role":"","dataset_examples":[],"role":"system","name":null},{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"What
+        is the capital of Japan?"}],"raw_request_display_role":"","dataset_examples":[],"role":"user","name":null}],"functions":[],"tools":null,"function_call":"none","tool_choice":null,"type":"chat","input_variables":[],"dataset_examples":[]},"llm_kwargs":{"messages":[{"content":"Hello","role":"system"}],"model":"gpt-4o","frequency_penalty":0,"max_tokens":256,"presence_penalty":0,"seed":0,"temperature":1,"top_p":1},"provider_base_url":null,"version":1,"snippets":[],"warning":null}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '1107'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:48:24 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"content": "Hello", "role": "system"}], "model": "gpt-3.5-turbo",
+      "frequency_penalty": 0, "max_tokens": 256, "presence_penalty": 0, "seed": 0,
+      "temperature": 1, "top_p": 1}'
+    headers:
+      Authorization:
+      - sanitized
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '169'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.60.1
+      x-stainless-arch:
+      - x64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - Linux
+      x-stainless-package-version:
+      - 1.60.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.9.21
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n  \"id\": \"chatcmpl-BMBeSHzYtFfWOaJukmxcQxflVDr5S\",\n  \"object\":
+        \"chat.completion\",\n  \"created\": 1744627704,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
+        \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
+        \"assistant\",\n        \"content\": \"Hello! How can I assist you today?\",\n
+        \       \"refusal\": null,\n        \"annotations\": []\n      },\n      \"logprobs\":
+        null,\n      \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\":
+        8,\n    \"completion_tokens\": 10,\n    \"total_tokens\": 18,\n    \"prompt_tokens_details\":
+        {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
+        {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\":
+        0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\":
+        \"default\",\n  \"system_fingerprint\": null\n}\n"
+    headers:
+      CF-RAY:
+      - 9302a1731995b243-WAW
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:48:25 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=dkxNTdwzyxu8C_XBrYGCBAIev6t5Rb9LOD0RScWu3Hw-1744627705-1.0.1.1-2P3mi4WpCJJUE82kaE7nJw1gaDRRSj.wiDv9ZhaeWkxJerxuvAb.AWlvlLTJg41n3_56LUg_bKyWkJzRvMBL93JV1q.IZQ8Fg3Heo.DAHas;
+        path=/; expires=Mon, 14-Apr-25 11:18:25 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=r5S0oTEM7vtkEpEEeOj.TuhQ5P0mhmRWZY87g0PtRXw-1744627705219-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '825'
+      openai-organization:
+      - promptlayer-qcpdch
+      openai-processing-ms:
+      - '229'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '50000000'
+      x-ratelimit-remaining-requests:
+      - '9999'
+      x-ratelimit-remaining-tokens:
+      - '49999995'
+      x-ratelimit-reset-requests:
+      - 6ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_86424c52e8d7f558b64fce8ed9457451
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"function_name": "openai.OpenAI.chat.completions.create", "provider_type":
+      "openai", "args": [], "kwargs": {"model": "gpt-3.5-turbo", "messages": [{"content":
+      "Hello", "role": "system"}], "frequency_penalty": 0, "max_tokens": 256, "presence_penalty":
+      0, "seed": 0, "temperature": 1, "top_p": 1}, "tags": null, "request_response":
+      {"id": "chatcmpl-BMBeSHzYtFfWOaJukmxcQxflVDr5S", "choices": [{"finish_reason":
+      "stop", "index": 0, "logprobs": null, "message": {"content": "Hello! How can
+      I assist you today?", "refusal": null, "role": "assistant", "audio": null, "function_call":
+      null, "tool_calls": null, "annotations": []}}], "created": 1744627704, "model":
+      "gpt-3.5-turbo-0125", "object": "chat.completion", "service_tier": "default",
+      "system_fingerprint": null, "usage": {"completion_tokens": 10, "prompt_tokens":
+      8, "total_tokens": 18, "completion_tokens_details": {"accepted_prediction_tokens":
+      0, "audio_tokens": 0, "reasoning_tokens": 0, "rejected_prediction_tokens": 0},
+      "prompt_tokens_details": {"audio_tokens": 0, "cached_tokens": 0}}}, "request_start_time":
+      1744627704.311881, "request_end_time": 1744627705.33816, "metadata": null, "span_id":
+      null, "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1210'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/track-request
+  response:
+    body:
+      string: '{"success":true,"request_id":132,"prompt_blueprint":null,"message":"Request
+        tracked successfully"}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '99'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:48:25 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"request_id": 132, "score": 10, "name": "accuracy", "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '102'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/library-track-score
+  response:
+    body:
+      string: '{"success":true}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '17'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:48:25 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"request_id": 132, "metadata": {"test": "test"}, "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '99'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/library-track-metadata
+  response:
+    body:
+      string: '{"success":true}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '17'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:48:25 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '50'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/create-group
+  response:
+    body:
+      string: '{"success":true,"id":1}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '24'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:48:25 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"request_id": 132, "group_id": 1, "api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '84'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.31.0
+    method: POST
+    uri: http://localhost:8000/track-group
+  response:
+    body:
+      string: '{"success":true}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '17'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 14 Apr 2025 10:48:25 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 200
+      message: OK
+version: 1

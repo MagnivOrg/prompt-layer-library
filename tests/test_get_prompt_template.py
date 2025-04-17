@@ -1,15 +1,9 @@
-import datetime
-import os
-
-from promptlayer import PromptLayer
+from tests.utils.vcr import assert_played
 
 
-def test_get_prompt_template_provider_base_url_name(capsys):
-    promptlayer = PromptLayer(api_key=os.environ.get("PROMPTLAYER_API_KEY"))
-
-    prompt_registry_name = f"test_template:{datetime.datetime.now()}"
+def test_get_prompt_template_provider_base_url_name(capsys, promptlayer_client):
+    # TODO(dmu) HIGH: Improve assertions for this test
     provider_base_url_name = "does_not_exist"
-
     prompt_template = {
         "type": "chat",
         "provider_base_url_name": provider_base_url_name,
@@ -33,14 +27,16 @@ def test_get_prompt_template_provider_base_url_name(capsys):
         ],
     }
 
-    promptlayer.templates.publish(
-        {
-            "provider_base_url_name": provider_base_url_name,
-            "prompt_name": prompt_registry_name,
-            "prompt_template": prompt_template,
-        }
-    )
-
-    get_response = promptlayer.templates.get(prompt_registry_name, {"provider": "openai", "model": "gpt-3.5-turbo"})
-
-    assert get_response["provider_base_url"] is None
+    prompt_registry_name = "test_template:test"
+    with assert_played("test_get_prompt_template_provider_base_url_name.yaml"):
+        promptlayer_client.templates.publish(
+            {
+                "provider_base_url_name": provider_base_url_name,
+                "prompt_name": prompt_registry_name,
+                "prompt_template": prompt_template,
+            }
+        )
+        response = promptlayer_client.templates.get(
+            prompt_registry_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
+        )
+        assert response["provider_base_url"] is None

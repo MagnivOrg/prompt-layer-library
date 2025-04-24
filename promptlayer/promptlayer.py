@@ -156,7 +156,6 @@ class PromptLayer(PromptLayerMixin):
                 ),
                 llm_request_params["stream_function"],
             )
-
         request_log = self._track_request_log(
             llm_request_params,
             tags,
@@ -164,7 +163,7 @@ class PromptLayer(PromptLayerMixin):
             group_id,
             pl_run_span_id,
             metadata=metadata,
-            request_response=response.model_dump(),
+            request_response=response.model_dump(mode="json"),
         )
 
         return {
@@ -578,7 +577,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             group_id,
             pl_run_span_id,
             metadata=metadata,
-            request_response=response.model_dump(),
+            request_response=response.model_dump(mode="json"),
         )
 
         return {

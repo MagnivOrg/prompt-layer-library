@@ -1606,6 +1606,21 @@ files = [
 pytest = ">=5.3.1"
 
 [[package]]
+name = "pytest-parametrize-cases"
+version = "0.1.2"
+description = "A more user-friendly way to write parametrized tests."
+optional = false
+python-versions = ">=3.8,<4.0"
+groups = ["dev"]
+files = [
+    {file = "pytest-parametrize-cases-0.1.2.tar.gz", hash = "sha256:e112425a7baaf4f72de4881a539270ac847696d8cb0b7e74f5549cee02767c12"},
+    {file = "pytest_parametrize_cases-0.1.2-py3-none-any.whl", hash = "sha256:aefc24ca8aebf4255a2b75ecbe5a70c49ef5c22d28d25462f2eebdcb15529f4c"},
+]
+
+[package.dependencies]
+pytest = ">=6.1.2"
+
+[[package]]
 name = "pyyaml"
 version = "6.0.2"
 description = "YAML parser and emitter for Python"
@@ -2144,4 +2159,4 @@ test = ["big-O", "importlib-resources ; python_version < \"3.9\"", "jaraco.funct
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "11b2f8555bec0f0cbcd5f67099954b35bfb2e19652c66b50f8cc382c6fd6c59e"
+content-hash = "f8590bd85ffdb758c6d10829dad6149a2520043f79d115777b0078ffeeec9ee9"

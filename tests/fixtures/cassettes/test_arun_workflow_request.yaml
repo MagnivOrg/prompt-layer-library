@@ -1,6 +1,6 @@
 interactions:
 - request:
-    body: '{"input_variables":{"var1":"value1"},"metadata":null,"workflow_label_name":null,"workflow_version_number":null,"return_all_outputs":false}'
+    body: ''
     headers:
       accept:
       - '*/*'
@@ -8,37 +8,33 @@ interactions:
       - gzip, deflate
       connection:
       - keep-alive
-      content-length:
-      - '138'
-      content-type:
-      - application/json
       host:
       - localhost:8000
       user-agent:
       - python-httpx/0.28.1
       x-api-key:
       - sanitized
-    method: POST
-    uri: http://localhost:8000/workflows/analyze_1/run
+    method: GET
+    uri: http://localhost:8000/workflows/analyze_1
   response:
     body:
-      string: '{"success":true,"message":"Workflow execution created successfully","warning":null,"workflow_version_execution_id":722}
+      string: '{"success":true,"workflow":{"id":3,"workspace_id":1,"user_id":null,"name":"analyze_1","is_draft":false,"is_deleted":false}}
 
         '
     headers:
       Connection:
       - close
       Content-Length:
-      - '120'
+      - '124'
       Content-Type:
       - application/json
       Date:
-      - Sun, 13 Apr 2025 15:34:16 GMT
+      - Thu, 01 May 2025 16:10:30 GMT
       Server:
       - gunicorn
     status:
-      code: 201
-      message: CREATED
+      code: 200
+      message: OK
 - request:
     body: ''
     headers:
@@ -57,21 +53,63 @@ interactions:
       x-api-key:
       - sanitized
     method: POST
-    uri: http://localhost:8000/ws-token-request-library?capability=workflow_updates%3A722
+    uri: http://localhost:8000/ws-token-request-library?capability=workflows%3A3%3Arun%3A8dd7e4d404754c60a50e78f70f74aade
   response:
     body:
-      string: '{"success":true,"token_details":{"expires":1744562056416,"token":"uV0vXQ.sanitized","issued":1744558456416,"capability":{"user:1":["presence","subscribe"],"workflow_updates:722":["presence","subscribe"]},"clientId":"1"}}
+      string: '{"success":true,"token_details":{"expires":1746119430452,"token":"uV0vXQ.JAcrUQfVqw-T7-Rlm000FrnEV3UAXYba0goN5h9XPQ7OrNfb5uq1juDZjNTFUWP9T6Gvvt3a0zzVfyuud8s9_uUFWB5Xu5pFLkbrAq1Le9BVvUhhCDdmOPzZVwKZRxJgRBQw7A7o6AABMcItiaennjFKUltTGmawIsX3kCEyBRiNluPC0k5SRhXTPfIC1gidZ3PZGHNB-PN1IDxqZVBlld5NwU2iLg-UQcvMR3fzRz-8SQQ9cDFp1HlEq38JNGvxA","issued":1746115830452,"capability":{"user:1":["presence","subscribe"],"workflows:3:run:8dd7e4d404754c60a50e78f70f74aade":["presence","subscribe"]},"clientId":"1"}}
 
         '
     headers:
       Connection:
       - close
       Content-Length:
-      - '427'
+      - '497'
       Content-Type:
       - application/json
       Date:
-      - Sun, 13 Apr 2025 15:34:16 GMT
+      - Thu, 01 May 2025 16:10:31 GMT
+      Server:
+      - gunicorn
+    status:
+      code: 201
+      message: CREATED
+- request:
+    body: '{"input_variables": {"var1": "value1"}, "metadata": null, "workflow_label_name":
+      null, "workflow_version_number": null, "return_all_outputs": false, "channel_name_suffix":
+      "8dd7e4d404754c60a50e78f70f74aade"}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '195'
+      content-type:
+      - application/json
+      host:
+      - localhost:8000
+      user-agent:
+      - python-httpx/0.28.1
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/workflows/3/run
+  response:
+    body:
+      string: '{"success":true,"message":"Workflow execution created successfully","warning":null,"workflow_version_execution_id":787}
+
+        '
+    headers:
+      Connection:
+      - close
+      Content-Length:
+      - '120'
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 01 May 2025 16:10:32 GMT
       Server:
       - gunicorn
     status:

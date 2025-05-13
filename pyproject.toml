@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.48"
+version = "1.0.49"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -26,6 +26,7 @@ anthropic = "0.49.0"
 # TODO(dmu) MEDIUM: Upgrade to vcrpy >= 7 once it supports urllib3 >= 2.2.2
 vcrpy = "<7.0.0"
 pytest-network = "^0.0.1"
+pytest-parametrize-cases = "^0.1.2"
 
 [build-system]
 requires = ["poetry-core"]

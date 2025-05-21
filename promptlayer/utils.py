@@ -1485,7 +1485,7 @@ async def aanthropic_stream_completion(generator: AsyncIterable[Any]) -> Any:
     return response
 
 
-def stream_response(generator: Generator, after_stream: Callable, map_results: Callable):
+def stream_response(*, generator: Generator, after_stream: Callable, map_results: Callable):
     data = {
         "request_id": None,
         "raw_response": None,

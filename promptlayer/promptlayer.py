@@ -137,6 +137,13 @@ class PromptLayer(PromptLayerMixin):
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
+
+        import json
+
+        print("\nprompt_blueprint_model:")
+        print(json.dumps(prompt_blueprint_model, indent=4))
+        print()
+
         llm_request_params = self._prepare_llm_request_params(
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
@@ -145,22 +152,33 @@ class PromptLayer(PromptLayerMixin):
             stream=stream,
         )
 
+        print("\nllm_request_params:")
+        print(json.dumps(llm_request_params, indent=4, default=str))
+        print()
+
+        # TODO: Figure out what all these fields are. What function is llm_request_params["request_function"] ?
+
+        # response is just whatever the LLM call returns
+        # streaming=False > Pydantic model instance
+        # streaming=True > generator that yields ChatCompletionChunk pieces as they arrive
         response = llm_request_params["request_function"](
             llm_request_params["prompt_blueprint"], **llm_request_params["kwargs"]
         )
 
         if stream:
+            # generator functions, returns a generator
             return stream_response(
-                response,
-                self._create_track_request_callable(
+                generator=response,
+                after_stream=self._create_track_request_callable(
                     request_params=llm_request_params,
                     tags=tags,
                     input_variables=input_variables,
                     group_id=group_id,
                     pl_run_span_id=pl_run_span_id,
                 ),
-                llm_request_params["stream_function"],
+                map_results=llm_request_params["stream_function"],
             )
+
         request_log = self._track_request_log(
             llm_request_params,
             tags,

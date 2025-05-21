@@ -92,11 +92,11 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
 
 
 MAP_PROVIDER_TO_FUNCTION = {
-    "openai": openai_request,
     "anthropic": anthropic_request,
-    "openai.azure": azure_openai_request,
-    "mistral": mistral_request,
     "google": google_request,
+    "mistral": mistral_request,
+    "openai": openai_request,
+    "openai.azure": azure_openai_request,
 }
 
 AMAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -154,11 +154,11 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
 
 
 AMAP_PROVIDER_TO_FUNCTION = {
-    "openai": aopenai_request,
     "anthropic": aanthropic_request,
-    "openai.azure": aazure_openai_request,
-    "mistral": amistral_request,
     "google": agoogle_request,
+    "mistral": amistral_request,
+    "openai": aopenai_request,
+    "openai.azure": aazure_openai_request,
 }
 
 
@@ -203,6 +203,7 @@ class PromptLayerMixin:
     ):
         provider = prompt_blueprint_model["provider"]
         kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
+
         if is_async:
             config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
             request_function = AMAP_PROVIDER_TO_FUNCTION[provider]

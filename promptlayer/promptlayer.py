@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, AsyncGenerator, Dict, Generator, List, Literal, Optional, Union
 
 import nest_asyncio
 
@@ -161,6 +161,7 @@ class PromptLayer(PromptLayerMixin):
                 ),
                 llm_request_params["stream_function"],
             )
+
         request_log = self._track_request_log(
             llm_request_params,
             tags,
@@ -210,7 +211,7 @@ class PromptLayer(PromptLayerMixin):
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
         stream: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], Generator]:
         _run_internal_kwargs = {
             "prompt_name": prompt_name,
             "prompt_version": prompt_version,
@@ -416,7 +417,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
         stream: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], AsyncGenerator]:
         _run_internal_kwargs = {
             "prompt_name": prompt_name,
             "prompt_version": prompt_version,

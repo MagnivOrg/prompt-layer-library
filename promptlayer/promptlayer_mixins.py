@@ -192,7 +192,7 @@ class PromptLayerMixin:
         return params
 
     @staticmethod
-    def _prepare_llm_request_params(
+    def _prepare_llm_data(
         *,
         prompt_blueprint,
         prompt_template,
@@ -201,8 +201,25 @@ class PromptLayerMixin:
         stream,
         is_async=False,
     ):
+        client_kwargs = {}
+        function_kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
+        function_kwargs["stream"] = stream
         provider = prompt_blueprint_model["provider"]
-        kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
+
+        if custom_provider := prompt_blueprint.get("custom_provider"):
+            provider = custom_provider["client"]
+            client_kwargs = {
+                "api_key": custom_provider["api_key"],
+                "base_url": custom_provider["base_url"],
+            }
+        elif provider_base_url := prompt_blueprint.get("provider_base_url"):
+            client_kwargs["base_url"] = provider_base_url["url"]
+
+        if model_parameter_overrides:
+            function_kwargs.update(model_parameter_overrides)
+
+        if stream and provider in ["openai", "openai.azure"]:
+            function_kwargs["stream_options"] = {"include_usage": True}
 
         if is_async:
             config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
@@ -211,22 +228,13 @@ class PromptLayerMixin:
             config = MAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
             request_function = MAP_PROVIDER_TO_FUNCTION[provider]
 
-        if provider_base_url := prompt_blueprint.get("provider_base_url"):
-            kwargs["base_url"] = provider_base_url["url"]
-
-        if model_parameter_overrides:
-            kwargs.update(model_parameter_overrides)
-
-        kwargs["stream"] = stream
-        if stream and provider in ["openai", "openai.azure"]:
-            kwargs["stream_options"] = {"include_usage": True}
-
         return {
             "provider": provider,
             "function_name": config["function_name"],
             "stream_function": config["stream_function"],
             "request_function": request_function,
-            "kwargs": kwargs,
+            "client_kwargs": client_kwargs,
+            "function_kwargs": function_kwargs,
             "prompt_blueprint": prompt_blueprint,
         }
 
@@ -264,7 +272,7 @@ class PromptLayerMixin:
             "function_name": request_params["function_name"],
             "provider_type": request_params["provider"],
             "args": [],
-            "kwargs": request_params["kwargs"],
+            "kwargs": request_params["function_kwargs"],
             "tags": tags,
             "request_start_time": datetime.datetime.now(datetime.timezone.utc).timestamp(),
             "request_end_time": datetime.datetime.now(datetime.timezone.utc).timestamp(),

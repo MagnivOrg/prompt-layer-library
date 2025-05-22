@@ -1544,12 +1544,12 @@ MAP_TYPE_TO_OPENAI_FUNCTION = {
 }
 
 
-def openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+def openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from openai import OpenAI
 
-    client = OpenAI(base_url=kwargs.pop("base_url", None))
+    client = OpenAI(**client_kwargs)
     request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
-    return request_to_make(client, **kwargs)
+    return request_to_make(client, **function_kwargs)
 
 
 async def aopenai_chat_request(client, **kwargs):
@@ -1574,12 +1574,12 @@ async def aopenai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs)
     return await request_to_make(client, **kwargs)
 
 
-def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from openai import AzureOpenAI
 
-    client = AzureOpenAI(azure_endpoint=kwargs.pop("base_url", None))
+    client = AzureOpenAI(azure_endpoint=client_kwargs.pop("base_url", None))
     request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
-    return request_to_make(client, **kwargs)
+    return request_to_make(client, **function_kwargs)
 
 
 async def aazure_openai_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
@@ -1604,12 +1604,12 @@ MAP_TYPE_TO_ANTHROPIC_FUNCTION = {
 }
 
 
-def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, **kwargs):
+def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from anthropic import Anthropic
 
-    client = Anthropic(base_url=kwargs.pop("base_url", None))
+    client = Anthropic(**client_kwargs)
     request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
-    return request_to_make(client, **kwargs)
+    return request_to_make(client, **function_kwargs)
 
 
 async def aanthropic_chat_request(client, **kwargs):
@@ -1690,19 +1690,16 @@ async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
         return None
 
 
-def mistral_request(
-    prompt_blueprint: GetPromptTemplateResponse,
-    **kwargs,
-):
+def mistral_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from mistralai import Mistral
 
     client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
-    if "stream" in kwargs and kwargs["stream"]:
-        kwargs.pop("stream")
-        return client.chat.stream(**kwargs)
-    if "stream" in kwargs:
-        kwargs.pop("stream")
-    return client.chat.complete(**kwargs)
+    if "stream" in function_kwargs and function_kwargs["stream"]:
+        function_kwargs.pop("stream")
+        return client.chat.stream(**function_kwargs)
+    if "stream" in function_kwargs:
+        function_kwargs.pop("stream")
+    return client.chat.complete(**function_kwargs)
 
 
 async def amistral_request(
@@ -1898,12 +1895,12 @@ MAP_TYPE_TO_GOOGLE_FUNCTION = {
 }
 
 
-def google_request(request: GetPromptTemplateResponse, **kwargs):
+def google_request(request: GetPromptTemplateResponse, _: dict, function_kwargs: dict):
     from google import genai
 
     client = genai.Client()
     request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
-    return request_to_make(client, **kwargs)
+    return request_to_make(client, **function_kwargs)
 
 
 async def agoogle_chat_request(client, **kwargs):

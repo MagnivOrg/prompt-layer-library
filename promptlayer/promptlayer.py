@@ -140,11 +140,15 @@ class PromptLayer(PromptLayerMixin):
 
         import json
 
-        print("\nprompt_blueprint_model:")
-        print(json.dumps(prompt_blueprint_model, indent=4))
-        print()
+        # print("\nprompt_blueprint:")
+        # print(json.dumps(prompt_blueprint, indent=4))
+        # print()
+        #
+        # print("\nprompt_blueprint_model:")
+        # print(json.dumps(prompt_blueprint_model, indent=4))
+        # print()
 
-        llm_request_params = self._prepare_llm_request_params(
+        llm_data = self._prepare_llm_data(
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
             prompt_blueprint_model=prompt_blueprint_model,
@@ -152,35 +156,37 @@ class PromptLayer(PromptLayerMixin):
             stream=stream,
         )
 
-        print("\nllm_request_params:")
-        print(json.dumps(llm_request_params, indent=4, default=str))
+        print("\nllm_data:")
+        print(json.dumps(llm_data, indent=4, default=str))
         print()
-
-        # TODO: Figure out what all these fields are. What function is llm_request_params["request_function"] ?
 
         # response is just whatever the LLM call returns
         # streaming=False > Pydantic model instance
         # streaming=True > generator that yields ChatCompletionChunk pieces as they arrive
-        response = llm_request_params["request_function"](
-            llm_request_params["prompt_blueprint"], **llm_request_params["kwargs"]
+        response = llm_data["request_function"](
+            prompt_blueprint=llm_data["prompt_blueprint"],
+            client_kwargs=llm_data["client_kwargs"],
+            function_kwargs=llm_data["function_kwargs"],
         )
 
         if stream:
-            # generator functions, returns a generator
+            # generator function, returns a generator
             return stream_response(
                 generator=response,
                 after_stream=self._create_track_request_callable(
-                    request_params=llm_request_params,
+                    request_params=llm_data,
                     tags=tags,
                     input_variables=input_variables,
                     group_id=group_id,
                     pl_run_span_id=pl_run_span_id,
                 ),
-                map_results=llm_request_params["stream_function"],
+                map_results=llm_data["stream_function"],
             )
 
+        # TODO: Important > make sure we are not logging API key
+
         request_log = self._track_request_log(
-            llm_request_params,
+            llm_data,
             tags,
             input_variables,
             group_id,
@@ -569,7 +575,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
-        llm_request_params = self._prepare_llm_request_params(
+        llm_data = self._prepare_llm_data(
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
             prompt_blueprint_model=prompt_blueprint_model,
@@ -578,13 +584,11 @@ class AsyncPromptLayer(PromptLayerMixin):
             is_async=True,
         )
 
-        response = await llm_request_params["request_function"](
-            llm_request_params["prompt_blueprint"], **llm_request_params["kwargs"]
-        )
+        response = await llm_data["request_function"](llm_data["prompt_blueprint"], **llm_data["function_kwargs"])
 
         if stream:
             track_request_callable = await self._create_track_request_callable(
-                request_params=llm_request_params,
+                request_params=llm_data,
                 tags=tags,
                 input_variables=input_variables,
                 group_id=group_id,
@@ -593,11 +597,11 @@ class AsyncPromptLayer(PromptLayerMixin):
             return astream_response(
                 response,
                 track_request_callable,
-                llm_request_params["stream_function"],
+                llm_data["stream_function"],
             )
 
         request_log = await self._track_request_log(
-            llm_request_params,
+            llm_data,
             tags,
             input_variables,
             group_id,

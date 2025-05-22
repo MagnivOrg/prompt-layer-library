@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from copy import deepcopy
 from functools import wraps
-from typing import Dict, Union
+from typing import Any, Dict, Union
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -177,7 +177,13 @@ class PromptLayerMixin:
             return None, None
 
     @staticmethod
-    def _prepare_get_prompt_template_params(*, prompt_version, prompt_release_label, input_variables, metadata):
+    def _prepare_get_prompt_template_params(
+        *,
+        prompt_version: Union[int, None],
+        prompt_release_label: Union[str, None],
+        input_variables: Union[Dict[str, Any], None],
+        metadata: Union[Dict[str, str], None]
+    ) -> Dict[str, Any]:
         params = {}
 
         if prompt_version:

@@ -584,7 +584,11 @@ class AsyncPromptLayer(PromptLayerMixin):
             is_async=True,
         )
 
-        response = await llm_data["request_function"](llm_data["prompt_blueprint"], **llm_data["function_kwargs"])
+        response = await llm_data["request_function"](
+            prompt_blueprint=llm_data["prompt_blueprint"],
+            client_kwargs=llm_data["client_kwargs"],
+            function_kwargs=llm_data["function_kwargs"],
+        )
 
         if stream:
             track_request_callable = await self._create_track_request_callable(

@@ -182,7 +182,7 @@ class PromptLayerMixin:
         prompt_version: Union[int, None],
         prompt_release_label: Union[str, None],
         input_variables: Union[Dict[str, Any], None],
-        metadata: Union[Dict[str, str], None]
+        metadata: Union[Dict[str, str], None],
     ) -> Dict[str, Any]:
         params = {}
 

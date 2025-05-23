@@ -271,7 +271,7 @@ class PromptLayerMixin:
             "metadata": metadata,
             "prompt_id": request_params["prompt_blueprint"]["id"],
             "prompt_version": request_params["prompt_blueprint"]["version"],
-            "prompt_input_variables": input_variables,
+            "prompt_input_variables": input_variables or {},
             "group_id": group_id,
             "return_prompt_blueprint": True,
             "span_id": pl_run_span_id,

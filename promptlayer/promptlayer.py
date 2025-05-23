@@ -167,8 +167,6 @@ class PromptLayer(PromptLayerMixin):
                 map_results=llm_data["stream_function"],
             )
 
-        # TODO: Important > make sure we are not logging API key from the custom provider
-
         request_log = self._track_request_log(
             llm_data,
             tags,

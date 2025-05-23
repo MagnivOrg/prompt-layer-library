@@ -137,17 +137,6 @@ class PromptLayer(PromptLayerMixin):
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
-
-        import json
-
-        # print("\nprompt_blueprint:")
-        # print(json.dumps(prompt_blueprint, indent=4))
-        # print()
-        #
-        # print("\nprompt_blueprint_model:")
-        # print(json.dumps(prompt_blueprint_model, indent=4))
-        # print()
-
         llm_data = self._prepare_llm_data(
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
@@ -155,10 +144,6 @@ class PromptLayer(PromptLayerMixin):
             model_parameter_overrides=model_parameter_overrides,
             stream=stream,
         )
-
-        print("\nllm_data:")
-        print(json.dumps(llm_data, indent=4, default=str))
-        print()
 
         # response is just whatever the LLM call returns
         # streaming=False > Pydantic model instance
@@ -170,7 +155,6 @@ class PromptLayer(PromptLayerMixin):
         )
 
         if stream:
-            # generator function, returns a generator
             return stream_response(
                 generator=response,
                 after_stream=self._create_track_request_callable(
@@ -183,7 +167,7 @@ class PromptLayer(PromptLayerMixin):
                 map_results=llm_data["stream_function"],
             )
 
-        # TODO: Important > make sure we are not logging API key
+        # TODO: Important > make sure we are not logging API key from the custom provider
 
         request_log = self._track_request_log(
             llm_data,

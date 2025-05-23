@@ -1706,12 +1706,12 @@ def mistral_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: 
 
 async def amistral_request(
     prompt_blueprint: GetPromptTemplateResponse,
-    client_kwargs: dict,
+    _: dict,
     function_kwargs: dict,
 ):
     from mistralai import Mistral
 
-    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"), **client_kwargs)
+    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
     if "stream" in function_kwargs and function_kwargs["stream"]:
         return await client.chat.stream_async(**function_kwargs)
     return await client.chat.complete_async(**function_kwargs)
@@ -1936,10 +1936,10 @@ AMAP_TYPE_TO_GOOGLE_FUNCTION = {
 }
 
 
-async def agoogle_request(request: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
+async def agoogle_request(request: GetPromptTemplateResponse, _: dict, function_kwargs: dict):
     from google import genai
 
-    client = genai.Client(**client_kwargs)
+    client = genai.Client()
     request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 

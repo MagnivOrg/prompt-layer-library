@@ -387,7 +387,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         # Allows `workflow_name` to be passed both as keyword and positional argument
         # (virtually identical to `workflow_id_or_name`)
         workflow_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], Any]:
         try:
             return await arun_workflow_request(
                 workflow_id_or_name=_get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name),

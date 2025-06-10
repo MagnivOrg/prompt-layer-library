@@ -23,6 +23,11 @@ class TextContent(TypedDict, total=False):
     text: str
 
 
+class ThinkingContent(TypedDict, total=False):
+    type: Literal["thinking"]
+    thinking: str
+
+
 class ImageContent(TypedDict, total=False):
     type: Literal["image_url"]
     image_url: ImageUrl
@@ -44,7 +49,7 @@ class MediaVariable(TypedDict, total=False):
     name: str
 
 
-Content = Union[TextContent, ImageContent, MediaContnt, MediaVariable]
+Content = Union[TextContent, ThinkingContent, ImageContent, MediaContnt, MediaVariable]
 
 
 class Function(TypedDict, total=False):

@@ -1947,11 +1947,11 @@ MAP_TYPE_TO_GOOGLE_FUNCTION = {
 }
 
 
-def google_request(request: GetPromptTemplateResponse, _: dict, function_kwargs: dict):
+def google_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
     client = genai.Client()
-    request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
+    request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **function_kwargs)
 
 
@@ -1985,11 +1985,11 @@ AMAP_TYPE_TO_GOOGLE_FUNCTION = {
 }
 
 
-async def agoogle_request(request: GetPromptTemplateResponse, _: dict, function_kwargs: dict):
+async def agoogle_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
     client = genai.Client()
-    request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
+    request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 
 

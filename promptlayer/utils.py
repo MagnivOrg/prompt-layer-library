@@ -788,30 +788,79 @@ class GeneratorProxy:
             response = ""
             for result in self.results:
                 if hasattr(result, "completion"):
-                    response = f"{response}{result.completion}"
+                    response += result.completion
                 elif hasattr(result, "message") and isinstance(result.message, str):
-                    response = f"{response}{result.message}"
+                    response += result.message
                 elif (
                     hasattr(result, "content_block")
                     and hasattr(result.content_block, "text")
-                    and "type" in result
-                    and result.type != "message_stop"
+                    and getattr(result, "type", None) != "message_stop"
                 ):
-                    response = f"{response}{result.content_block.text}"
-                elif hasattr(result, "delta") and hasattr(result.delta, "text"):
-                    response = f"{response}{result.delta.text}"
-            if (
-                hasattr(self.results[-1], "type") and self.results[-1].type == "message_stop"
-            ):  # this is a message stream and not the correct event
+                    response += result.content_block.text
+                elif hasattr(result, "delta"):
+                    if hasattr(result.delta, "thinking"):
+                        response += result.delta.thinking
+                    elif hasattr(result.delta, "text"):
+                        response += result.delta.text
+
+            # 2) If this is a “stream” (ended by message_stop), reconstruct both ThinkingBlock & TextBlock
+            last_event = self.results[-1]
+            if getattr(last_event, "type", None) == "message_stop":
                 final_result = deepcopy(self.results[0].message)
-                final_result.usage = None
-                content_block = deepcopy(self.results[1].content_block)
-                content_block.text = response
-                final_result.content = [content_block]
+
+                content_blocks = []
+                current_block = None
+                current_signature = ""
+                current_thinking = ""
+                current_text = ""
+
+                for event in self.results:
+                    # On a new content block starting:
+                    if getattr(event, "type", None) == "content_block_start":
+                        current_block = deepcopy(event.content_block)
+
+                        if getattr(event.content_block, "type", None) == "thinking":
+                            current_signature = ""
+                            current_thinking = ""
+                        elif getattr(event.content_block, "type", None) == "text":
+                            current_text = ""
+
+                    elif getattr(event, "type", None) == "content_block_delta" and current_block is not None:
+                        if getattr(current_block, "type", None) == "thinking":
+                            if hasattr(event.delta, "signature"):
+                                current_signature = event.delta.signature
+                            if hasattr(event.delta, "thinking"):
+                                current_thinking += event.delta.thinking
+
+                        elif getattr(current_block, "type", None) == "text":
+                            if hasattr(event.delta, "text"):
+                                current_text += event.delta.text
+
+                    elif getattr(event, "type", None) == "content_block_stop" and current_block is not None:
+                        if getattr(current_block, "type", None) == "thinking":
+                            current_block.signature = current_signature
+                            current_block.thinking = current_thinking
+                        elif getattr(current_block, "type", None) == "text":
+                            current_block.text = current_text
+
+                        content_blocks.append(current_block)
+
+                        current_block = None
+                        current_signature = ""
+                        current_thinking = ""
+                        current_text = ""
+
+                final_result.content = content_blocks
+                for event in reversed(self.results):
+                    if hasattr(event, "usage") and hasattr(event.usage, "output_tokens"):
+                        final_result.usage.output_tokens = event.usage.output_tokens
+                        break
+
+                return final_result
+
+            # 3) Otherwise (not a “stream”), fall back to returning the last raw message
             else:
-                final_result = deepcopy(self.results[-1])
-                final_result.completion = response
-            return final_result
+                return deepcopy(self.results[-1])
         if hasattr(self.results[0].choices[0], "text"):  # this is regular completion
             response = ""
             for result in self.results:
@@ -1898,11 +1947,11 @@ MAP_TYPE_TO_GOOGLE_FUNCTION = {
 }
 
 
-def google_request(request: GetPromptTemplateResponse, _: dict, function_kwargs: dict):
+def google_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
     client = genai.Client()
-    request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
+    request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **function_kwargs)
 
 
@@ -1936,11 +1985,11 @@ AMAP_TYPE_TO_GOOGLE_FUNCTION = {
 }
 
 
-async def agoogle_request(request: GetPromptTemplateResponse, _: dict, function_kwargs: dict):
+async def agoogle_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
     client = genai.Client()
-    request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[request["prompt_template"]["type"]]
+    request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 
 

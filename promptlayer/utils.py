@@ -691,6 +691,52 @@ async def apromptlayer_track_score(
     return True
 
 
+def build_anthropic_content_blocks(events):
+    content_blocks = []
+    current_block = None
+    current_signature = ""
+    current_thinking = ""
+    current_text = ""
+    usage = None
+    stop_reason = None
+
+    for event in events:
+        if event.type == "content_block_start":
+            current_block = deepcopy(event.content_block)
+            if current_block.type == "thinking":
+                current_signature = ""
+                current_thinking = ""
+            elif current_block.type == "text":
+                current_text = ""
+        elif event.type == "content_block_delta" and current_block is not None:
+            if current_block.type == "thinking":
+                if hasattr(event.delta, "signature"):
+                    current_signature = event.delta.signature
+                if hasattr(event.delta, "thinking"):
+                    current_thinking += event.delta.thinking
+            elif current_block.type == "text":
+                if hasattr(event.delta, "text"):
+                    current_text += event.delta.text
+        elif event.type == "content_block_stop" and current_block is not None:
+            if current_block.type == "thinking":
+                current_block.signature = current_signature
+                current_block.thinking = current_thinking
+            elif current_block.type == "text":
+                current_block.text = current_text
+
+            content_blocks.append(current_block)
+            current_block = None
+            current_signature = ""
+            current_thinking = ""
+            current_text = ""
+        elif event.type == "message_delta":
+            if hasattr(event, "usage"):
+                usage = event.usage
+            if hasattr(event.delta, "stop_reason"):
+                stop_reason = event.delta.stop_reason
+    return content_blocks, usage, stop_reason
+
+
 class GeneratorProxy:
     def __init__(self, generator, api_request_arguments, api_key):
         self.generator = generator
@@ -808,59 +854,15 @@ class GeneratorProxy:
             if getattr(last_event, "type", None) == "message_stop":
                 final_result = deepcopy(self.results[0].message)
 
-                content_blocks = []
-                current_block = None
-                current_signature = ""
-                current_thinking = ""
-                current_text = ""
-
-                for event in self.results:
-                    # On a new content block starting:
-                    if getattr(event, "type", None) == "content_block_start":
-                        current_block = deepcopy(event.content_block)
-
-                        if getattr(event.content_block, "type", None) == "thinking":
-                            current_signature = ""
-                            current_thinking = ""
-                        elif getattr(event.content_block, "type", None) == "text":
-                            current_text = ""
-
-                    elif getattr(event, "type", None) == "content_block_delta" and current_block is not None:
-                        if getattr(current_block, "type", None) == "thinking":
-                            if hasattr(event.delta, "signature"):
-                                current_signature = event.delta.signature
-                            if hasattr(event.delta, "thinking"):
-                                current_thinking += event.delta.thinking
-
-                        elif getattr(current_block, "type", None) == "text":
-                            if hasattr(event.delta, "text"):
-                                current_text += event.delta.text
-
-                    elif getattr(event, "type", None) == "content_block_stop" and current_block is not None:
-                        if getattr(current_block, "type", None) == "thinking":
-                            current_block.signature = current_signature
-                            current_block.thinking = current_thinking
-                        elif getattr(current_block, "type", None) == "text":
-                            current_block.text = current_text
-
-                        content_blocks.append(current_block)
-
-                        current_block = None
-                        current_signature = ""
-                        current_thinking = ""
-                        current_text = ""
-
-                final_result.content = content_blocks
-                for event in reversed(self.results):
-                    if hasattr(event, "usage") and hasattr(event.usage, "output_tokens"):
-                        final_result.usage.output_tokens = event.usage.output_tokens
-                        break
-
-                return final_result
-
-            # 3) Otherwise (not a “stream”), fall back to returning the last raw message
-            else:
-                return deepcopy(self.results[-1])
+                content_blocks, usage, stop_reason = build_anthropic_content_blocks(self.results)
+            final_result.content = content_blocks
+            if usage:
+                final_result.usage.output_tokens = usage.output_tokens
+            if stop_reason:
+                final_result.stop_reason = stop_reason
+            return final_result
+        else:
+            return deepcopy(self.results[-1])
         if hasattr(self.results[0].choices[0], "text"):  # this is regular completion
             response = ""
             for result in self.results:
@@ -1425,7 +1427,7 @@ async def aopenai_stream_completion(generator: AsyncIterable[Any]) -> Any:
 
 
 def anthropic_stream_message(results: list):
-    from anthropic.types import Message, MessageStreamEvent, TextBlock, Usage
+    from anthropic.types import Message, MessageStreamEvent, Usage
 
     message_stream_events: List[MessageStreamEvent] = results
     response: Message = Message(
@@ -1438,24 +1440,24 @@ def anthropic_stream_message(results: list):
         stop_sequence=None,
         usage=Usage(input_tokens=0, output_tokens=0),
     )
-    content = ""
-    for result in message_stream_events:
-        if result.type == "message_start":
-            response = result.message
-        elif result.type == "content_block_delta":
-            if result.delta.type == "text_delta":
-                content = f"{content}{result.delta.text}"
-        elif result.type == "message_delta":
-            if hasattr(result, "usage"):
-                response.usage.output_tokens = result.usage.output_tokens
-            if hasattr(result.delta, "stop_reason"):
-                response.stop_reason = result.delta.stop_reason
-    response.content.append(TextBlock(type="text", text=content))
+
+    for event in message_stream_events:
+        if event.type == "message_start":
+            response = event.message
+            break
+
+    content_blocks, usage, stop_reason = build_anthropic_content_blocks(message_stream_events)
+    response.content = content_blocks
+    if usage:
+        response.usage.output_tokens = usage.output_tokens
+    if stop_reason:
+        response.stop_reason = stop_reason
+
     return response
 
 
 async def aanthropic_stream_message(generator: AsyncIterable[Any]) -> Any:
-    from anthropic.types import Message, MessageStreamEvent, TextBlock, Usage
+    from anthropic.types import Message, MessageStreamEvent, Usage
 
     message_stream_events: List[MessageStreamEvent] = []
     response: Message = Message(
@@ -1468,22 +1470,19 @@ async def aanthropic_stream_message(generator: AsyncIterable[Any]) -> Any:
         stop_sequence=None,
         usage=Usage(input_tokens=0, output_tokens=0),
     )
-    content = ""
 
-    async for result in generator:
-        message_stream_events.append(result)
-        if result.type == "message_start":
-            response = result.message
-        elif result.type == "content_block_delta":
-            if result.delta.type == "text_delta":
-                content = f"{content}{result.delta.text}"
-        elif result.type == "message_delta":
-            if hasattr(result, "usage"):
-                response.usage.output_tokens = result.usage.output_tokens
-            if hasattr(result.delta, "stop_reason"):
-                response.stop_reason = result.delta.stop_reason
+    async for event in generator:
+        if event.type == "message_start":
+            response = event.message
+        message_stream_events.append(event)
 
-    response.content.append(TextBlock(type="text", text=content))
+    content_blocks, usage, stop_reason = build_anthropic_content_blocks(message_stream_events)
+    response.content = content_blocks
+    if usage:
+        response.usage.output_tokens = usage.output_tokens
+    if stop_reason:
+        response.stop_reason = stop_reason
+
     return response
 
 

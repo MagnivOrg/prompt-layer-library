@@ -24,6 +24,7 @@ class TextContent(TypedDict, total=False):
 
 
 class ThinkingContent(TypedDict, total=False):
+    signature: str | None = None
     type: Literal["thinking"]
     thinking: str
 

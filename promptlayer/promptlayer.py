@@ -126,12 +126,16 @@ class PromptLayer(PromptLayerMixin):
         group_id: Union[int, None] = None,
         stream: bool = False,
         pl_run_span_id: Union[str, None] = None,
+        provider: Union[str, None] = None,
+        model: Union[str, None] = None,
     ) -> Dict[str, Any]:
         get_prompt_template_params = self._prepare_get_prompt_template_params(
             prompt_version=prompt_version,
             prompt_release_label=prompt_release_label,
             input_variables=input_variables,
             metadata=metadata,
+            provider=provider,
+            model=model,
         )
         prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
@@ -216,6 +220,8 @@ class PromptLayer(PromptLayerMixin):
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
         stream: bool = False,
+        provider: Union[str, None] = None,
+        model: Union[str, None] = None,
     ) -> Dict[str, Any]:
         _run_internal_kwargs = {
             "prompt_name": prompt_name,
@@ -227,6 +233,8 @@ class PromptLayer(PromptLayerMixin):
             "metadata": metadata,
             "group_id": group_id,
             "stream": stream,
+            "provider": provider,
+            "model": model,
         }
 
         if self.tracer:
@@ -422,6 +430,8 @@ class AsyncPromptLayer(PromptLayerMixin):
         metadata: Union[Dict[str, str], None] = None,
         group_id: Union[int, None] = None,
         stream: bool = False,
+        provider: Union[str, None] = None,
+        model: Union[str, None] = None,
     ) -> Dict[str, Any]:
         _run_internal_kwargs = {
             "prompt_name": prompt_name,
@@ -433,6 +443,8 @@ class AsyncPromptLayer(PromptLayerMixin):
             "metadata": metadata,
             "group_id": group_id,
             "stream": stream,
+            "provider": provider,
+            "model": model,
         }
 
         if self.tracer:
@@ -546,12 +558,16 @@ class AsyncPromptLayer(PromptLayerMixin):
         group_id: Union[int, None] = None,
         stream: bool = False,
         pl_run_span_id: Union[str, None] = None,
+        provider: Union[str, None] = None,
+        model: Union[str, None] = None,
     ) -> Dict[str, Any]:
         get_prompt_template_params = self._prepare_get_prompt_template_params(
             prompt_version=prompt_version,
             prompt_release_label=prompt_release_label,
             input_variables=input_variables,
             metadata=metadata,
+            provider=provider,
+            model=model,
         )
         prompt_blueprint = await self.templates.get(prompt_name, get_prompt_template_params)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(

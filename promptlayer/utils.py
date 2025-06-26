@@ -697,6 +697,7 @@ def build_anthropic_content_blocks(events):
     current_signature = ""
     current_thinking = ""
     current_text = ""
+    current_tool_input_json = ""
     usage = None
     stop_reason = None
 
@@ -708,6 +709,8 @@ def build_anthropic_content_blocks(events):
                 current_thinking = ""
             elif current_block.type == "text":
                 current_text = ""
+            elif current_block.type == "tool_use":
+                current_tool_input_json = ""
         elif event.type == "content_block_delta" and current_block is not None:
             if current_block.type == "thinking":
                 if hasattr(event.delta, "signature"):
@@ -717,18 +720,26 @@ def build_anthropic_content_blocks(events):
             elif current_block.type == "text":
                 if hasattr(event.delta, "text"):
                     current_text += event.delta.text
+            elif current_block.type == "tool_use":
+                if hasattr(event.delta, "partial_json"):
+                    current_tool_input_json += event.delta.partial_json
         elif event.type == "content_block_stop" and current_block is not None:
             if current_block.type == "thinking":
                 current_block.signature = current_signature
                 current_block.thinking = current_thinking
             elif current_block.type == "text":
                 current_block.text = current_text
-
+            elif current_block.type == "tool_use":
+                try:
+                    current_block.input = json.loads(current_tool_input_json)
+                except json.JSONDecodeError:
+                    current_block.input = {}
             content_blocks.append(current_block)
             current_block = None
             current_signature = ""
             current_thinking = ""
             current_text = ""
+            current_tool_input_json = ""
         elif event.type == "message_delta":
             if hasattr(event, "usage"):
                 usage = event.usage
@@ -1916,6 +1927,31 @@ def google_completions_request(client, **kwargs):
     return client.models.generate_content(model=model, contents=contents, config=config)
 
 
+def _build_google_response_from_parts(thought_content: str, regular_content: str, function_calls: list, last_result):
+    """Helper function to build Google response with thought, regular, and function call parts."""
+    from google.genai.chats import Part
+
+    response = last_result.model_copy()
+    final_parts = []
+
+    if thought_content:
+        thought_part = Part(text=thought_content, thought=True)
+        final_parts.append(thought_part)
+
+    if regular_content:
+        text_part = Part(text=regular_content, thought=None)
+        final_parts.append(text_part)
+
+    for function_call in function_calls:
+        function_part = Part(function_call=function_call, thought=None)
+        final_parts.append(function_part)
+
+    if final_parts:
+        response.candidates[0].content.parts = final_parts
+
+    return response
+
+
 def map_google_stream_response(results: list):
     from google.genai.chats import GenerateContentResponse
 
@@ -1923,13 +1959,23 @@ def map_google_stream_response(results: list):
     if not results:
         return response
     results: List[GenerateContentResponse] = results
-    content = ""
+
+    thought_content = ""
+    regular_content = ""
+    function_calls = []
+
     for result in results:
-        content = f"{content}{result.candidates[0].content.parts[0].text}"
-    last_result = results[-1]
-    response = last_result.model_copy()
-    response.candidates[0].content.parts[0].text = content
-    return response
+        if result.candidates and result.candidates[0].content.parts:
+            for part in result.candidates[0].content.parts:
+                if hasattr(part, "text") and part.text:
+                    if hasattr(part, "thought") and part.thought:
+                        thought_content = f"{thought_content}{part.text}"
+                    else:
+                        regular_content = f"{regular_content}{part.text}"
+                elif hasattr(part, "function_call") and part.function_call:
+                    function_calls.append(part.function_call)
+
+    return _build_google_response_from_parts(thought_content, regular_content, function_calls, results[-1])
 
 
 def google_stream_chat(results: list):
@@ -1995,14 +2041,29 @@ async def agoogle_request(prompt_blueprint: GetPromptTemplateResponse, client_kw
 async def amap_google_stream_response(generator: AsyncIterable[Any]):
     from google.genai.chats import GenerateContentResponse
 
-    GenerateContentResponse()
-    content = ""
+    response = GenerateContentResponse()
+
+    thought_content = ""
+    regular_content = ""
+    function_calls = []
+    last_result = None
+
     async for result in generator:
-        content = f"{content}{result.candidates[0].content.parts[0].text}"
-    last_result = result
-    response = last_result.model_copy()
-    response.candidates[0].content.parts[0].text = content
-    return response
+        last_result = result
+        if result.candidates and result.candidates[0].content.parts:
+            for part in result.candidates[0].content.parts:
+                if hasattr(part, "text") and part.text:
+                    if hasattr(part, "thought") and part.thought:
+                        thought_content = f"{thought_content}{part.text}"
+                    else:
+                        regular_content = f"{regular_content}{part.text}"
+                elif hasattr(part, "function_call") and part.function_call:
+                    function_calls.append(part.function_call)
+
+    if not last_result:
+        return response
+
+    return _build_google_response_from_parts(thought_content, regular_content, function_calls, last_result)
 
 
 async def agoogle_stream_chat(generator: AsyncIterable[Any]):

@@ -183,6 +183,8 @@ class PromptLayerMixin:
         prompt_release_label: Union[str, None],
         input_variables: Union[Dict[str, Any], None],
         metadata: Union[Dict[str, str], None],
+        provider: Union[str, None] = None,
+        model: Union[str, None] = None,
     ) -> Dict[str, Any]:
         params = {}
 
@@ -194,6 +196,10 @@ class PromptLayerMixin:
             params["input_variables"] = input_variables
         if metadata:
             params["metadata_filters"] = metadata
+        if provider:
+            params["provider"] = provider
+        if model:
+            params["model"] = model
 
         return params
 

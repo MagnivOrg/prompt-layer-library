@@ -2072,3 +2072,49 @@ async def agoogle_stream_chat(generator: AsyncIterable[Any]):
 
 async def agoogle_stream_completion(generator: AsyncIterable[Any]):
     return await amap_google_stream_response(generator)
+
+
+def vertexai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
+    if "gemini" in prompt_blueprint["metadata"]["model"]["name"]:
+        return google_request(
+            prompt_blueprint=prompt_blueprint,
+            client_kwargs=client_kwargs,
+            function_kwargs=function_kwargs,
+        )
+
+    if "claude" in prompt_blueprint["metadata"]["model"]["name"]:
+        from anthropic import AnthropicVertex
+
+        client = AnthropicVertex(**client_kwargs)
+        if prompt_blueprint["prompt_template"]["type"] == "chat":
+            return anthropic_chat_request(client=client, **function_kwargs)
+        raise NotImplementedError(
+            f"Unsupported prompt template type {prompt_blueprint['prompt_template']['type']}' for Anthropic Vertex AI"
+        )
+
+    raise NotImplementedError(
+        f"Vertex AI request for model {prompt_blueprint['metadata']['model']['name']} is not implemented yet."
+    )
+
+
+async def avertexai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
+    if "gemini" in prompt_blueprint["metadata"]["model"]["name"]:
+        return await agoogle_request(
+            prompt_blueprint=prompt_blueprint,
+            client_kwargs=client_kwargs,
+            function_kwargs=function_kwargs,
+        )
+
+    if "claude" in prompt_blueprint["metadata"]["model"]["name"]:
+        from anthropic import AsyncAnthropicVertex
+
+        client = AsyncAnthropicVertex(**client_kwargs)
+        if prompt_blueprint["prompt_template"]["type"] == "chat":
+            return await aanthropic_chat_request(client=client, **function_kwargs)
+        raise NotImplementedError(
+            f"Unsupported prompt template type {prompt_blueprint['prompt_template']['type']}' for Anthropic Vertex AI"
+        )
+
+    raise NotImplementedError(
+        f"Vertex AI request for model {prompt_blueprint['metadata']['model']['name']} is not implemented yet."
+    )

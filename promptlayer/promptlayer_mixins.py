@@ -26,6 +26,7 @@ from promptlayer.utils import (
     aopenai_request,
     aopenai_stream_chat,
     aopenai_stream_completion,
+    avertexai_request,
     azure_openai_request,
     google_request,
     google_stream_chat,
@@ -35,6 +36,7 @@ from promptlayer.utils import (
     openai_request,
     openai_stream_chat,
     openai_stream_completion,
+    vertexai_request,
 )
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -97,6 +99,7 @@ MAP_PROVIDER_TO_FUNCTION = {
     "mistral": mistral_request,
     "openai": openai_request,
     "openai.azure": azure_openai_request,
+    "vertexai": vertexai_request,
 }
 
 AMAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -159,6 +162,7 @@ AMAP_PROVIDER_TO_FUNCTION = {
     "mistral": amistral_request,
     "openai": aopenai_request,
     "openai.azure": aazure_openai_request,
+    "vertexai": avertexai_request,
 }
 
 
@@ -233,11 +237,18 @@ class PromptLayerMixin:
         if stream and provider in ["openai", "openai.azure"]:
             function_kwargs["stream_options"] = {"include_usage": True}
 
+        provider_function_name = provider
+        if provider_function_name == "vertexai":
+            if "gemini" in prompt_blueprint_model["name"]:
+                provider_function_name = "google"
+            elif "claude" in prompt_blueprint_model["name"]:
+                provider_function_name = "anthropic"
+
         if is_async:
-            config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
+            config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider_function_name][prompt_template["type"]]
             request_function = AMAP_PROVIDER_TO_FUNCTION[provider]
         else:
-            config = MAP_PROVIDER_TO_FUNCTION_NAME[provider][prompt_template["type"]]
+            config = MAP_PROVIDER_TO_FUNCTION_NAME[provider_function_name][prompt_template["type"]]
             request_function = MAP_PROVIDER_TO_FUNCTION[provider]
 
         return {

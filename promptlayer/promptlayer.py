@@ -320,6 +320,7 @@ class PromptLayer(PromptLayerMixin):
         price: float = 0.0,
         function_name: str = "",
         score: int = 0,
+        prompt_id: Union[int, None] = None,
     ):
         return util_log_request(
             self.api_key,
@@ -340,6 +341,7 @@ class PromptLayer(PromptLayerMixin):
             price=price,
             function_name=function_name,
             score=score,
+            prompt_id=prompt_id,
         )
 
 
@@ -478,6 +480,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         price: float = 0.0,
         function_name: str = "",
         score: int = 0,
+        prompt_id: Union[int, None] = None,
     ):
         return await autil_log_request(
             self.api_key,
@@ -498,6 +501,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             price=price,
             function_name=function_name,
             score=score,
+            prompt_id=prompt_id,
         )
 
     async def _create_track_request_callable(

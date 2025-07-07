@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.59"
+version = "1.0.60"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -27,6 +27,8 @@ anthropic = {extras = ["vertex"], version = "^0.57.1"}
 vcrpy = "<7.0.0"
 pytest-network = "^0.0.1"
 pytest-parametrize-cases = "^0.1.2"
+pydantic = "^2.11.7"
+pydantic-settings = "^2.10.1"
 
 [build-system]
 requires = ["poetry-core"]

@@ -9,6 +9,7 @@ import nest_asyncio
 from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
+from promptlayer.streaming import astream_response, stream_response
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
 from promptlayer.track import AsyncTrackManager, TrackManager
 from promptlayer.types.prompt_template import PromptTemplate
@@ -16,10 +17,8 @@ from promptlayer.utils import (
     RERAISE_ORIGINAL_EXCEPTION,
     _get_workflow_workflow_id_or_name,
     arun_workflow_request,
-    astream_response,
     atrack_request,
     autil_log_request,
-    stream_response,
     track_request,
     util_log_request,
 )
@@ -169,6 +168,7 @@ class PromptLayer(PromptLayerMixin):
                     pl_run_span_id=pl_run_span_id,
                 ),
                 map_results=llm_data["stream_function"],
+                metadata=llm_data["prompt_blueprint"]["metadata"],
             )
 
         request_log = self._track_request_log(
@@ -604,6 +604,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 response,
                 track_request_callable,
                 llm_data["stream_function"],
+                llm_data["prompt_blueprint"]["metadata"],
             )
 
         request_log = await self._track_request_log(

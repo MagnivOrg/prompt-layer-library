@@ -10,32 +10,34 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
 from promptlayer.span_exporter import PromptLayerSpanExporter
-from promptlayer.utils import (
-    aanthropic_request,
+from promptlayer.streaming import (
     aanthropic_stream_completion,
     aanthropic_stream_message,
-    aazure_openai_request,
-    agoogle_request,
     agoogle_stream_chat,
     agoogle_stream_completion,
-    amistral_request,
     amistral_stream_chat,
-    anthropic_request,
     anthropic_stream_completion,
     anthropic_stream_message,
-    aopenai_request,
     aopenai_stream_chat,
     aopenai_stream_completion,
+    google_stream_chat,
+    google_stream_completion,
+    mistral_stream_chat,
+    openai_stream_chat,
+    openai_stream_completion,
+)
+from promptlayer.utils import (
+    aanthropic_request,
+    aazure_openai_request,
+    agoogle_request,
+    amistral_request,
+    anthropic_request,
+    aopenai_request,
     avertexai_request,
     azure_openai_request,
     google_request,
-    google_stream_chat,
-    google_stream_completion,
     mistral_request,
-    mistral_stream_chat,
     openai_request,
-    openai_stream_chat,
-    openai_stream_completion,
     vertexai_request,
 )
 

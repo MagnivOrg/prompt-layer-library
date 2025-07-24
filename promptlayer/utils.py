@@ -10,6 +10,7 @@ import types
 from copy import deepcopy
 from enum import Enum
 from typing import Any, AsyncGenerator, AsyncIterable, Callable, Dict, Generator, List, Optional, Union
+from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
@@ -87,7 +88,7 @@ async def _resolve_workflow_id(workflow_id_or_name: Union[int, str], headers):
     # TODO(dmu) LOW: Should we warn user here to avoid using workflow names in favor of workflow id?
     async with _make_httpx_client() as client:
         # TODO(dmu) MEDIUM: Generalize the way we make async calls to PromptLayer API and reuse it everywhere
-        response = await client.get(f"{URL_API_PROMPTLAYER}/workflows/{workflow_id_or_name}", headers=headers)
+        response = await client.get(f"{URL_API_PROMPTLAYER}/workflows/{quote(str(workflow_id_or_name), safe='')}", headers=headers)
         if RAISE_FOR_STATUS:
             response.raise_for_status()
         elif response.status_code != 200:
@@ -1081,7 +1082,7 @@ def get_prompt_template(
         if params:
             json_body = {**json_body, **params}
         response = requests.post(
-            f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
+            f"{URL_API_PROMPTLAYER}/prompt-templates/{quote(prompt_name, safe='')}",
             headers={"X-API-KEY": api_key},
             json=json_body,
         )
@@ -1110,7 +1111,7 @@ async def aget_prompt_template(
             json_body.update(params)
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
+                f"{URL_API_PROMPTLAYER}/prompt-templates/{quote(prompt_name, safe='')}",
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )

@@ -59,6 +59,10 @@ def _make_httpx_client():
     return httpx.AsyncClient(timeout=_get_http_timeout())
 
 
+def _make_simple_httpx_client():
+    return httpx.Client(timeout=_get_http_timeout())
+
+
 def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
     # This is backward compatibility code
     if (workflow_id_or_name := workflow_name if workflow_id_or_name is None else workflow_id_or_name) is None:
@@ -1396,7 +1400,7 @@ async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
 def mistral_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from mistralai import Mistral
 
-    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"), client=_make_simple_httpx_client())
     if "stream" in function_kwargs and function_kwargs["stream"]:
         function_kwargs.pop("stream")
         return client.chat.stream(**function_kwargs)
@@ -1412,7 +1416,7 @@ async def amistral_request(
 ):
     from mistralai import Mistral
 
-    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"), async_client=_make_httpx_client())
     if "stream" in function_kwargs and function_kwargs["stream"]:
         return await client.chat.stream_async(**function_kwargs)
     return await client.chat.complete_async(**function_kwargs)

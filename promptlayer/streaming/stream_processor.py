@@ -1,10 +1,3 @@
-"""
-Stream processors for handling streaming responses
-
-This module contains the main streaming logic that processes streaming responses
-from various LLM providers and builds progressive prompt blueprints.
-"""
-
 from typing import Any, AsyncGenerator, AsyncIterable, Callable, Dict, Generator
 
 from .blueprint_builder import (
@@ -14,35 +7,41 @@ from .blueprint_builder import (
 )
 
 
-def stream_response(*, generator: Generator, after_stream: Callable, map_results: Callable, metadata: Dict):
-    """
-    Process streaming responses and build progressive prompt blueprints
+def _build_stream_blueprint(result: Any, metadata: Dict) -> Any:
+    model_info = metadata.get("model", {}) if metadata else {}
+    provider = model_info.get("provider", "")
+    model_name = model_info.get("name", "")
 
-    Supports OpenAI, Anthropic, and Google (Gemini) streaming formats, building blueprints
-    progressively as the stream progresses.
-    """
+    if provider == "openai" or provider == "openai.azure":
+        return build_prompt_blueprint_from_openai_chunk(result, metadata)
+
+    elif provider == "google" or (provider == "vertexai" and model_name.startswith("gemini")):
+        return build_prompt_blueprint_from_google_event(result, metadata)
+
+    elif provider == "anthropic" or (provider == "vertexai" and model_name.startswith("claude")):
+        return build_prompt_blueprint_from_anthropic_event(result, metadata)
+
+    elif provider == "mistral":
+        return build_prompt_blueprint_from_openai_chunk(result.data, metadata)
+
+    return None
+
+
+def _build_stream_data(result: Any, stream_blueprint: Any, request_id: Any = None) -> Dict[str, Any]:
+    return {
+        "request_id": request_id,
+        "raw_response": result,
+        "prompt_blueprint": stream_blueprint,
+    }
+
+
+def stream_response(*, generator: Generator, after_stream: Callable, map_results: Callable, metadata: Dict):
     results = []
-    stream_blueprint = None
     for result in generator:
         results.append(result)
 
-        # Handle OpenAI streaming format - process each chunk individually
-        if hasattr(result, "choices"):
-            stream_blueprint = build_prompt_blueprint_from_openai_chunk(result, metadata)
-
-        # Handle Google streaming format (Gemini) - GenerateContentResponse objects
-        elif hasattr(result, "candidates"):
-            stream_blueprint = build_prompt_blueprint_from_google_event(result, metadata)
-
-        # Handle Anthropic streaming format - process each event individually
-        elif hasattr(result, "type"):
-            stream_blueprint = build_prompt_blueprint_from_anthropic_event(result, metadata)
-
-        data = {
-            "request_id": None,
-            "raw_response": result,
-            "prompt_blueprint": stream_blueprint,
-        }
+        stream_blueprint = _build_stream_blueprint(result, metadata)
+        data = _build_stream_data(result, stream_blueprint)
         yield data
 
     request_response = map_results(results)
@@ -58,35 +57,13 @@ async def astream_response(
     map_results: Callable[[Any], Any],
     metadata: Dict[str, Any] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    Async version of stream_response
-
-    Process streaming responses asynchronously and build progressive prompt blueprints
-    Supports OpenAI, Anthropic, and Google (Gemini) streaming formats.
-    """
     results = []
-    stream_blueprint = None
 
     async for result in generator:
         results.append(result)
 
-        # Handle OpenAI streaming format - process each chunk individually
-        if hasattr(result, "choices"):
-            stream_blueprint = build_prompt_blueprint_from_openai_chunk(result, metadata)
-
-        # Handle Google streaming format (Gemini) - GenerateContentResponse objects
-        elif hasattr(result, "candidates"):
-            stream_blueprint = build_prompt_blueprint_from_google_event(result, metadata)
-
-        # Handle Anthropic streaming format - process each event individually
-        elif hasattr(result, "type"):
-            stream_blueprint = build_prompt_blueprint_from_anthropic_event(result, metadata)
-
-        data = {
-            "request_id": None,
-            "raw_response": result,
-            "prompt_blueprint": stream_blueprint,
-        }
+        stream_blueprint = _build_stream_blueprint(result, metadata)
+        data = _build_stream_data(result, stream_blueprint)
         yield data
 
     async def async_generator_from_list(lst):

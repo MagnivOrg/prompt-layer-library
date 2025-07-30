@@ -1542,3 +1542,45 @@ async def avertexai_request(prompt_blueprint: GetPromptTemplateResponse, client_
     raise NotImplementedError(
         f"Vertex AI request for model {prompt_blueprint['metadata']['model']['name']} is not implemented yet."
     )
+
+
+def anthropic_bedrock_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
+    from anthropic import AnthropicBedrock
+
+    client = AnthropicBedrock(
+        aws_access_key=function_kwargs.pop("aws_access_key", None),
+        aws_secret_key=function_kwargs.pop("aws_secret_key", None),
+        aws_region=function_kwargs.pop("aws_region", None),
+        aws_session_token=function_kwargs.pop("aws_session_token", None),
+        base_url=function_kwargs.pop("base_url", None),
+        **client_kwargs,
+    )
+    if prompt_blueprint["prompt_template"]["type"] == "chat":
+        return anthropic_chat_request(client=client, **function_kwargs)
+    elif prompt_blueprint["prompt_template"]["type"] == "completion":
+        return anthropic_completions_request(client=client, **function_kwargs)
+    raise NotImplementedError(
+        f"Unsupported prompt template type {prompt_blueprint['prompt_template']['type']}' for Anthropic Bedrock"
+    )
+
+
+async def aanthropic_bedrock_request(
+    prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict
+):
+    from anthropic import AsyncAnthropicBedrock
+
+    client = AsyncAnthropicBedrock(
+        aws_access_key=function_kwargs.pop("aws_access_key", None),
+        aws_secret_key=function_kwargs.pop("aws_secret_key", None),
+        aws_region=function_kwargs.pop("aws_region", None),
+        aws_session_token=function_kwargs.pop("aws_session_token", None),
+        base_url=function_kwargs.pop("base_url", None),
+        **client_kwargs,
+    )
+    if prompt_blueprint["prompt_template"]["type"] == "chat":
+        return await aanthropic_chat_request(client=client, **function_kwargs)
+    elif prompt_blueprint["prompt_template"]["type"] == "completion":
+        return await aanthropic_completions_request(client=client, **function_kwargs)
+    raise NotImplementedError(
+        f"Unsupported prompt template type {prompt_blueprint['prompt_template']['type']}' for Anthropic Bedrock"
+    )

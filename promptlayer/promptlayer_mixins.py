@@ -27,10 +27,12 @@ from promptlayer.streaming import (
     openai_stream_completion,
 )
 from promptlayer.utils import (
+    aanthropic_bedrock_request,
     aanthropic_request,
     aazure_openai_request,
     agoogle_request,
     amistral_request,
+    anthropic_bedrock_request,
     anthropic_request,
     aopenai_request,
     avertexai_request,
@@ -92,6 +94,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": google_stream_completion,
         },
     },
+    "anthropic.bedrock": {
+        "chat": {
+            "function_name": "anthropic.messages.create",
+            "stream_function": anthropic_stream_message,
+        },
+        "completion": {
+            "function_name": "anthropic.completions.create",
+            "stream_function": anthropic_stream_completion,
+        },
+    },
 }
 
 
@@ -102,6 +114,7 @@ MAP_PROVIDER_TO_FUNCTION = {
     "openai": openai_request,
     "openai.azure": azure_openai_request,
     "vertexai": vertexai_request,
+    "anthropic.bedrock": anthropic_bedrock_request,
 }
 
 AMAP_PROVIDER_TO_FUNCTION_NAME = {
@@ -155,6 +168,16 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": agoogle_stream_completion,
         },
     },
+    "anthropic.bedrock": {
+        "chat": {
+            "function_name": "anthropic.messages.create",
+            "stream_function": aanthropic_stream_message,
+        },
+        "completion": {
+            "function_name": "anthropic.completions.create",
+            "stream_function": aanthropic_stream_completion,
+        },
+    },
 }
 
 
@@ -165,6 +188,7 @@ AMAP_PROVIDER_TO_FUNCTION = {
     "openai": aopenai_request,
     "openai.azure": aazure_openai_request,
     "vertexai": avertexai_request,
+    "anthropic.bedrock": aanthropic_bedrock_request,
 }
 
 

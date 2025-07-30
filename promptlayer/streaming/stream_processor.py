@@ -18,7 +18,7 @@ def _build_stream_blueprint(result: Any, metadata: Dict) -> Any:
     elif provider == "google" or (provider == "vertexai" and model_name.startswith("gemini")):
         return build_prompt_blueprint_from_google_event(result, metadata)
 
-    elif provider == "anthropic" or (provider == "vertexai" and model_name.startswith("claude")):
+    elif provider in ["anthropic", "anthropic.bedrock"] or (provider == "vertexai" and model_name.startswith("claude")):
         return build_prompt_blueprint_from_anthropic_event(result, metadata)
 
     elif provider == "mistral":

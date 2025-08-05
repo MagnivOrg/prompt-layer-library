@@ -135,6 +135,7 @@ class PromptLayer(PromptLayerMixin):
             metadata=metadata,
             provider=provider,
             model=model,
+            model_parameter_overrides=model_parameter_overrides,
         )
         prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
@@ -144,7 +145,6 @@ class PromptLayer(PromptLayerMixin):
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
             prompt_blueprint_model=prompt_blueprint_model,
-            model_parameter_overrides=model_parameter_overrides,
             stream=stream,
         )
 
@@ -572,6 +572,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             metadata=metadata,
             provider=provider,
             model=model,
+            model_parameter_overrides=model_parameter_overrides,
         )
         prompt_blueprint = await self.templates.get(prompt_name, get_prompt_template_params)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
@@ -581,7 +582,6 @@ class AsyncPromptLayer(PromptLayerMixin):
             prompt_blueprint=prompt_blueprint,
             prompt_template=prompt_blueprint["prompt_template"],
             prompt_blueprint_model=prompt_blueprint_model,
-            model_parameter_overrides=model_parameter_overrides,
             stream=stream,
             is_async=True,
         )

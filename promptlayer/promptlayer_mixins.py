@@ -215,6 +215,7 @@ class PromptLayerMixin:
         metadata: Union[Dict[str, str], None],
         provider: Union[str, None] = None,
         model: Union[str, None] = None,
+        model_parameter_overrides: Union[Dict[str, Any], None] = None,
     ) -> Dict[str, Any]:
         params = {}
 
@@ -230,6 +231,8 @@ class PromptLayerMixin:
             params["provider"] = provider
         if model:
             params["model"] = model
+        if model_parameter_overrides:
+            params["model_parameter_overrides"] = model_parameter_overrides
 
         return params
 
@@ -239,7 +242,6 @@ class PromptLayerMixin:
         prompt_blueprint,
         prompt_template,
         prompt_blueprint_model,
-        model_parameter_overrides,
         stream,
         is_async=False,
     ):
@@ -256,9 +258,6 @@ class PromptLayerMixin:
             }
         elif provider_base_url := prompt_blueprint.get("provider_base_url"):
             client_kwargs["base_url"] = provider_base_url["url"]
-
-        if model_parameter_overrides:
-            function_kwargs.update(model_parameter_overrides)
 
         if stream and provider in ["openai", "openai.azure"]:
             function_kwargs["stream_options"] = {"include_usage": True}

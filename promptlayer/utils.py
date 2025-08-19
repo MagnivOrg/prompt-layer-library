@@ -1544,6 +1544,51 @@ async def avertexai_request(prompt_blueprint: GetPromptTemplateResponse, client_
     )
 
 
+def amazon_bedrock_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
+    import boto3
+
+    bedrock_client = boto3.client(
+        "bedrock-runtime",
+        aws_access_key_id=function_kwargs.pop("aws_access_key", None),
+        aws_secret_access_key=function_kwargs.pop("aws_secret_key", None),
+        region_name=function_kwargs.pop("aws_region", "us-east-1"),
+    )
+
+    stream = function_kwargs.pop("stream", False)
+
+    if stream:
+        return bedrock_client.converse_stream(**function_kwargs)
+    else:
+        return bedrock_client.converse(**function_kwargs)
+
+
+async def aamazon_bedrock_request(
+    prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict
+):
+    import aioboto3
+
+    aws_access_key = function_kwargs.pop("aws_access_key", None)
+    aws_secret_key = function_kwargs.pop("aws_secret_key", None)
+    aws_region = function_kwargs.pop("aws_region", "us-east-1")
+
+    session_kwargs = {}
+    if aws_access_key:
+        session_kwargs["aws_access_key_id"] = aws_access_key
+    if aws_secret_key:
+        session_kwargs["aws_secret_access_key"] = aws_secret_key
+    if aws_region:
+        session_kwargs["region_name"] = aws_region
+
+    stream = function_kwargs.pop("stream", False)
+    session = aioboto3.Session()
+
+    async with session.client("bedrock-runtime", **session_kwargs) as client:
+        if stream:
+            return await client.converse_stream(**function_kwargs)
+        else:
+            return await client.converse(**function_kwargs)
+
+
 def anthropic_bedrock_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from anthropic import AnthropicBedrock
 

@@ -137,3 +137,38 @@ def build_prompt_blueprint_from_google_event(event, metadata):
 
     assistant_message = _build_assistant_message(assistant_content, tool_calls or None, template_format="f-string")
     return _build_prompt_blueprint(assistant_message, metadata)
+
+
+def build_prompt_blueprint_from_bedrock_event(result, metadata):
+    """
+    Build a prompt blueprint from an Amazon Bedrock streaming event.
+    """
+    assistant_content = []
+    tool_calls = []
+
+    if "contentBlockDelta" in result:
+        delta = result["contentBlockDelta"].get("delta", {})
+
+        if "reasoningContent" in delta:
+            reasoning_text = delta["reasoningContent"].get("text", "")
+            signature = delta["reasoningContent"].get("signature")
+            assistant_content.append(_create_content_item("thinking", thinking=reasoning_text, signature=signature))
+
+        elif "text" in delta:
+            assistant_content.append(_create_content_item("text", text=delta["text"]))
+
+        elif "toolUse" in delta:
+            tool_use = delta["toolUse"]
+            assistant_content.append(
+                _create_tool_call(tool_use.get("toolUseId", ""), tool_use.get("name", ""), tool_use.get("input", ""))
+            )
+
+    elif "contentBlockStart" in result:
+        start_block = result["contentBlockStart"].get("start", {})
+
+        if "toolUse" in start_block:
+            tool_use = start_block["toolUse"]
+            tool_calls.append(_create_tool_call(tool_use.get("toolUseId", ""), tool_use.get("name", ""), ""))
+
+    assistant_message = _build_assistant_message(assistant_content, tool_calls or None)
+    return _build_prompt_blueprint(assistant_message, metadata)

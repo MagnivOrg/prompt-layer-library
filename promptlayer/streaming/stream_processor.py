@@ -2,6 +2,7 @@ from typing import Any, AsyncGenerator, AsyncIterable, Callable, Dict, Generator
 
 from .blueprint_builder import (
     build_prompt_blueprint_from_anthropic_event,
+    build_prompt_blueprint_from_bedrock_event,
     build_prompt_blueprint_from_google_event,
     build_prompt_blueprint_from_openai_chunk,
 )
@@ -18,11 +19,14 @@ def _build_stream_blueprint(result: Any, metadata: Dict) -> Any:
     elif provider == "google" or (provider == "vertexai" and model_name.startswith("gemini")):
         return build_prompt_blueprint_from_google_event(result, metadata)
 
-    elif provider in ["anthropic", "anthropic.bedrock"] or (provider == "vertexai" and model_name.startswith("claude")):
+    elif provider in ("anthropic", "anthropic.bedrock") or (provider == "vertexai" and model_name.startswith("claude")):
         return build_prompt_blueprint_from_anthropic_event(result, metadata)
 
     elif provider == "mistral":
         return build_prompt_blueprint_from_openai_chunk(result.data, metadata)
+
+    elif provider == "amazon.bedrock":
+        return build_prompt_blueprint_from_bedrock_event(result, metadata)
 
     return None
 
@@ -37,6 +41,11 @@ def _build_stream_data(result: Any, stream_blueprint: Any, request_id: Any = Non
 
 def stream_response(*, generator: Generator, after_stream: Callable, map_results: Callable, metadata: Dict):
     results = []
+    provider = metadata.get("model", {}).get("provider", "")
+    if provider == "amazon.bedrock":
+        response_metadata = generator.get("ResponseMetadata", {})
+        generator = generator.get("stream", generator)
+
     for result in generator:
         results.append(result)
 
@@ -45,7 +54,12 @@ def stream_response(*, generator: Generator, after_stream: Callable, map_results
         yield data
 
     request_response = map_results(results)
-    response = after_stream(request_response=request_response.model_dump(mode="json"))
+    if provider == "amazon.bedrock":
+        request_response["ResponseMetadata"] = response_metadata
+    else:
+        request_response = request_response.model_dump(mode="json")
+
+    response = after_stream(request_response=request_response)
     data["request_id"] = response.get("request_id")
     data["prompt_blueprint"] = response.get("prompt_blueprint")
     yield data
@@ -58,6 +72,10 @@ async def astream_response(
     metadata: Dict[str, Any] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     results = []
+    provider = metadata.get("model", {}).get("provider", "")
+    if provider == "amazon.bedrock":
+        response_metadata = generator.get("ResponseMetadata", {})
+        generator = generator.get("stream", generator)
 
     async for result in generator:
         results.append(result)
@@ -71,7 +89,13 @@ async def astream_response(
             yield item
 
     request_response = await map_results(async_generator_from_list(results))
-    after_stream_response = await after_stream(request_response=request_response.model_dump(mode="json"))
+
+    if provider == "amazon.bedrock":
+        request_response["ResponseMetadata"] = response_metadata
+    else:
+        request_response = request_response.model_dump(mode="json")
+
+    after_stream_response = await after_stream(request_response=request_response)
     data["request_id"] = after_stream_response.get("request_id")
     data["prompt_blueprint"] = after_stream_response.get("prompt_blueprint")
     yield data

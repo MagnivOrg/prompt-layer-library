@@ -171,6 +171,11 @@ class PromptLayer(PromptLayerMixin):
                 metadata=llm_data["prompt_blueprint"]["metadata"],
             )
 
+        if isinstance(response, dict):
+            request_response = response
+        else:
+            request_response = response.model_dump(mode="json")
+
         request_log = self._track_request_log(
             llm_data,
             tags,
@@ -178,7 +183,7 @@ class PromptLayer(PromptLayerMixin):
             group_id,
             pl_run_span_id,
             metadata=metadata,
-            request_response=response.model_dump(mode="json"),
+            request_response=request_response,
         )
 
         return {
@@ -592,6 +597,11 @@ class AsyncPromptLayer(PromptLayerMixin):
             function_kwargs=llm_data["function_kwargs"],
         )
 
+        if isinstance(response, dict):
+            request_response = response
+        else:
+            request_response = response.model_dump(mode="json")
+
         if stream:
             track_request_callable = await self._create_track_request_callable(
                 request_params=llm_data,
@@ -601,7 +611,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 pl_run_span_id=pl_run_span_id,
             )
             return astream_response(
-                response,
+                request_response,
                 track_request_callable,
                 llm_data["stream_function"],
                 llm_data["prompt_blueprint"]["metadata"],
@@ -614,11 +624,11 @@ class AsyncPromptLayer(PromptLayerMixin):
             group_id,
             pl_run_span_id,
             metadata=metadata,
-            request_response=response.model_dump(mode="json"),
+            request_response=request_response,
         )
 
         return {
             "request_id": request_log.get("request_id", None),
-            "raw_response": response,
+            "raw_response": request_response,
             "prompt_blueprint": request_log.get("prompt_blueprint", None),
         }

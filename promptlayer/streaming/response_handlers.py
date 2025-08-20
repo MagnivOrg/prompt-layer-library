@@ -5,6 +5,7 @@ This module contains handlers that process streaming responses from various
 LLM providers and return both the final response and prompt blueprint.
 """
 
+import json
 from typing import Any, AsyncIterable, List
 
 
@@ -547,4 +548,148 @@ async def amistral_stream_chat(generator: AsyncIterable[Any]) -> Any:
 
     response.choices[0].message.content = content
     response.choices[0].message.tool_calls = tool_calls
+    return response
+
+
+def bedrock_stream_message(results: list):
+    """Process Amazon Bedrock streaming message results and return response + blueprint"""
+
+    response = {"ResponseMetadata": {}, "output": {"message": {}}, "stopReason": "end_turn", "metrics": {}, "usage": {}}
+
+    content_blocks = []
+    current_tool_call = None
+    current_tool_input = ""
+    current_text = ""
+    current_signature = ""
+    current_thinking = ""
+
+    for event in results:
+        if "contentBlockStart" in event:
+            content_block = event["contentBlockStart"]
+            if "start" in content_block and "toolUse" in content_block["start"]:
+                tool_use = content_block["start"]["toolUse"]
+                current_tool_call = {"toolUse": {"toolUseId": tool_use["toolUseId"], "name": tool_use["name"]}}
+                current_tool_input = ""
+
+        elif "contentBlockDelta" in event:
+            delta = event["contentBlockDelta"]["delta"]
+            if "text" in delta:
+                current_text += delta["text"]
+            elif "reasoningContent" in delta:
+                reasoning_content = delta["reasoningContent"]
+                if "text" in reasoning_content:
+                    current_thinking += reasoning_content["text"]
+                elif "signature" in reasoning_content:
+                    current_signature += reasoning_content["signature"]
+            elif "toolUse" in delta:
+                if "input" in delta["toolUse"]:
+                    input_chunk = delta["toolUse"]["input"]
+                    current_tool_input += input_chunk
+                    if not input_chunk.strip():
+                        continue
+
+        elif "contentBlockStop" in event:
+            if current_tool_call and current_tool_input:
+                try:
+                    current_tool_call["toolUse"]["input"] = json.loads(current_tool_input)
+                except json.JSONDecodeError:
+                    current_tool_call["toolUse"]["input"] = {}
+                content_blocks.append(current_tool_call)
+                current_tool_call = None
+                current_tool_input = ""
+            elif current_text:
+                content_blocks.append({"text": current_text})
+                current_text = ""
+            elif current_thinking and current_signature:
+                content_blocks.append(
+                    {
+                        "reasoningContent": {
+                            "reasoningText": {"text": current_thinking, "signature": current_signature},
+                        }
+                    }
+                )
+                current_thinking = ""
+                current_signature = ""
+
+        elif "messageStop" in event:
+            response["stopReason"] = event["messageStop"]["stopReason"]
+
+        elif "metadata" in event:
+            metadata = event["metadata"]
+            response["usage"] = metadata.get("usage", {})
+            response["metrics"] = metadata.get("metrics", {})
+
+    response["output"]["message"] = {"role": "assistant", "content": content_blocks}
+    return response
+
+
+async def abedrock_stream_message(generator: AsyncIterable[Any]) -> Any:
+    """Async version of bedrock_stream_message"""
+
+    response = {"ResponseMetadata": {}, "output": {"message": {}}, "stopReason": "end_turn", "metrics": {}, "usage": {}}
+
+    content_blocks = []
+    current_tool_call = None
+    current_tool_input = ""
+    current_text = ""
+    current_signature = ""
+    current_thinking = ""
+
+    async for event in generator:
+        if "contentBlockStart" in event:
+            content_block = event["contentBlockStart"]
+            if "start" in content_block and "toolUse" in content_block["start"]:
+                tool_use = content_block["start"]["toolUse"]
+                current_tool_call = {"toolUse": {"toolUseId": tool_use["toolUseId"], "name": tool_use["name"]}}
+                current_tool_input = ""
+
+        elif "contentBlockDelta" in event:
+            delta = event["contentBlockDelta"]["delta"]
+            if "text" in delta:
+                current_text += delta["text"]
+            elif "reasoningContent" in delta:
+                reasoning_content = delta["reasoningContent"]
+                if "text" in reasoning_content:
+                    current_thinking += reasoning_content["text"]
+                elif "signature" in reasoning_content:
+                    current_signature += reasoning_content["signature"]
+            elif "toolUse" in delta:
+                if "input" in delta["toolUse"]:
+                    input_chunk = delta["toolUse"]["input"]
+                    current_tool_input += input_chunk
+                    if not input_chunk.strip():
+                        continue
+
+        elif "contentBlockStop" in event:
+            if current_tool_call and current_tool_input:
+                try:
+                    current_tool_call["toolUse"]["input"] = json.loads(current_tool_input)
+                except json.JSONDecodeError:
+                    current_tool_call["toolUse"]["input"] = {}
+                content_blocks.append(current_tool_call)
+                current_tool_call = None
+                current_tool_input = ""
+            elif current_text:
+                content_blocks.append({"text": current_text})
+                current_text = ""
+            elif current_thinking and current_signature:
+                content_blocks.append(
+                    {
+                        "reasoningContent": {
+                            "reasoningText": {"text": current_thinking, "signature": current_signature},
+                        }
+                    }
+                )
+                current_thinking = ""
+                current_signature = ""
+
+        elif "messageStop" in event:
+            response["stopReason"] = event["messageStop"]["stopReason"]
+
+        elif "metadata" in event:
+            metadata = event["metadata"]
+            response["usage"] = metadata.get("usage", {})
+            response["metrics"] = metadata.get("metrics", {})
+
+    response["output"]["message"] = {"role": "assistant", "content": content_blocks}
     return response

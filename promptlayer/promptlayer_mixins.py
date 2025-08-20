@@ -13,6 +13,7 @@ from promptlayer.span_exporter import PromptLayerSpanExporter
 from promptlayer.streaming import (
     aanthropic_stream_completion,
     aanthropic_stream_message,
+    abedrock_stream_message,
     agoogle_stream_chat,
     agoogle_stream_completion,
     amistral_stream_chat,
@@ -20,6 +21,7 @@ from promptlayer.streaming import (
     anthropic_stream_message,
     aopenai_stream_chat,
     aopenai_stream_completion,
+    bedrock_stream_message,
     google_stream_chat,
     google_stream_completion,
     mistral_stream_chat,
@@ -27,10 +29,12 @@ from promptlayer.streaming import (
     openai_stream_completion,
 )
 from promptlayer.utils import (
+    aamazon_bedrock_request,
     aanthropic_bedrock_request,
     aanthropic_request,
     aazure_openai_request,
     agoogle_request,
+    amazon_bedrock_request,
     amistral_request,
     anthropic_bedrock_request,
     anthropic_request,
@@ -94,6 +98,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": google_stream_completion,
         },
     },
+    "amazon.bedrock": {
+        "chat": {
+            "function_name": "boto3.bedrock-runtime.converse",
+            "stream_function": bedrock_stream_message,
+        },
+        "completion": {
+            "function_name": "boto3.bedrock-runtime.converse",
+            "stream_function": bedrock_stream_message,
+        },
+    },
     "anthropic.bedrock": {
         "chat": {
             "function_name": "anthropic.messages.create",
@@ -114,6 +128,7 @@ MAP_PROVIDER_TO_FUNCTION = {
     "openai": openai_request,
     "openai.azure": azure_openai_request,
     "vertexai": vertexai_request,
+    "amazon.bedrock": amazon_bedrock_request,
     "anthropic.bedrock": anthropic_bedrock_request,
 }
 
@@ -168,6 +183,16 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": agoogle_stream_completion,
         },
     },
+    "amazon.bedrock": {
+        "chat": {
+            "function_name": "boto3.bedrock-runtime.converse",
+            "stream_function": abedrock_stream_message,
+        },
+        "completion": {
+            "function_name": "boto3.bedrock-runtime.converse",
+            "stream_function": abedrock_stream_message,
+        },
+    },
     "anthropic.bedrock": {
         "chat": {
             "function_name": "anthropic.messages.create",
@@ -188,6 +213,7 @@ AMAP_PROVIDER_TO_FUNCTION = {
     "openai": aopenai_request,
     "openai.azure": aazure_openai_request,
     "vertexai": avertexai_request,
+    "amazon.bedrock": aamazon_bedrock_request,
     "anthropic.bedrock": aanthropic_bedrock_request,
 }
 

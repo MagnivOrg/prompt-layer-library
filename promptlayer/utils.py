@@ -1455,7 +1455,14 @@ MAP_TYPE_TO_GOOGLE_FUNCTION = {
 def google_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
-    client = genai.Client()
+    if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI") == "true":
+        client = genai.Client(
+            vertexai=True,
+            project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+            location=os.environ.get("GOOGLE_CLOUD_LOCATION"),
+        )
+    else:
+        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
     request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **function_kwargs)
 
@@ -1493,7 +1500,14 @@ AMAP_TYPE_TO_GOOGLE_FUNCTION = {
 async def agoogle_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
-    client = genai.Client()
+    if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI") == "true":
+        client = genai.Client(
+            vertexai=True,
+            project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+            location=os.environ.get("GOOGLE_CLOUD_LOCATION"),
+        )
+    else:
+        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
     request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 

@@ -1,4 +1,4 @@
 from .promptlayer import AsyncPromptLayer, PromptLayer
 
-__version__ = "1.0.66"
+__version__ = "1.0.67"
 __all__ = ["PromptLayer", "AsyncPromptLayer", "__version__"]

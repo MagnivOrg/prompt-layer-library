@@ -326,6 +326,7 @@ class PromptLayer(PromptLayerMixin):
         function_name: str = "",
         score: int = 0,
         prompt_id: Union[int, None] = None,
+        score_name: Union[str, None] = None,
     ):
         return util_log_request(
             self.api_key,
@@ -347,6 +348,7 @@ class PromptLayer(PromptLayerMixin):
             function_name=function_name,
             score=score,
             prompt_id=prompt_id,
+            score_name=score_name,
         )
 
 

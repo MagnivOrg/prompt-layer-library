@@ -21,12 +21,14 @@ class ImageUrl(TypedDict, total=False):
 class TextContent(TypedDict, total=False):
     type: Literal["text"]
     text: str
+    id: Union[str, None]
 
 
 class ThinkingContent(TypedDict, total=False):
     signature: Union[str, None]
     type: Literal["thinking"]
     thinking: str
+    id: Union[str, None]
 
 
 class ImageContent(TypedDict, total=False):
@@ -87,6 +89,7 @@ class UserMessage(TypedDict, total=False):
 
 class ToolCall(TypedDict, total=False):
     id: str
+    tool_id: Union[str, None]
     type: Literal["function"]
     function: FunctionCall
 

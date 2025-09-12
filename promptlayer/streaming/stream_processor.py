@@ -5,6 +5,7 @@ from .blueprint_builder import (
     build_prompt_blueprint_from_bedrock_event,
     build_prompt_blueprint_from_google_event,
     build_prompt_blueprint_from_openai_chunk,
+    build_prompt_blueprint_from_openai_responses_event,
 )
 
 
@@ -14,7 +15,11 @@ def _build_stream_blueprint(result: Any, metadata: Dict) -> Any:
     model_name = model_info.get("name", "")
 
     if provider == "openai" or provider == "openai.azure":
-        return build_prompt_blueprint_from_openai_chunk(result, metadata)
+        api_type = model_info.get("api_type", "chat-completions") if metadata else "chat-completions"
+        if api_type == "chat-completions":
+            return build_prompt_blueprint_from_openai_chunk(result, metadata)
+        elif api_type == "responses":
+            return build_prompt_blueprint_from_openai_responses_event(result, metadata)
 
     elif provider == "google" or (provider == "vertexai" and model_name.startswith("gemini")):
         return build_prompt_blueprint_from_google_event(result, metadata)

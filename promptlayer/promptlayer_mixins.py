@@ -19,12 +19,14 @@ from promptlayer.streaming import (
     amistral_stream_chat,
     anthropic_stream_completion,
     anthropic_stream_message,
+    aopenai_responses_stream_chat,
     aopenai_stream_chat,
     aopenai_stream_completion,
     bedrock_stream_message,
     google_stream_chat,
     google_stream_completion,
     mistral_stream_chat,
+    openai_responses_stream_chat,
     openai_stream_chat,
     openai_stream_completion,
 )
@@ -48,7 +50,7 @@ from promptlayer.utils import (
 )
 
 MAP_PROVIDER_TO_FUNCTION_NAME = {
-    "openai": {
+    "openai:chat-completions": {
         "chat": {
             "function_name": "openai.chat.completions.create",
             "stream_function": openai_stream_chat,
@@ -56,6 +58,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
         "completion": {
             "function_name": "openai.completions.create",
             "stream_function": openai_stream_completion,
+        },
+    },
+    "openai:responses": {
+        "chat": {
+            "function_name": "openai.responses.create",
+            "stream_function": openai_responses_stream_chat,
+        },
+        "completion": {
+            "function_name": "openai.responses.create",
+            "stream_function": openai_responses_stream_chat,
         },
     },
     "anthropic": {
@@ -68,7 +80,7 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": anthropic_stream_completion,
         },
     },
-    "openai.azure": {
+    "openai.azure:chat-completions": {
         "chat": {
             "function_name": "openai.AzureOpenAI.chat.completions.create",
             "stream_function": openai_stream_chat,
@@ -76,6 +88,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
         "completion": {
             "function_name": "openai.AzureOpenAI.completions.create",
             "stream_function": openai_stream_completion,
+        },
+    },
+    "openai.azure:responses": {
+        "chat": {
+            "function_name": "openai.AzureOpenAI.responses.create",
+            "stream_function": openai_responses_stream_chat,
+        },
+        "completion": {
+            "function_name": "openai.AzureOpenAI.responses.create",
+            "stream_function": openai_responses_stream_chat,
         },
     },
     "mistral": {
@@ -133,7 +155,7 @@ MAP_PROVIDER_TO_FUNCTION = {
 }
 
 AMAP_PROVIDER_TO_FUNCTION_NAME = {
-    "openai": {
+    "openai:chat-completions": {
         "chat": {
             "function_name": "openai.chat.completions.create",
             "stream_function": aopenai_stream_chat,
@@ -141,6 +163,16 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
         "completion": {
             "function_name": "openai.completions.create",
             "stream_function": aopenai_stream_completion,
+        },
+    },
+    "openai:responses": {
+        "chat": {
+            "function_name": "openai.responses.create",
+            "stream_function": aopenai_responses_stream_chat,
+        },
+        "completion": {
+            "function_name": "openai.responses.create",
+            "stream_function": aopenai_responses_stream_chat,
         },
     },
     "anthropic": {
@@ -153,7 +185,7 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": aanthropic_stream_completion,
         },
     },
-    "openai.azure": {
+    "openai.azure:chat-completions": {
         "chat": {
             "function_name": "openai.AzureOpenAI.chat.completions.create",
             "stream_function": aopenai_stream_chat,
@@ -161,6 +193,16 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
         "completion": {
             "function_name": "openai.AzureOpenAI.completions.create",
             "stream_function": aopenai_stream_completion,
+        },
+    },
+    "openai.azure:responses": {
+        "chat": {
+            "function_name": "openai.AzureOpenAI.responses.create",
+            "stream_function": aopenai_responses_stream_chat,
+        },
+        "completion": {
+            "function_name": "openai.AzureOpenAI.responses.create",
+            "stream_function": aopenai_responses_stream_chat,
         },
     },
     "mistral": {
@@ -275,6 +317,7 @@ class PromptLayerMixin:
         function_kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
         function_kwargs["stream"] = stream
         provider = prompt_blueprint_model["provider"]
+        api_type = prompt_blueprint_model["api_type"]
 
         if custom_provider := prompt_blueprint.get("custom_provider"):
             provider = custom_provider["client"]
@@ -285,7 +328,7 @@ class PromptLayerMixin:
         elif provider_base_url := prompt_blueprint.get("provider_base_url"):
             client_kwargs["base_url"] = provider_base_url["url"]
 
-        if stream and provider in ["openai", "openai.azure"]:
+        if stream and provider in ["openai", "openai.azure"] and api_type == "chat-completions":
             function_kwargs["stream_options"] = {"include_usage": True}
 
         provider_function_name = provider
@@ -294,6 +337,9 @@ class PromptLayerMixin:
                 provider_function_name = "google"
             elif "claude" in prompt_blueprint_model["name"]:
                 provider_function_name = "anthropic"
+
+        if provider_function_name in ("openai", "openai.azure"):
+            provider_function_name = f"{provider_function_name}:{api_type}"
 
         if is_async:
             config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider_function_name][prompt_template["type"]]

@@ -599,10 +599,10 @@ class AsyncPromptLayer(PromptLayerMixin):
             function_kwargs=llm_data["function_kwargs"],
         )
 
-        if isinstance(response, dict):
-            request_response = response
-        else:
+        if hasattr(response, "model_dump"):
             request_response = response.model_dump(mode="json")
+        else:
+            request_response = response
 
         if stream:
             track_request_callable = await self._create_track_request_callable(

@@ -155,6 +155,262 @@ async def aopenai_stream_chat(generator: AsyncIterable[Any]) -> Any:
     return response
 
 
+def _initialize_openai_response_data():
+    """Initialize the response data structure for OpenAI responses"""
+    return {
+        "id": None,
+        "object": "response",
+        "created_at": None,
+        "status": None,
+        "error": None,
+        "incomplete_details": None,
+        "instructions": None,
+        "max_output_tokens": None,
+        "model": None,
+        "output": [],
+        "parallel_tool_calls": True,
+        "previous_response_id": None,
+        "reasoning": {"effort": None, "summary": None},
+        "store": True,
+        "temperature": 1,
+        "text": {"format": {"type": "text"}},
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "truncation": "disabled",
+        "usage": None,
+        "user": None,
+        "metadata": {},
+    }
+
+
+def _process_openai_response_event(chunk_dict, response_data, current_items):
+    """Process a single OpenAI response event and update the response data"""
+    event_type = chunk_dict.get("type")
+    has_reasoning = False
+
+    if event_type == "response.created":
+        response_info = chunk_dict.get("response", {})
+        response_data["id"] = response_info.get("id")
+        response_data["created_at"] = response_info.get("created_at")
+        response_data["model"] = response_info.get("model")
+        response_data["status"] = response_info.get("status")
+        response_data["parallel_tool_calls"] = response_info.get("parallel_tool_calls", True)
+        response_data["temperature"] = response_info.get("temperature", 1)
+        response_data["tool_choice"] = response_info.get("tool_choice", "auto")
+        response_data["tools"] = response_info.get("tools", [])
+        response_data["top_p"] = response_info.get("top_p", 1)
+        response_data["truncation"] = response_info.get("truncation", "disabled")
+        response_data["max_output_tokens"] = response_info.get("max_output_tokens")
+        response_data["previous_response_id"] = response_info.get("previous_response_id")
+        response_data["store"] = response_info.get("store", True)
+        response_data["user"] = response_info.get("user")
+        response_data["metadata"] = response_info.get("metadata", {})
+
+        text_config = response_info.get("text", {})
+        if text_config:
+            response_data["text"] = text_config
+
+        reasoning = response_info.get("reasoning", {})
+        if reasoning:
+            response_data["reasoning"] = reasoning
+            has_reasoning = True
+
+    elif event_type == "response.in_progress":
+        response_info = chunk_dict.get("response", {})
+        response_data["status"] = response_info.get("status")
+
+    elif event_type == "response.output_item.added":
+        item = chunk_dict.get("item", {})
+        item_id = item.get("id")
+        item_type = item.get("type")
+
+        if item_type == "reasoning":
+            current_items[item_id] = {
+                "type": "reasoning",
+                "id": item_id,
+                "summary": [],
+                "status": item.get("status", "in_progress"),
+            }
+            has_reasoning = True
+
+        elif item_type == "function_call":
+            current_items[item_id] = {
+                "type": "function_call",
+                "id": item_id,
+                "call_id": item.get("call_id"),
+                "name": item.get("name"),
+                "arguments": "",
+                "status": item.get("status", "in_progress"),
+            }
+
+        elif item_type == "message":
+            current_items[item_id] = {
+                "type": "message",
+                "id": item_id,
+                "role": item.get("role", "assistant"),
+                "content": [],
+                "status": item.get("status", "in_progress"),
+            }
+
+    elif event_type == "response.reasoning_summary_part.added":
+        item_id = chunk_dict.get("item_id")
+        part = chunk_dict.get("part", {})
+
+        if item_id in current_items and current_items[item_id]["type"] == "reasoning":
+            summary_part = {"type": part.get("type", "summary_text"), "text": part.get("text", "")}
+            current_items[item_id]["summary"].append(summary_part)
+
+    elif event_type == "response.reasoning_summary_text.delta":
+        item_id = chunk_dict.get("item_id")
+        delta = chunk_dict.get("delta", "")
+        summary_index = chunk_dict.get("summary_index", 0)
+
+        if item_id in current_items and current_items[item_id]["type"] == "reasoning":
+            while len(current_items[item_id]["summary"]) <= summary_index:
+                current_items[item_id]["summary"].append({"type": "summary_text", "text": ""})
+
+            current_items[item_id]["summary"][summary_index]["text"] += delta
+
+    elif event_type == "response.reasoning_summary_text.done":
+        item_id = chunk_dict.get("item_id")
+        final_text = chunk_dict.get("text", "")
+        summary_index = chunk_dict.get("summary_index", 0)
+
+        if item_id in current_items and current_items[item_id]["type"] == "reasoning":
+            while len(current_items[item_id]["summary"]) <= summary_index:
+                current_items[item_id]["summary"].append({"type": "summary_text", "text": ""})
+
+            current_items[item_id]["summary"][summary_index]["text"] = final_text
+
+    elif event_type == "response.reasoning_summary_part.done":
+        item_id = chunk_dict.get("item_id")
+        part = chunk_dict.get("part", {})
+
+        if item_id in current_items and current_items[item_id]["type"] == "reasoning":
+            summary_index = chunk_dict.get("summary_index", 0)
+            if summary_index < len(current_items[item_id]["summary"]):
+                current_items[item_id]["summary"][summary_index] = {
+                    "type": part.get("type", "summary_text"),
+                    "text": part.get("text", ""),
+                }
+
+    elif event_type == "response.function_call_arguments.delta":
+        item_id = chunk_dict.get("item_id")
+        delta = chunk_dict.get("delta", "")
+
+        if item_id in current_items:
+            current_items[item_id]["arguments"] += delta
+
+    elif event_type == "response.function_call_arguments.done":
+        item_id = chunk_dict.get("item_id")
+        final_arguments = chunk_dict.get("arguments", "")
+
+        if item_id in current_items:
+            current_items[item_id]["arguments"] = final_arguments
+
+    elif event_type == "response.content_part.added":
+        part = chunk_dict.get("part", {})
+
+        message_item = None
+        for item in current_items.values():
+            if item.get("type") == "message":
+                message_item = item
+                break
+
+        if message_item:
+            content_part = {
+                "type": part.get("type", "output_text"),
+                "text": part.get("text", ""),
+                "annotations": part.get("annotations", []),
+            }
+            message_item["content"].append(content_part)
+
+    elif event_type == "response.output_text.delta":
+        delta_text = chunk_dict.get("delta", "")
+
+        for item in current_items.values():
+            if item.get("type") == "message" and item.get("content"):
+                if item["content"] and item["content"][-1].get("type") == "output_text":
+                    item["content"][-1]["text"] += delta_text
+                break
+
+    elif event_type == "response.output_text.done":
+        final_text = chunk_dict.get("text", "")
+
+        for item in current_items.values():
+            if item.get("type") == "message" and item.get("content"):
+                if item["content"] and item["content"][-1].get("type") == "output_text":
+                    item["content"][-1]["text"] = final_text
+                break
+
+    elif event_type == "response.output_item.done":
+        item = chunk_dict.get("item", {})
+        item_id = item.get("id")
+
+        if item_id in current_items:
+            current_items[item_id]["status"] = item.get("status", "completed")
+
+            if item.get("type") == "reasoning":
+                current_items[item_id].update({"summary": item.get("summary", current_items[item_id]["summary"])})
+            elif item.get("type") == "function_call":
+                current_items[item_id].update(
+                    {
+                        "arguments": item.get("arguments", current_items[item_id]["arguments"]),
+                        "call_id": item.get("call_id", current_items[item_id]["call_id"]),
+                        "name": item.get("name", current_items[item_id]["name"]),
+                    }
+                )
+            elif item.get("type") == "message":
+                current_items[item_id].update(
+                    {
+                        "content": item.get("content", current_items[item_id]["content"]),
+                        "role": item.get("role", current_items[item_id]["role"]),
+                    }
+                )
+
+            response_data["output"].append(current_items[item_id])
+
+    elif event_type == "response.completed":
+        response_info = chunk_dict.get("response", {})
+        response_data["status"] = response_info.get("status", "completed")
+        response_data["usage"] = response_info.get("usage")
+        response_data["output"] = response_info.get("output", response_data["output"])
+
+        if response_info.get("reasoning"):
+            response_data["reasoning"] = response_info["reasoning"]
+
+    return has_reasoning
+
+
+def openai_responses_stream_chat(results: list):
+    """Process OpenAI Responses streaming chat results and return response"""
+    from openai.types.responses import Response
+
+    response_data = _initialize_openai_response_data()
+    current_items = {}
+
+    for chunk in results:
+        chunk_dict = chunk.model_dump()
+        _process_openai_response_event(chunk_dict, response_data, current_items)
+
+    return Response(**response_data)
+
+
+async def aopenai_responses_stream_chat(generator: AsyncIterable[Any]) -> Any:
+    """Async version of openai_responses_stream_chat"""
+    from openai.types.responses import Response
+
+    response_data = _initialize_openai_response_data()
+    current_items = {}
+
+    async for chunk in generator:
+        chunk_dict = chunk.model_dump()
+        _process_openai_response_event(chunk_dict, response_data, current_items)
+
+    return Response(**response_data)
+
+
 def anthropic_stream_message(results: list):
     """Process Anthropic streaming message results and return response + blueprint"""
     from anthropic.types import Message, MessageStreamEvent, Usage

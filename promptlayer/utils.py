@@ -1253,8 +1253,13 @@ def openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: d
     from openai import OpenAI
 
     client = OpenAI(**client_kwargs)
-    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
-    return request_to_make(client, **function_kwargs)
+    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+
+    if api_type == "chat-completions":
+        request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
+        return request_to_make(client, **function_kwargs)
+    else:
+        return client.responses.create(**function_kwargs)
 
 
 async def aopenai_chat_request(client, **kwargs):
@@ -1275,16 +1280,26 @@ async def aopenai_request(prompt_blueprint: GetPromptTemplateResponse, client_kw
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(**client_kwargs)
-    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
-    return await request_to_make(client, **function_kwargs)
+    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+
+    if api_type == "chat-completions":
+        request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
+        return await request_to_make(client, **function_kwargs)
+    else:
+        return await client.responses.create(**function_kwargs)
 
 
 def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from openai import AzureOpenAI
 
     client = AzureOpenAI(azure_endpoint=client_kwargs.pop("base_url", None))
-    request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
-    return request_to_make(client, **function_kwargs)
+    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+
+    if api_type == "chat-completions":
+        request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
+        return request_to_make(client, **function_kwargs)
+    else:
+        return client.responses.create(**function_kwargs)
 
 
 async def aazure_openai_request(
@@ -1293,8 +1308,13 @@ async def aazure_openai_request(
     from openai import AsyncAzureOpenAI
 
     client = AsyncAzureOpenAI(azure_endpoint=client_kwargs.pop("base_url", None))
-    request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
-    return await request_to_make(client, **function_kwargs)
+    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+
+    if api_type == "chat-completions":
+        request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
+        return await request_to_make(client, **function_kwargs)
+    else:
+        return await client.responses.create(**function_kwargs)
 
 
 def anthropic_chat_request(client, **kwargs):

@@ -876,8 +876,8 @@ class GeneratorProxy:
             if stop_reason:
                 final_result.stop_reason = stop_reason
             return final_result
-        else:
-            return deepcopy(self.results[-1])
+
+        # OpenAI and other providers
         if hasattr(self.results[0].choices[0], "text"):  # this is regular completion
             response = ""
             for result in self.results:
@@ -891,9 +891,7 @@ class GeneratorProxy:
                 if hasattr(result.choices[0].delta, "role") and result.choices[0].delta.role is not None:
                     response["role"] = result.choices[0].delta.role
                 if hasattr(result.choices[0].delta, "content") and result.choices[0].delta.content is not None:
-                    response["content"] = response["content"] = (
-                        f"{response['content']}{result.choices[0].delta.content}"
-                    )
+                    response["content"] = f"{response['content']}{result.choices[0].delta.content}"
             final_result = deepcopy(self.results[-1])
             final_result.choices[0] = response
             return final_result

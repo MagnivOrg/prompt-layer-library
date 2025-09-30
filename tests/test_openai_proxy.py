@@ -106,3 +106,30 @@ async def test_openai_chat_completion_async_stream_with_pl_id(capsys, openai_asy
         async for _, pl_id in completion:
             assert pl_id is None or isinstance(pl_id, int)
         assert isinstance(pl_id, int)
+
+
+def test_openai_compatible_chat_completion_stream(openai_compatible_client):
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is the capital of China? Answer in one sentence."},
+    ]
+
+    with assert_played("test_openai_compatible_chat_completion_stream.yaml"):
+        stream = openai_compatible_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=messages,
+            stream=True,
+        )
+
+        full_content = ""
+        chunk_count = 0
+        for chunk in stream:
+            chunk_count += 1
+            if chunk.choices[0].delta.content is not None:
+                full_content += chunk.choices[0].delta.content
+
+    assert len(messages) > 0
+    assert messages[1]["content"] is not None and len(messages[1]["content"]) > 0
+    assert full_content is not None and len(full_content) > 0
+    assert chunk_count > 0
+    assert "Beijing" in full_content or "北京" in full_content

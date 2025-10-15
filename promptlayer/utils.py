@@ -1193,13 +1193,16 @@ async def apublish_prompt_template(
 
 
 def get_all_prompt_templates(
-    page: int = 1, per_page: int = 30, api_key: str = None
+    page: int = 1, per_page: int = 30, api_key: str = None, release_label: str = None
 ) -> List[ListPromptTemplateResponse]:
     try:
+        params = {"page": page, "per_page": per_page}
+        if release_label:
+            params["release_label"] = release_label
         response = requests.get(
             f"{URL_API_PROMPTLAYER}/prompt-templates",
             headers={"X-API-KEY": api_key},
-            params={"page": page, "per_page": per_page},
+            params=params,
         )
         if response.status_code != 200:
             raise Exception(
@@ -1212,14 +1215,17 @@ def get_all_prompt_templates(
 
 
 async def aget_all_prompt_templates(
-    page: int = 1, per_page: int = 30, api_key: str = None
+    page: int = 1, per_page: int = 30, api_key: str = None, release_label: str = None
 ) -> List[ListPromptTemplateResponse]:
     try:
+        params = {"page": page, "per_page": per_page}
+        if release_label:
+            params["release_label"] = release_label
         async with _make_httpx_client() as client:
             response = await client.get(
                 f"{URL_API_PROMPTLAYER}/prompt-templates",
                 headers={"X-API-KEY": api_key},
-                params={"page": page, "per_page": per_page},
+                params=params,
             )
 
         if RAISE_FOR_STATUS:

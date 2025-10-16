@@ -20,8 +20,8 @@ class TemplateManager:
     def publish(self, body: PublishPromptTemplate):
         return publish_prompt_template(body, self.api_key)
 
-    def all(self, page: int = 1, per_page: int = 30, release_label: str = None):
-        return get_all_prompt_templates(page, per_page, self.api_key, release_label)
+    def all(self, page: int = 1, per_page: int = 30, label: str = None):
+        return get_all_prompt_templates(page, per_page, self.api_key, label)
 
 
 class AsyncTemplateManager:
@@ -31,5 +31,5 @@ class AsyncTemplateManager:
     async def get(self, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
         return await aget_prompt_template(prompt_name, params, self.api_key)
 
-    async def all(self, page: int = 1, per_page: int = 30, release_label: str = None):
-        return await aget_all_prompt_templates(page, per_page, self.api_key, release_label)
+    async def all(self, page: int = 1, per_page: int = 30, label: str = None):
+        return await aget_all_prompt_templates(page, per_page, self.api_key, label)

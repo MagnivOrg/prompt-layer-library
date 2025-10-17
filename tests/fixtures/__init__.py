@@ -4,6 +4,8 @@ from .clients import (  # noqa: F401
     anthropic_client,
     openai_async_client,
     openai_client,
+    openai_compatible_api_key,
+    openai_compatible_client,
     promptlayer_async_client,
     promptlayer_client,
 )

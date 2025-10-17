@@ -1,0 +1,108 @@
+interactions:
+- request:
+    body: '{"messages": [{"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of China? Answer in one sentence."}],
+      "model": "deepseek-chat", "stream": true}'
+    headers:
+      Authorization:
+      - sanitized
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '193'
+      content-type:
+      - application/json
+      host:
+      - api.deepseek.com
+      user-agent:
+      - OpenAI/Python 1.60.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.60.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.13.4
+    method: POST
+    uri: https://api.deepseek.com/beta/chat/completions
+  response:
+    body:
+      string: 'data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"The"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"
+        capital"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"
+        of"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"
+        China"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"
+        is"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"
+        Beijing"},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"."},"logprobs":null,"finish_reason":null}]}
+
+
+        data: {"id":"0f12a0f7-1142-4b7f-94f0-14432d543e56","object":"chat.completion.chunk","created":1759203810,"model":"deepseek-chat","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":""},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":22,"completion_tokens":7,"total_tokens":29,"prompt_tokens_details":{"cached_tokens":0},"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":22}}
+
+
+        data: [DONE]
+
+
+        '
+    headers:
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 30 Sep 2025 03:43:30 GMT
+      Server:
+      - CW
+      Set-Cookie:
+      - HWWAFSESTIME=1759203809896; path=/
+      - HWWAFSESID=b8ff6799743aa04a94; path=/
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-allow-credentials:
+      - 'true'
+      cache-control:
+      - no-cache
+      vary:
+      - origin, access-control-request-method, access-control-request-headers
+      x-ds-trace-id:
+      - 3317092e58b76a99226aa9753487241b
+    status:
+      code: 200
+      message: OK
+version: 1

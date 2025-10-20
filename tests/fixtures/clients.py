@@ -31,3 +31,16 @@ def openai_client(promptlayer_client, openai_api_key):
 @pytest.fixture
 def openai_async_client(promptlayer_client, openai_api_key):
     return promptlayer_client.openai.AsyncOpenAI(api_key=openai_api_key)
+
+
+@pytest.fixture
+def openai_compatible_api_key():
+    import os
+
+    return os.environ.get("OPENAI_COMPATIBLE_API_KEY", "sk-sanitized")
+
+
+@pytest.fixture
+def openai_compatible_client(promptlayer_client, openai_compatible_api_key):
+    # Use DeepSeek API (OpenAI compatible) here
+    return promptlayer_client.openai.OpenAI(api_key=openai_compatible_api_key, base_url="https://api.deepseek.com/beta")

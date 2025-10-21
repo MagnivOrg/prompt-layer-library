@@ -7,15 +7,24 @@ import logging
 import os
 import sys
 import types
+from contextlib import asynccontextmanager
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 from uuid import uuid4
 
 import httpx
 import requests
+import urllib3
+import urllib3.util
 from ably import AblyRealtime
 from ably.types.message import Message
+from centrifuge import (
+    Client,
+    PublicationContext,
+    SubscriptionEventHandler,
+    SubscriptionState,
+)
 from opentelemetry import context, trace
 
 from promptlayer.types import RequestLog
@@ -28,8 +37,7 @@ from promptlayer.types.prompt_template import (
 )
 
 # Configuration
-# TODO(dmu) MEDIUM: Use `PROMPTLAYER_` prefix instead of `_PROMPTLAYER` suffix
-URL_API_PROMPTLAYER = os.environ.setdefault("URL_API_PROMPTLAYER", "https://api.promptlayer.com")
+
 RERAISE_ORIGINAL_EXCEPTION = os.getenv("PROMPTLAYER_RE_RAISE_ORIGINAL_EXCEPTION", "False").lower() == "true"
 RAISE_FOR_STATUS = os.getenv("PROMPTLAYER_RAISE_FOR_STATUS", "False").lower() == "true"
 DEFAULT_HTTP_TIMEOUT = 5
@@ -37,7 +45,9 @@ DEFAULT_HTTP_TIMEOUT = 5
 WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
 WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
 SET_WORKFLOW_COMPLETE_MESSAGE = "SET_WORKFLOW_COMPLETE"
-WS_TOKEN_REQUEST_LIBRARY_URL = URL_API_PROMPTLAYER + "/ws-token-request-library"
+WS_TOKEN_REQUEST_LIBRARY_URL = (
+    f"{os.getenv('PROMPTLAYER_BASE_URL', 'https://api.promptlayer.com')}/ws-token-request-library"
+)
 
 
 logger = logging.getLogger(__name__)
@@ -71,10 +81,12 @@ def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
     return workflow_id_or_name
 
 
-async def _get_final_output(execution_id: int, return_all_outputs: bool, *, headers: Dict[str, str]) -> Dict[str, Any]:
+async def _get_final_output(
+    base_url: str, execution_id: int, return_all_outputs: bool, *, headers: Dict[str, str]
+) -> Dict[str, Any]:
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"{URL_API_PROMPTLAYER}/workflow-version-execution-results",
+            f"{base_url}/workflow-version-execution-results",
             headers=headers,
             params={"workflow_version_execution_id": execution_id, "return_all_outputs": return_all_outputs},
         )
@@ -84,14 +96,14 @@ async def _get_final_output(execution_id: int, return_all_outputs: bool, *, head
 
 # TODO(dmu) MEDIUM: Consider putting all these functions into a class, so we do not have to pass
 #                   `authorization_headers` into each function
-async def _resolve_workflow_id(workflow_id_or_name: Union[int, str], headers):
+async def _resolve_workflow_id(base_url: str, workflow_id_or_name: Union[int, str], headers):
     if isinstance(workflow_id_or_name, int):
         return workflow_id_or_name
 
     # TODO(dmu) LOW: Should we warn user here to avoid using workflow names in favor of workflow id?
     async with _make_httpx_client() as client:
         # TODO(dmu) MEDIUM: Generalize the way we make async calls to PromptLayer API and reuse it everywhere
-        response = await client.get(f"{URL_API_PROMPTLAYER}/workflows/{workflow_id_or_name}", headers=headers)
+        response = await client.get(f"{base_url}/workflows/{workflow_id_or_name}", headers=headers)
         if RAISE_FOR_STATUS:
             response.raise_for_status()
         elif response.status_code != 200:
@@ -100,11 +112,11 @@ async def _resolve_workflow_id(workflow_id_or_name: Union[int, str], headers):
         return response.json()["workflow"]["id"]
 
 
-async def _get_ably_token(channel_name, authentication_headers):
+async def _get_ably_token(base_url: str, channel_name, authentication_headers):
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/ws-token-request-library",
+                f"{base_url}/ws-token-request-library",
                 headers=authentication_headers,
                 params={"capability": channel_name},
             )
@@ -115,7 +127,7 @@ async def _get_ably_token(channel_name, authentication_headers):
                     response,
                     "PromptLayer had the following error while getting WebSocket token",
                 )
-            return response.json()["token_details"]["token"]
+            return response.json()
     except Exception as ex:
         error_message = f"Failed to get WebSocket token: {ex}"
         print(error_message)  # TODO(dmu) MEDIUM: Remove prints in favor of logging
@@ -126,7 +138,7 @@ async def _get_ably_token(channel_name, authentication_headers):
             raise Exception(error_message)
 
 
-def _make_message_listener(results_future, execution_id_future, return_all_outputs, headers):
+def _make_message_listener(base_url: str, results_future, execution_id_future, return_all_outputs, headers):
     # We need this function to be mocked by unittests
     async def message_listener(message: Message):
         if results_future.cancelled() or message.name != SET_WORKFLOW_COMPLETE_MESSAGE:
@@ -140,7 +152,7 @@ def _make_message_listener(results_future, execution_id_future, return_all_outpu
         if (result_code := message_data.get("result_code")) in (FinalOutputCode.OK.value, None):
             results = message_data["final_output"]
         elif result_code == FinalOutputCode.EXCEEDS_SIZE_LIMIT.value:
-            results = await _get_final_output(execution_id, return_all_outputs, headers=headers)
+            results = await _get_final_output(base_url, execution_id, return_all_outputs, headers=headers)
         else:
             raise NotImplementedError(f"Unsupported final output code: {result_code}")
 
@@ -149,15 +161,20 @@ def _make_message_listener(results_future, execution_id_future, return_all_outpu
     return message_listener
 
 
-async def _subscribe_to_workflow_completion_channel(channel, execution_id_future, return_all_outputs, headers):
+async def _subscribe_to_workflow_completion_channel(
+    base_url: str, channel, execution_id_future, return_all_outputs, headers
+):
     results_future = asyncio.Future()
-    message_listener = _make_message_listener(results_future, execution_id_future, return_all_outputs, headers)
+    message_listener = _make_message_listener(
+        base_url, results_future, execution_id_future, return_all_outputs, headers
+    )
     await channel.subscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
     return results_future, message_listener
 
 
 async def _post_workflow_id_run(
     *,
+    base_url: str,
     authentication_headers,
     workflow_id,
     input_variables: Dict[str, Any],
@@ -168,7 +185,7 @@ async def _post_workflow_id_run(
     channel_name_suffix: str,
     _url_template: str = WORKFLOW_RUN_URL_TEMPLATE,
 ):
-    url = _url_template.format(base_url=URL_API_PROMPTLAYER, workflow_id=workflow_id)
+    url = _url_template.format(base_url=base_url, workflow_id=workflow_id)
     payload = {
         "input_variables": input_variables,
         "metadata": metadata,
@@ -215,14 +232,53 @@ def _make_channel_name_suffix():
     return uuid4().hex
 
 
+MessageCallback = Callable[[Message], Coroutine[None, None, None]]
+
+
+class SubscriptionEventLoggerHandler(SubscriptionEventHandler):
+    def __init__(self, callback: MessageCallback):
+        self.callback = callback
+
+    async def on_publication(self, ctx: PublicationContext):
+        message_name = ctx.pub.data.get("message_name", "unknown")
+        data = ctx.pub.data.get("data", "")
+        message = Message(name=message_name, data=data)
+        await self.callback(message)
+
+
+@asynccontextmanager
+async def centrifugo_client(address: str, token: str):
+    client = Client(address, token=token)
+    try:
+        await client.connect()
+        yield client
+    finally:
+        await client.disconnect()
+
+
+@asynccontextmanager
+async def centrifugo_subscription(client: Client, topic: str, message_listener: MessageCallback):
+    subscription = client.new_subscription(
+        topic,
+        events=SubscriptionEventLoggerHandler(message_listener),
+    )
+    try:
+        await subscription.subscribe()
+        yield
+    finally:
+        if subscription.state == SubscriptionState.SUBSCRIBED:
+            await subscription.unsubscribe()
+
+
 async def arun_workflow_request(
     *,
+    api_key: str,
+    base_url: str,
     workflow_id_or_name: Optional[Union[int, str]] = None,
     input_variables: Dict[str, Any],
     metadata: Optional[Dict[str, Any]] = None,
     workflow_label_name: Optional[str] = None,
     workflow_version_number: Optional[int] = None,
-    api_key: str,
     return_all_outputs: Optional[bool] = False,
     timeout: Optional[int] = 3600,
     # `workflow_name` deprecated, kept for backward compatibility only.
@@ -230,22 +286,50 @@ async def arun_workflow_request(
 ):
     headers = {"X-API-KEY": api_key}
     workflow_id = await _resolve_workflow_id(
-        _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name), headers
+        base_url, _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name), headers
     )
     channel_name_suffix = _make_channel_name_suffix()
     channel_name = WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE.format(
         workflow_id=workflow_id, channel_name_suffix=channel_name_suffix
     )
-    ably_token = await _get_ably_token(channel_name, headers)
-    async with AblyRealtime(token=ably_token) as ably_client:
+    ably_token = await _get_ably_token(base_url, channel_name, headers)
+    token = ably_token["token_details"]["token"]
+
+    execution_id_future = asyncio.Future[int]()
+
+    if ably_token.get("messaging_backend") == "centrifugo":
+        address = urllib3.util.parse_url(base_url)._replace(scheme="wss", path="/connection/websocket").url
+        async with centrifugo_client(address, token) as client:
+            results_future = asyncio.Future[dict[str, Any]]()
+            async with centrifugo_subscription(
+                client,
+                channel_name,
+                _make_message_listener(base_url, results_future, execution_id_future, return_all_outputs, headers),
+            ):
+                execution_id = await _post_workflow_id_run(
+                    base_url=base_url,
+                    authentication_headers=headers,
+                    workflow_id=workflow_id,
+                    input_variables=input_variables,
+                    metadata=metadata,
+                    workflow_label_name=workflow_label_name,
+                    workflow_version_number=workflow_version_number,
+                    return_all_outputs=return_all_outputs,
+                    channel_name_suffix=channel_name_suffix,
+                )
+                execution_id_future.set_result(execution_id)
+                await asyncio.wait_for(results_future, timeout)
+                return results_future.result()
+
+    async with AblyRealtime(token=token) as ably_client:
         # It is crucial to subscribe before running a workflow, otherwise we may miss a completion message
         channel = ably_client.channels.get(channel_name)
-        execution_id_future = asyncio.Future()
         results_future, message_listener = await _subscribe_to_workflow_completion_channel(
-            channel, execution_id_future, return_all_outputs, headers
+            base_url, channel, execution_id_future, return_all_outputs, headers
         )
 
         execution_id = await _post_workflow_id_run(
+            base_url=base_url,
             authentication_headers=headers,
             workflow_id=workflow_id,
             input_variables=input_variables,
@@ -261,6 +345,8 @@ async def arun_workflow_request(
 
 
 def promptlayer_api_handler(
+    api_key: str,
+    base_url: str,
     function_name,
     provider_type,
     args,
@@ -269,7 +355,6 @@ def promptlayer_api_handler(
     response,
     request_start_time,
     request_end_time,
-    api_key,
     return_pl_id=False,
     llm_request_span_id=None,
 ):
@@ -292,9 +377,11 @@ def promptlayer_api_handler(
                 "llm_request_span_id": llm_request_span_id,
             },
             api_key=api_key,
+            base_url=base_url,
         )
     else:
         request_id = promptlayer_api_request(
+            base_url=base_url,
             function_name=function_name,
             provider_type=provider_type,
             args=args,
@@ -313,6 +400,8 @@ def promptlayer_api_handler(
 
 
 async def promptlayer_api_handler_async(
+    api_key: str,
+    base_url: str,
     function_name,
     provider_type,
     args,
@@ -321,13 +410,14 @@ async def promptlayer_api_handler_async(
     response,
     request_start_time,
     request_end_time,
-    api_key,
     return_pl_id=False,
     llm_request_span_id=None,
 ):
     return await run_in_thread_async(
         None,
         promptlayer_api_handler,
+        api_key,
+        base_url,
         function_name,
         provider_type,
         args,
@@ -336,7 +426,6 @@ async def promptlayer_api_handler_async(
         response,
         request_start_time,
         request_end_time,
-        api_key,
         return_pl_id=return_pl_id,
         llm_request_span_id=llm_request_span_id,
     )
@@ -356,6 +445,7 @@ def convert_native_object_to_dict(native_object):
 
 def promptlayer_api_request(
     *,
+    base_url: str,
     function_name,
     provider_type,
     args,
@@ -376,7 +466,7 @@ def promptlayer_api_request(
         response = response.dict()
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/track-request",
+            f"{base_url}/track-request",
             json={
                 "function_name": function_name,
                 "provider_type": provider_type,
@@ -405,10 +495,10 @@ def promptlayer_api_request(
         return request_response.json().get("request_id")
 
 
-def track_request(**body):
+def track_request(base_url: str, **body):
     try:
         response = requests.post(
-            f"{URL_API_PROMPTLAYER}/track-request",
+            f"{base_url}/track-request",
             json=body,
         )
         if response.status_code != 200:
@@ -421,11 +511,11 @@ def track_request(**body):
         return {}
 
 
-async def atrack_request(**body: Any) -> Dict[str, Any]:
+async def atrack_request(base_url: str, **body: Any) -> Dict[str, Any]:
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/track-request",
+                f"{base_url}/track-request",
                 json=body,
             )
             if RAISE_FOR_STATUS:
@@ -468,7 +558,7 @@ def promptlayer_api_request_async(
     )
 
 
-def promptlayer_get_prompt(prompt_name, api_key, version: int = None, label: str = None):
+def promptlayer_get_prompt(api_key: str, base_url: str, prompt_name, version: int = None, label: str = None):
     """
     Get a prompt from the PromptLayer library
     version: version of the prompt to get, None for latest
@@ -476,7 +566,7 @@ def promptlayer_get_prompt(prompt_name, api_key, version: int = None, label: str
     """
     try:
         request_response = requests.get(
-            f"{URL_API_PROMPTLAYER}/library-get-prompt-template",
+            f"{base_url}/library-get-prompt-template",
             headers={"X-API-KEY": api_key},
             params={"prompt_name": prompt_name, "version": version, "label": label},
         )
@@ -491,10 +581,12 @@ def promptlayer_get_prompt(prompt_name, api_key, version: int = None, label: str
     return request_response.json()
 
 
-def promptlayer_publish_prompt(prompt_name, prompt_template, commit_message, tags, api_key, metadata=None):
+def promptlayer_publish_prompt(
+    api_key: str, base_url: str, prompt_name, prompt_template, commit_message, tags, metadata=None
+):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-publish-prompt-template",
+            f"{base_url}/library-publish-prompt-template",
             json={
                 "prompt_name": prompt_name,
                 "prompt_template": prompt_template,
@@ -514,10 +606,10 @@ def promptlayer_publish_prompt(prompt_name, prompt_template, commit_message, tag
     return True
 
 
-def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, version, label):
+def promptlayer_track_prompt(api_key: str, base_url: str, request_id, prompt_name, input_variables, version, label):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-track-prompt",
+            f"{base_url}/library-track-prompt",
             json={
                 "request_id": request_id,
                 "prompt_name": prompt_name,
@@ -543,14 +635,15 @@ def promptlayer_track_prompt(request_id, prompt_name, input_variables, api_key, 
 
 
 async def apromptlayer_track_prompt(
+    api_key: str,
+    base_url: str,
     request_id: str,
     prompt_name: str,
     input_variables: Dict[str, Any],
-    api_key: Optional[str] = None,
     version: Optional[int] = None,
     label: Optional[str] = None,
 ) -> bool:
-    url = f"{URL_API_PROMPTLAYER}/library-track-prompt"
+    url = f"{base_url}/library-track-prompt"
     payload = {
         "request_id": request_id,
         "prompt_name": prompt_name,
@@ -581,10 +674,10 @@ async def apromptlayer_track_prompt(
     return True
 
 
-def promptlayer_track_metadata(request_id, metadata, api_key):
+def promptlayer_track_metadata(api_key: str, base_url: str, request_id, metadata):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-track-metadata",
+            f"{base_url}/library-track-metadata",
             json={
                 "request_id": request_id,
                 "metadata": metadata,
@@ -606,8 +699,8 @@ def promptlayer_track_metadata(request_id, metadata, api_key):
     return True
 
 
-async def apromptlayer_track_metadata(request_id: str, metadata: Dict[str, Any], api_key: Optional[str] = None) -> bool:
-    url = f"{URL_API_PROMPTLAYER}/library-track-metadata"
+async def apromptlayer_track_metadata(api_key: str, base_url: str, request_id: str, metadata: Dict[str, Any]) -> bool:
+    url = f"{base_url}/library-track-metadata"
     payload = {
         "request_id": request_id,
         "metadata": metadata,
@@ -635,13 +728,13 @@ async def apromptlayer_track_metadata(request_id: str, metadata: Dict[str, Any],
     return True
 
 
-def promptlayer_track_score(request_id, score, score_name, api_key):
+def promptlayer_track_score(api_key: str, base_url: str, request_id, score, score_name):
     try:
         data = {"request_id": request_id, "score": score, "api_key": api_key}
         if score_name is not None:
             data["name"] = score_name
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/library-track-score",
+            f"{base_url}/library-track-score",
             json=data,
         )
         if request_response.status_code != 200:
@@ -660,12 +753,13 @@ def promptlayer_track_score(request_id, score, score_name, api_key):
 
 
 async def apromptlayer_track_score(
+    api_key: str,
+    base_url: str,
     request_id: str,
     score: float,
     score_name: Optional[str],
-    api_key: Optional[str] = None,
 ) -> bool:
-    url = f"{URL_API_PROMPTLAYER}/library-track-score"
+    url = f"{base_url}/library-track-score"
     data = {
         "request_id": request_id,
         "score": score,
@@ -753,11 +847,12 @@ def build_anthropic_content_blocks(events):
 
 
 class GeneratorProxy:
-    def __init__(self, generator, api_request_arguments, api_key):
+    def __init__(self, generator, api_request_arguments, api_key, base_url):
         self.generator = generator
         self.results = []
         self.api_request_arugments = api_request_arguments
         self.api_key = api_key
+        self.base_url = base_url
 
     def __iter__(self):
         return self
@@ -772,6 +867,7 @@ class GeneratorProxy:
                 await self.generator._AsyncMessageStreamManager__api_request,
                 api_request_arguments,
                 self.api_key,
+                self.base_url,
             )
 
     def __enter__(self):
@@ -782,6 +878,7 @@ class GeneratorProxy:
                 stream,
                 api_request_arguments,
                 self.api_key,
+                self.base_url,
             )
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -800,7 +897,7 @@ class GeneratorProxy:
 
     def __getattr__(self, name):
         if name == "text_stream":  # anthropic async stream
-            return GeneratorProxy(self.generator.text_stream, self.api_request_arugments, self.api_key)
+            return GeneratorProxy(self.generator.text_stream, self.api_request_arugments, self.api_key, self.base_url)
         return getattr(self.generator, name)
 
     def _abstracted_next(self, result):
@@ -822,6 +919,7 @@ class GeneratorProxy:
 
         if end_anthropic or end_openai:
             request_id = promptlayer_api_request(
+                base_url=self.base_url,
                 function_name=self.api_request_arugments["function_name"],
                 provider_type=self.api_request_arugments["provider_type"],
                 args=self.api_request_arugments["args"],
@@ -938,13 +1036,14 @@ def raise_on_bad_response(request_response, main_message):
 
 
 async def async_wrapper(
+    api_key: str,
+    base_url: str,
     coroutine_obj,
     return_pl_id,
     request_start_time,
     function_name,
     provider_type,
     tags,
-    api_key: str = None,
     llm_request_span_id: str = None,
     tracer=None,
     *args,
@@ -957,6 +1056,8 @@ async def async_wrapper(
         response = await coroutine_obj
         request_end_time = datetime.datetime.now().timestamp()
         result = await promptlayer_api_handler_async(
+            api_key,
+            base_url,
             function_name,
             provider_type,
             args,
@@ -965,7 +1066,6 @@ async def async_wrapper(
             response,
             request_start_time,
             request_end_time,
-            api_key,
             return_pl_id=return_pl_id,
             llm_request_span_id=llm_request_span_id,
         )
@@ -980,10 +1080,10 @@ async def async_wrapper(
         context.detach(token)
 
 
-def promptlayer_create_group(api_key: str = None):
+def promptlayer_create_group(api_key: str, base_url: str):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/create-group",
+            f"{base_url}/create-group",
             json={
                 "api_key": api_key,
             },
@@ -1000,11 +1100,11 @@ def promptlayer_create_group(api_key: str = None):
     return request_response.json()["id"]
 
 
-async def apromptlayer_create_group(api_key: Optional[str] = None) -> str:
+async def apromptlayer_create_group(api_key: str, base_url: str):
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/create-group",
+                f"{base_url}/create-group",
                 json={
                     "api_key": api_key,
                 },
@@ -1023,10 +1123,10 @@ async def apromptlayer_create_group(api_key: Optional[str] = None) -> str:
         raise Exception(f"PromptLayer had the following error while creating your group: {str(e)}") from e
 
 
-def promptlayer_track_group(request_id, group_id, api_key: str = None):
+def promptlayer_track_group(api_key: str, base_url: str, request_id, group_id):
     try:
         request_response = requests.post(
-            f"{URL_API_PROMPTLAYER}/track-group",
+            f"{base_url}/track-group",
             json={
                 "api_key": api_key,
                 "request_id": request_id,
@@ -1045,7 +1145,7 @@ def promptlayer_track_group(request_id, group_id, api_key: str = None):
     return True
 
 
-async def apromptlayer_track_group(request_id, group_id, api_key: str = None):
+async def apromptlayer_track_group(api_key: str, base_url: str, request_id, group_id):
     try:
         payload = {
             "api_key": api_key,
@@ -1054,7 +1154,7 @@ async def apromptlayer_track_group(request_id, group_id, api_key: str = None):
         }
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/track-group",
+                f"{base_url}/track-group",
                 headers={"X-API-KEY": api_key},
                 json=payload,
             )
@@ -1078,14 +1178,14 @@ async def apromptlayer_track_group(request_id, group_id, api_key: str = None):
 
 
 def get_prompt_template(
-    prompt_name: str, params: Union[GetPromptTemplate, None] = None, api_key: str = None
+    api_key: str, base_url: str, prompt_name: str, params: Union[GetPromptTemplate, None] = None
 ) -> GetPromptTemplateResponse:
     try:
         json_body = {"api_key": api_key}
         if params:
             json_body = {**json_body, **params}
         response = requests.post(
-            f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
+            f"{base_url}/prompt-templates/{prompt_name}",
             headers={"X-API-KEY": api_key},
             json=json_body,
         )
@@ -1104,9 +1204,10 @@ def get_prompt_template(
 
 
 async def aget_prompt_template(
+    api_key: str,
+    base_url: str,
     prompt_name: str,
     params: Union[GetPromptTemplate, None] = None,
-    api_key: str = None,
 ) -> GetPromptTemplateResponse:
     try:
         json_body = {"api_key": api_key}
@@ -1114,7 +1215,7 @@ async def aget_prompt_template(
             json_body.update(params)
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/prompt-templates/{prompt_name}",
+                f"{base_url}/prompt-templates/{prompt_name}",
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )
@@ -1138,12 +1239,13 @@ async def aget_prompt_template(
 
 
 def publish_prompt_template(
+    api_key: str,
+    base_url: str,
     body: PublishPromptTemplate,
-    api_key: str = None,
 ) -> PublishPromptTemplateResponse:
     try:
         response = requests.post(
-            f"{URL_API_PROMPTLAYER}/rest/prompt-templates",
+            f"{base_url}/rest/prompt-templates",
             headers={"X-API-KEY": api_key},
             json={
                 "prompt_template": {**body},
@@ -1161,13 +1263,14 @@ def publish_prompt_template(
 
 
 async def apublish_prompt_template(
+    api_key: str,
+    base_url: str,
     body: PublishPromptTemplate,
-    api_key: str = None,
 ) -> PublishPromptTemplateResponse:
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/rest/prompt-templates",
+                f"{base_url}/rest/prompt-templates",
                 headers={"X-API-KEY": api_key},
                 json={
                     "prompt_template": {**body},
@@ -1193,14 +1296,14 @@ async def apublish_prompt_template(
 
 
 def get_all_prompt_templates(
-    page: int = 1, per_page: int = 30, api_key: str = None, label: str = None
+    api_key: str, base_url: str, page: int = 1, per_page: int = 30, label: str = None
 ) -> List[ListPromptTemplateResponse]:
     try:
         params = {"page": page, "per_page": per_page}
         if label:
             params["label"] = label
         response = requests.get(
-            f"{URL_API_PROMPTLAYER}/prompt-templates",
+            f"{base_url}/prompt-templates",
             headers={"X-API-KEY": api_key},
             params=params,
         )
@@ -1215,7 +1318,7 @@ def get_all_prompt_templates(
 
 
 async def aget_all_prompt_templates(
-    page: int = 1, per_page: int = 30, api_key: str = None, label: str = None
+    api_key: str, base_url: str, page: int = 1, per_page: int = 30, label: str = None
 ) -> List[ListPromptTemplateResponse]:
     try:
         params = {"page": page, "per_page": per_page}
@@ -1223,7 +1326,7 @@ async def aget_all_prompt_templates(
             params["label"] = label
         async with _make_httpx_client() as client:
             response = await client.get(
-                f"{URL_API_PROMPTLAYER}/prompt-templates",
+                f"{base_url}/prompt-templates",
                 headers={"X-API-KEY": api_key},
                 params=params,
             )
@@ -1259,7 +1362,7 @@ def openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: d
     from openai import OpenAI
 
     client = OpenAI(**client_kwargs)
-    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
         request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
@@ -1286,7 +1389,7 @@ async def aopenai_request(prompt_blueprint: GetPromptTemplateResponse, client_kw
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(**client_kwargs)
-    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
         request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
@@ -1299,7 +1402,7 @@ def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwa
     from openai import AzureOpenAI
 
     client = AzureOpenAI(azure_endpoint=client_kwargs.pop("base_url", None))
-    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
         request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
@@ -1314,7 +1417,7 @@ async def aazure_openai_request(
     from openai import AsyncAzureOpenAI
 
     client = AsyncAzureOpenAI(azure_endpoint=client_kwargs.pop("base_url", None))
-    api_type = prompt_blueprint["metadata"]["model"]["api_type"]
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
         request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
@@ -1378,10 +1481,10 @@ def get_api_key():
     return api_key
 
 
-def util_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
+def util_log_request(api_key: str, base_url: str, **kwargs) -> Union[RequestLog, None]:
     try:
         response = requests.post(
-            f"{URL_API_PROMPTLAYER}/log-request",
+            f"{base_url}/log-request",
             headers={"X-API-KEY": api_key},
             json=kwargs,
         )
@@ -1400,11 +1503,11 @@ def util_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
         return None
 
 
-async def autil_log_request(api_key: str, **kwargs) -> Union[RequestLog, None]:
+async def autil_log_request(api_key: str, base_url: str, **kwargs) -> Union[RequestLog, None]:
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{URL_API_PROMPTLAYER}/log-request",
+                f"{base_url}/log-request",
                 headers={"X-API-KEY": api_key},
                 json=kwargs,
             )

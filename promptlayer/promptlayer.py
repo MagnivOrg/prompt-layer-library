@@ -26,6 +26,10 @@ from promptlayer.utils import (
 logger = logging.getLogger(__name__)
 
 
+def get_base_url(base_url: Union[str, None]):
+    return base_url or os.environ.get("PROMPTLAYER_BASE_URL", "https://api.promptlayer.com")
+
+
 def is_workflow_results_dict(obj: Any) -> bool:
     if not isinstance(obj, dict):
         return False
@@ -49,9 +53,7 @@ def is_workflow_results_dict(obj: Any) -> bool:
 
 class PromptLayer(PromptLayerMixin):
     def __init__(
-        self,
-        api_key: str = None,
-        enable_tracing: bool = False,
+        self, api_key: Union[str, None] = None, enable_tracing: bool = False, base_url: Union[str, None] = None
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -62,11 +64,12 @@ class PromptLayer(PromptLayerMixin):
                 "Please set the PROMPTLAYER_API_KEY environment variable or pass the api_key parameter."
             )
 
+        self.base_url = get_base_url(base_url)
         self.api_key = api_key
-        self.templates = TemplateManager(api_key)
-        self.group = GroupManager(api_key)
-        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, enable_tracing)
-        self.track = TrackManager(api_key)
+        self.templates = TemplateManager(api_key, self.base_url)
+        self.group = GroupManager(api_key, self.base_url)
+        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, self.base_url, enable_tracing)
+        self.track = TrackManager(api_key, self.base_url)
 
     def __getattr__(
         self,
@@ -75,15 +78,18 @@ class PromptLayer(PromptLayerMixin):
         if name == "openai":
             import openai as openai_module
 
-            return PromptLayerBase(openai_module, function_name="openai", api_key=self.api_key, tracer=self.tracer)
+            return PromptLayerBase(
+                self.api_key, self.base_url, openai_module, function_name="openai", tracer=self.tracer
+            )
         elif name == "anthropic":
             import anthropic as anthropic_module
 
             return PromptLayerBase(
+                self.api_key,
+                self.base_url,
                 anthropic_module,
                 function_name="anthropic",
                 provider_type="anthropic",
-                api_key=self.api_key,
                 tracer=self.tracer,
             )
         else:
@@ -212,7 +218,7 @@ class PromptLayer(PromptLayerMixin):
             metadata=metadata,
             **body,
         )
-        return track_request(**track_request_kwargs)
+        return track_request(self.base_url, **track_request_kwargs)
 
     def run(
         self,
@@ -277,12 +283,13 @@ class PromptLayer(PromptLayerMixin):
 
             results = asyncio.run(
                 arun_workflow_request(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
                     workflow_id_or_name=_get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name),
                     input_variables=input_variables or {},
                     metadata=metadata,
                     workflow_label_name=workflow_label_name,
                     workflow_version_number=workflow_version,
-                    api_key=self.api_key,
                     return_all_outputs=return_all_outputs,
                 )
             )
@@ -330,6 +337,7 @@ class PromptLayer(PromptLayerMixin):
     ):
         return util_log_request(
             self.api_key,
+            self.base_url,
             provider=provider,
             model=model,
             input=input,
@@ -354,9 +362,7 @@ class PromptLayer(PromptLayerMixin):
 
 class AsyncPromptLayer(PromptLayerMixin):
     def __init__(
-        self,
-        api_key: str = None,
-        enable_tracing: bool = False,
+        self, api_key: Union[str, None] = None, enable_tracing: bool = False, base_url: Union[str, None] = None
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -367,31 +373,30 @@ class AsyncPromptLayer(PromptLayerMixin):
                 "Please set the PROMPTLAYER_API_KEY environment variable or pass the api_key parameter."
             )
 
+        self.base_url = get_base_url(base_url)
         self.api_key = api_key
-        self.templates = AsyncTemplateManager(api_key)
-        self.group = AsyncGroupManager(api_key)
-        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, enable_tracing)
-        self.track = AsyncTrackManager(api_key)
+        self.templates = AsyncTemplateManager(api_key, self.base_url)
+        self.group = AsyncGroupManager(api_key, self.base_url)
+        self.tracer_provider, self.tracer = self._initialize_tracer(api_key, self.base_url, enable_tracing)
+        self.track = AsyncTrackManager(api_key, self.base_url)
 
     def __getattr__(self, name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]]):
         if name == "openai":
             import openai as openai_module
 
             openai = PromptLayerBase(
-                openai_module,
-                function_name="openai",
-                api_key=self.api_key,
-                tracer=self.tracer,
+                self.api_key, self.base_url, openai_module, function_name="openai", tracer=self.tracer
             )
             return openai
         elif name == "anthropic":
             import anthropic as anthropic_module
 
             anthropic = PromptLayerBase(
+                self.api_key,
+                self.base_url,
                 anthropic_module,
                 function_name="anthropic",
                 provider_type="anthropic",
-                api_key=self.api_key,
                 tracer=self.tracer,
             )
             return anthropic
@@ -413,12 +418,13 @@ class AsyncPromptLayer(PromptLayerMixin):
     ) -> Union[Dict[str, Any], Any]:
         try:
             return await arun_workflow_request(
+                api_key=self.api_key,
+                base_url=self.base_url,
                 workflow_id_or_name=_get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name),
                 input_variables=input_variables or {},
                 metadata=metadata,
                 workflow_label_name=workflow_label_name,
                 workflow_version_number=workflow_version,
-                api_key=self.api_key,
                 return_all_outputs=return_all_outputs,
             )
         except Exception as ex:
@@ -491,6 +497,7 @@ class AsyncPromptLayer(PromptLayerMixin):
     ):
         return await autil_log_request(
             self.api_key,
+            self.base_url,
             provider=provider,
             model=model,
             input=input,
@@ -530,7 +537,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 pl_run_span_id,
                 **body,
             )
-            return await atrack_request(**track_request_kwargs)
+            return await atrack_request(self.base_url, **track_request_kwargs)
 
         return _track_request
 
@@ -554,7 +561,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             metadata=metadata,
             **body,
         )
-        return await atrack_request(**track_request_kwargs)
+        return await atrack_request(self.base_url, **track_request_kwargs)
 
     async def _run_internal(
         self,
@@ -631,6 +638,6 @@ class AsyncPromptLayer(PromptLayerMixin):
 
         return {
             "request_id": request_log.get("request_id", None),
-            "raw_response": request_response,
+            "raw_response": response,
             "prompt_blueprint": request_log.get("prompt_blueprint", None),
         }

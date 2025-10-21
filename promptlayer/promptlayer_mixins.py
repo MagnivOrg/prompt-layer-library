@@ -262,11 +262,11 @@ AMAP_PROVIDER_TO_FUNCTION = {
 
 class PromptLayerMixin:
     @staticmethod
-    def _initialize_tracer(api_key: str = None, enable_tracing: bool = False):
+    def _initialize_tracer(api_key: str, base_url: str, enable_tracing: bool = False):
         if enable_tracing:
             resource = Resource(attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"})
             tracer_provider = TracerProvider(resource=resource)
-            promptlayer_exporter = PromptLayerSpanExporter(api_key=api_key)
+            promptlayer_exporter = PromptLayerSpanExporter(api_key=api_key, base_url=base_url)
             span_processor = BatchSpanProcessor(promptlayer_exporter)
             tracer_provider.add_span_processor(span_processor)
             tracer = tracer_provider.get_tracer(__name__)
@@ -317,7 +317,7 @@ class PromptLayerMixin:
         function_kwargs = deepcopy(prompt_blueprint["llm_kwargs"])
         function_kwargs["stream"] = stream
         provider = prompt_blueprint_model["provider"]
-        api_type = prompt_blueprint_model["api_type"]
+        api_type = prompt_blueprint_model.get("api_type", "chat-completions")
 
         if custom_provider := prompt_blueprint.get("custom_provider"):
             provider = custom_provider["client"]

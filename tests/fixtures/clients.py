@@ -4,13 +4,13 @@ from promptlayer import AsyncPromptLayer, PromptLayer
 
 
 @pytest.fixture
-def promptlayer_client(promptlayer_api_key):
-    return PromptLayer(api_key=promptlayer_api_key)
+def promptlayer_client(promptlayer_api_key, base_url: str):
+    return PromptLayer(api_key=promptlayer_api_key, base_url=base_url)
 
 
 @pytest.fixture
-def promptlayer_async_client(promptlayer_api_key):
-    return AsyncPromptLayer(api_key=promptlayer_api_key)
+def promptlayer_async_client(promptlayer_api_key, base_url: str):
+    return AsyncPromptLayer(api_key=promptlayer_api_key, base_url=base_url)
 
 
 @pytest.fixture

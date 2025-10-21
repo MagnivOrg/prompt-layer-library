@@ -4,13 +4,11 @@ import requests
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from promptlayer.utils import URL_API_PROMPTLAYER
-
 
 class PromptLayerSpanExporter(SpanExporter):
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str, base_url: str):
         self.api_key = api_key
-        self.url = f"{URL_API_PROMPTLAYER}/spans-bulk"
+        self.url = f"{base_url}/spans-bulk"
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         request_data = []

@@ -19,5 +19,10 @@ def openai_api_key():
 
 
 @pytest.fixture
+def base_url():
+    return "http://localhost:8000"
+
+
+@pytest.fixture
 def headers(promptlayer_api_key):
     return {"X-API-KEY": promptlayer_api_key}

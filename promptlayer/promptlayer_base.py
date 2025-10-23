@@ -13,14 +13,16 @@ class PromptLayerBase(object):
         "_provider_type",
         "_api_key",
         "_tracer",
+        "_base_url",
     ]
 
-    def __init__(self, obj, function_name="", provider_type="openai", api_key=None, tracer=None):
+    def __init__(self, api_key: str, base_url: str, obj, function_name="", provider_type="openai", tracer=None):
         object.__setattr__(self, "_obj", obj)
         object.__setattr__(self, "_function_name", function_name)
         object.__setattr__(self, "_provider_type", provider_type)
         object.__setattr__(self, "_api_key", api_key)
         object.__setattr__(self, "_tracer", tracer)
+        object.__setattr__(self, "_base_url", base_url)
 
     def __getattr__(self, name):
         attr = getattr(object.__getattribute__(self, "_obj"), name)
@@ -41,10 +43,11 @@ class PromptLayerBase(object):
             )
         ):
             return PromptLayerBase(
+                object.__getattribute__(self, "_api_key"),
+                object.__getattribute__(self, "_base_url"),
                 attr,
                 function_name=f"{object.__getattribute__(self, '_function_name')}.{name}",
                 provider_type=object.__getattribute__(self, "_provider_type"),
-                api_key=object.__getattribute__(self, "_api_key"),
                 tracer=object.__getattribute__(self, "_tracer"),
             )
         return attr
@@ -75,10 +78,11 @@ class PromptLayerBase(object):
 
                 if inspect.isclass(function_object):
                     result = PromptLayerBase(
+                        object.__getattribute__(self, "_api_key"),
+                        object.__getattribute__(self, "_base_url"),
                         function_object(*args, **kwargs),
                         function_name=function_name,
                         provider_type=object.__getattribute__(self, "_provider_type"),
-                        api_key=object.__getattribute__(self, "_api_key"),
                         tracer=tracer,
                     )
                     llm_request_span.set_attribute("function_output", str(result))
@@ -88,13 +92,14 @@ class PromptLayerBase(object):
 
                 if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(function_response):
                     return async_wrapper(
+                        object.__getattribute__(self, "_api_key"),
+                        object.__getattribute__(self, "_base_url"),
                         function_response,
                         return_pl_id,
                         request_start_time,
                         function_name,
                         object.__getattribute__(self, "_provider_type"),
                         tags,
-                        api_key=object.__getattribute__(self, "_api_key"),
                         llm_request_span_id=llm_request_span_id,
                         tracer=tracer,  # Pass the tracer to async_wrapper
                         *args,
@@ -103,6 +108,8 @@ class PromptLayerBase(object):
 
                 request_end_time = datetime.datetime.now().timestamp()
                 result = promptlayer_api_handler(
+                    object.__getattribute__(self, "_api_key"),
+                    object.__getattribute__(self, "_base_url"),
                     function_name,
                     object.__getattribute__(self, "_provider_type"),
                     args,
@@ -111,7 +118,6 @@ class PromptLayerBase(object):
                     function_response,
                     request_start_time,
                     request_end_time,
-                    object.__getattribute__(self, "_api_key"),
                     return_pl_id=return_pl_id,
                     llm_request_span_id=llm_request_span_id,
                 )
@@ -121,29 +127,33 @@ class PromptLayerBase(object):
             # Without tracing
             if inspect.isclass(function_object):
                 return PromptLayerBase(
+                    object.__getattribute__(self, "_api_key"),
+                    object.__getattribute__(self, "_base_url"),
                     function_object(*args, **kwargs),
                     function_name=function_name,
                     provider_type=object.__getattribute__(self, "_provider_type"),
-                    api_key=object.__getattribute__(self, "_api_key"),
                 )
 
             function_response = function_object(*args, **kwargs)
 
             if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(function_response):
                 return async_wrapper(
+                    object.__getattribute__(self, "_api_key"),
+                    object.__getattribute__(self, "_base_url"),
                     function_response,
                     return_pl_id,
                     request_start_time,
                     function_name,
                     object.__getattribute__(self, "_provider_type"),
                     tags,
-                    api_key=object.__getattribute__(self, "_api_key"),
                     *args,
                     **kwargs,
                 )
 
             request_end_time = datetime.datetime.now().timestamp()
             return promptlayer_api_handler(
+                object.__getattribute__(self, "_api_key"),
+                object.__getattribute__(self, "_base_url"),
                 function_name,
                 object.__getattribute__(self, "_provider_type"),
                 args,
@@ -152,6 +162,5 @@ class PromptLayerBase(object):
                 function_response,
                 request_start_time,
                 request_end_time,
-                object.__getattribute__(self, "_api_key"),
                 return_pl_id=return_pl_id,
             )

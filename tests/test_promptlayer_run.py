@@ -10,7 +10,6 @@ from openai.types.completion_usage import CompletionTokensDetails, CompletionUsa
 from tests.utils.vcr import assert_played
 
 
-@patch("promptlayer.utils.URL_API_PROMPTLAYER", "http://localhost:8000")
 @pytest.mark.asyncio
 async def test_publish_template_async(sample_template_name, sample_template_content, promptlayer_client):
     body = {
@@ -92,7 +91,6 @@ async def test_publish_template_async(sample_template_name, sample_template_cont
     }
 
 
-@patch("promptlayer.utils.URL_API_PROMPTLAYER", "http://localhost:8000")
 @pytest.mark.asyncio
 async def test_get_template_async(sample_template_name, promptlayer_async_client):
     params = {"provider": "openai", "model": "gpt-3.5-turbo"}
@@ -167,7 +165,6 @@ async def test_get_template_async(sample_template_name, promptlayer_async_client
     }
 
 
-@patch("promptlayer.utils.URL_API_PROMPTLAYER", "http://localhost:8000")
 @pytest.mark.asyncio
 async def test_run_prompt_async(sample_template_name, promptlayer_async_client):
     client = promptlayer_async_client
@@ -281,7 +278,6 @@ async def test_run_prompt_async(sample_template_name, promptlayer_async_client):
         await client.track.prompt(pl_request_id, sample_template_name, {})
 
 
-@patch("promptlayer.utils.URL_API_PROMPTLAYER", "http://localhost:8000")
 @pytest.mark.asyncio
 async def test_log_request_async(sample_template_name, promptlayer_async_client):
     with assert_played("test_log_request_async.yaml"):

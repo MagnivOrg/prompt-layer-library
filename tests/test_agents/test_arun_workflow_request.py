@@ -11,14 +11,13 @@ from tests.utils.mocks import Any
 from tests.utils.vcr import assert_played, is_cassette_recording
 
 
-@patch("promptlayer.utils.URL_API_PROMPTLAYER", "http://localhost:8000")
 @patch("promptlayer.utils.WS_TOKEN_REQUEST_LIBRARY_URL", "http://localhost:8000/ws-token-request-library")
 @parametrize_cases(
     Case("Regular call", kwargs={"workflow_id_or_name": "analyze_1", "input_variables": {"var1": "value1"}}),
     Case("Legacy call", kwargs={"workflow_name": "analyze_1", "input_variables": {"var1": "value1"}}),
 )
 @pytest.mark.asyncio
-async def test_arun_workflow_request(promptlayer_api_key, kwargs):
+async def test_arun_workflow_request(base_url: str, promptlayer_api_key, kwargs):
     is_recording = is_cassette_recording()
     results_future = MagicMock()
     message_listener = MagicMock()
@@ -41,7 +40,7 @@ async def test_arun_workflow_request(promptlayer_api_key, kwargs):
             return_value={"Node 2": "False", "Node 3": "AAA"},
         ) as _wait_for_workflow_completion_mock,
     ):
-        assert await arun_workflow_request(api_key=promptlayer_api_key, **kwargs) == {
+        assert await arun_workflow_request(api_key=promptlayer_api_key, base_url=base_url, **kwargs) == {
             "Node 2": "False",
             "Node 3": "AAA",
         }
@@ -60,7 +59,7 @@ async def test_arun_workflow_request(promptlayer_api_key, kwargs):
     _make_channel_name_suffix_mock.assert_called_once()
     if not is_recording:
         _subscribe_to_workflow_completion_channel_mock.assert_awaited_once_with(
-            Any(type_=RealtimeChannel), Any(type_=asyncio.Future), False, {"X-API-KEY": promptlayer_api_key}
+            base_url, Any(type_=RealtimeChannel), Any(type_=asyncio.Future), False, {"X-API-KEY": promptlayer_api_key}
         )
         _wait_for_workflow_completion_mock.assert_awaited_once_with(
             Any(type_=RealtimeChannel), results_future, message_listener, 3600

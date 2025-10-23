@@ -10,9 +10,9 @@ from tests.utils.vcr import assert_played
 
 
 @pytest.mark.asyncio
-async def test_get_final_output(headers):
+async def test_get_final_output(base_url: str, headers):
     with assert_played("test_get_final_output_1.yaml"):
-        assert (await _get_final_output(717, True, headers=headers)) == {
+        assert (await _get_final_output(base_url, 717, True, headers=headers)) == {
             "Node 1": {
                 "status": "SUCCESS",
                 "value": "AAA",
@@ -23,16 +23,20 @@ async def test_get_final_output(headers):
         }
 
     with assert_played("test_get_final_output_2.yaml"):
-        assert (await _get_final_output(717, False, headers=headers)) == "AAA"
+        assert (await _get_final_output(base_url, 717, False, headers=headers)) == "AAA"
 
 
 @pytest.mark.asyncio
 async def test_make_message_listener(
-    headers, workflow_update_data_no_result_code, workflow_update_data_ok, workflow_update_data_exceeds_size_limit
+    base_url: str,
+    headers,
+    workflow_update_data_no_result_code,
+    workflow_update_data_ok,
+    workflow_update_data_exceeds_size_limit,
 ):
     results_future = asyncio.Future()
     execution_id_future = asyncio.Future()
-    message_listener = _make_message_listener(results_future, execution_id_future, True, headers)
+    message_listener = _make_message_listener(base_url, results_future, execution_id_future, True, headers)
     execution_id_future.set_result(717)
     await message_listener(Message(name="INVALID"))
     assert not results_future.done()
@@ -43,7 +47,7 @@ async def test_make_message_listener(
         results_future = asyncio.Future()
         execution_id_future = asyncio.Future()
         execution_id_future.set_result(717)
-        message_listener = _make_message_listener(results_future, execution_id_future, True, headers)
+        message_listener = _make_message_listener(base_url, results_future, execution_id_future, True, headers)
         await message_listener(Message(name="SET_WORKFLOW_COMPLETE", data=json.dumps(message_data)))
         assert results_future.done()
         assert (await asyncio.wait_for(results_future, 0.1)) == message_data["final_output"]
@@ -53,7 +57,7 @@ async def test_make_message_listener(
         results_future = asyncio.Future()
         execution_id_future = asyncio.Future()
         execution_id_future.set_result(717)
-        message_listener = _make_message_listener(results_future, execution_id_future, True, headers)
+        message_listener = _make_message_listener(base_url, results_future, execution_id_future, True, headers)
         await message_listener(
             Message(name="SET_WORKFLOW_COMPLETE", data=json.dumps(workflow_update_data_exceeds_size_limit))
         )
@@ -73,7 +77,7 @@ async def test_make_message_listener(
         results_future = asyncio.Future()
         execution_id_future = asyncio.Future()
         execution_id_future.set_result(717)
-        message_listener = _make_message_listener(results_future, execution_id_future, False, headers)
+        message_listener = _make_message_listener(base_url, results_future, execution_id_future, False, headers)
         await message_listener(
             Message(name="SET_WORKFLOW_COMPLETE", data=json.dumps(workflow_update_data_exceeds_size_limit))
         )

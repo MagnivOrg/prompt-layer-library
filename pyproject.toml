@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.0.72"
+version = "1.0.73"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -16,6 +16,7 @@ aiohttp = "^3.10.10"
 httpx = "^0.28.1"
 nest-asyncio = "^1.6.0"
 centrifuge-python = "^0.4.1"
+tenacity = "^9.1.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"

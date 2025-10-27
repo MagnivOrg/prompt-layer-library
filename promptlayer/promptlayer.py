@@ -114,7 +114,7 @@ class PromptLayer(PromptLayerMixin):
                 pl_run_span_id,
                 **body,
             )
-            return track_request(**track_request_kwargs)
+            return track_request(self.base_url, **track_request_kwargs)
 
         return _track_request
 

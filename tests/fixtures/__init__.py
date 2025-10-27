@@ -1,4 +1,11 @@
-from .auth import anthropic_api_key, base_url, headers, openai_api_key, promptlayer_api_key  # noqa: F401
+from .auth import (  # noqa: F401
+    anthropic_api_key,
+    base_url,
+    headers,
+    openai_api_key,
+    promptlayer_api_key,
+    throw_on_error,
+)
 from .clients import (  # noqa: F401
     anthropic_async_client,
     anthropic_client,

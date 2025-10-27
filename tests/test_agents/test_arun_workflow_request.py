@@ -17,7 +17,7 @@ from tests.utils.vcr import assert_played, is_cassette_recording
     Case("Legacy call", kwargs={"workflow_name": "analyze_1", "input_variables": {"var1": "value1"}}),
 )
 @pytest.mark.asyncio
-async def test_arun_workflow_request(base_url: str, promptlayer_api_key, kwargs):
+async def test_arun_workflow_request(base_url: str, throw_on_error: bool, promptlayer_api_key, kwargs):
     is_recording = is_cassette_recording()
     results_future = MagicMock()
     message_listener = MagicMock()
@@ -40,7 +40,9 @@ async def test_arun_workflow_request(base_url: str, promptlayer_api_key, kwargs)
             return_value={"Node 2": "False", "Node 3": "AAA"},
         ) as _wait_for_workflow_completion_mock,
     ):
-        assert await arun_workflow_request(api_key=promptlayer_api_key, base_url=base_url, **kwargs) == {
+        assert await arun_workflow_request(
+            api_key=promptlayer_api_key, base_url=base_url, throw_on_error=throw_on_error, **kwargs
+        ) == {
             "Node 2": "False",
             "Node 3": "AAA",
         }

@@ -24,5 +24,10 @@ def base_url():
 
 
 @pytest.fixture
+def throw_on_error():
+    return True
+
+
+@pytest.fixture
 def headers(promptlayer_api_key):
     return {"X-API-KEY": promptlayer_api_key}

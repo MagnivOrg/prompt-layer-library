@@ -262,11 +262,13 @@ AMAP_PROVIDER_TO_FUNCTION = {
 
 class PromptLayerMixin:
     @staticmethod
-    def _initialize_tracer(api_key: str, base_url: str, enable_tracing: bool = False):
+    def _initialize_tracer(api_key: str, base_url: str, throw_on_error: bool, enable_tracing: bool = False):
         if enable_tracing:
             resource = Resource(attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"})
             tracer_provider = TracerProvider(resource=resource)
-            promptlayer_exporter = PromptLayerSpanExporter(api_key=api_key, base_url=base_url)
+            promptlayer_exporter = PromptLayerSpanExporter(
+                api_key=api_key, base_url=base_url, throw_on_error=throw_on_error
+            )
             span_processor = BatchSpanProcessor(promptlayer_exporter)
             tracer_provider.add_span_processor(span_processor)
             tracer = tracer_provider.get_tracer(__name__)

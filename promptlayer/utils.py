@@ -76,7 +76,7 @@ def should_retry_error(exception):
             if status_code >= 500 or status_code == 429:
                 return True
 
-    if isinstance(exception, (_exceptions.InternalServerError, _exceptions.RateLimitError)):
+    if isinstance(exception, (_exceptions.PromptLayerInternalServerError, _exceptions.PromptLayerRateLimitError)):
         return True
 
     return False
@@ -165,7 +165,7 @@ async def _get_ably_token(base_url: str, channel_name, authentication_headers):
         if RERAISE_ORIGINAL_EXCEPTION:
             raise
         else:
-            raise _exceptions.APIError(error_message, response=None, body=None) from ex
+            raise _exceptions.PromptLayerAPIError(error_message, response=None, body=None) from ex
 
 
 def _make_message_listener(base_url: str, results_future, execution_id_future, return_all_outputs, headers):
@@ -239,7 +239,7 @@ async def _post_workflow_id_run(
         if RERAISE_ORIGINAL_EXCEPTION:
             raise
         else:
-            raise _exceptions.APIError(error_message, response=None, body=None) from ex
+            raise _exceptions.PromptLayerAPIError(error_message, response=None, body=None) from ex
 
     return result.get("workflow_version_execution_id")
 
@@ -249,7 +249,9 @@ async def _wait_for_workflow_completion(channel, results_future, message_listene
     try:
         return await asyncio.wait_for(results_future, timeout)
     except asyncio.TimeoutError:
-        raise _exceptions.APITimeoutError("Workflow execution did not complete properly", response=None, body=None)
+        raise _exceptions.PromptLayerAPITimeoutError(
+            "Workflow execution did not complete properly", response=None, body=None
+        )
     finally:
         channel.unsubscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
 
@@ -541,7 +543,7 @@ def track_request(base_url: str, throw_on_error: bool, **body):
         return response.json()
     except requests.exceptions.RequestException as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while tracking your request: {e}", response=None, body=None
             ) from e
         logger.warning(f"While logging your request PromptLayer had the following error: {e}")
@@ -566,7 +568,7 @@ async def atrack_request(base_url: str, throw_on_error: bool, **body: Any) -> Di
         return response.json()
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while tracking your request: {e}", response=None, body=None
             ) from e
         logger.warning(f"While logging your request PromptLayer had the following error: {e}")
@@ -618,7 +620,7 @@ def promptlayer_get_prompt(
         )
     except Exception as e:
         if throw_on_error:
-            raise _exceptions.APIError(
+            raise _exceptions.PromptLayerAPIError(
                 f"PromptLayer had the following error while getting your prompt: {e}", response=None, body=None
             ) from e
         logger.warning(f"PromptLayer had the following error while getting your prompt: {e}")
@@ -657,7 +659,7 @@ def promptlayer_publish_prompt(
         )
     except Exception as e:
         if throw_on_error:
-            raise _exceptions.APIError(
+            raise _exceptions.PromptLayerAPIError(
                 f"PromptLayer had the following error while publishing your prompt: {e}", response=None, body=None
             ) from e
         logger.warning(f"PromptLayer had the following error while publishing your prompt: {e}")
@@ -707,7 +709,7 @@ def promptlayer_track_prompt(
                 return False
     except Exception as e:
         if throw_on_error:
-            raise _exceptions.APIError(
+            raise _exceptions.PromptLayerAPIError(
                 f"While tracking your prompt PromptLayer had the following error: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")
@@ -750,7 +752,7 @@ async def apromptlayer_track_prompt(
                 return False
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"While tracking your prompt PromptLayer had the following error: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")
@@ -784,7 +786,7 @@ def promptlayer_track_metadata(api_key: str, base_url: str, throw_on_error: bool
                 return False
     except Exception as e:
         if throw_on_error:
-            raise _exceptions.APIError(
+            raise _exceptions.PromptLayerAPIError(
                 f"While tracking your metadata PromptLayer had the following error: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your metadata PromptLayer had the following error: {e}")
@@ -820,7 +822,7 @@ async def apromptlayer_track_metadata(
                 return False
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"While tracking your metadata PromptLayer had the following error: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your metadata PromptLayer had the following error: {e}")
@@ -853,7 +855,7 @@ def promptlayer_track_score(api_key: str, base_url: str, throw_on_error: bool, r
                 return False
     except Exception as e:
         if throw_on_error:
-            raise _exceptions.APIError(
+            raise _exceptions.PromptLayerAPIError(
                 f"While tracking your score PromptLayer had the following error: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your score PromptLayer had the following error: {e}")
@@ -896,7 +898,7 @@ async def apromptlayer_track_score(
                 return False
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while tracking your score: {str(e)}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your score PromptLayer had the following error: {str(e)}")
@@ -1156,30 +1158,30 @@ def raise_on_bad_response(request_response, main_message):
         err_msg = main_message
 
     if status_code == 400:
-        raise _exceptions.BadRequestError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerBadRequestError(err_msg, response=request_response, body=body)
 
     if status_code == 401:
-        raise _exceptions.AuthenticationError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerAuthenticationError(err_msg, response=request_response, body=body)
 
     if status_code == 403:
-        raise _exceptions.PermissionDeniedError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerPermissionDeniedError(err_msg, response=request_response, body=body)
 
     if status_code == 404:
-        raise _exceptions.NotFoundError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerNotFoundError(err_msg, response=request_response, body=body)
 
     if status_code == 409:
-        raise _exceptions.ConflictError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerConflictError(err_msg, response=request_response, body=body)
 
     if status_code == 422:
-        raise _exceptions.UnprocessableEntityError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerUnprocessableEntityError(err_msg, response=request_response, body=body)
 
     if status_code == 429:
-        raise _exceptions.RateLimitError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerRateLimitError(err_msg, response=request_response, body=body)
 
     if status_code and status_code >= 500:
-        raise _exceptions.InternalServerError(err_msg, response=request_response, body=body)
+        raise _exceptions.PromptLayerInternalServerError(err_msg, response=request_response, body=body)
 
-    raise _exceptions.APIStatusError(err_msg, response=request_response, body=body)
+    raise _exceptions.PromptLayerAPIStatusError(err_msg, response=request_response, body=body)
 
 
 async def async_wrapper(
@@ -1250,7 +1252,7 @@ def promptlayer_create_group(api_key: str, base_url: str, throw_on_error: bool):
                 return False
     except requests.exceptions.RequestException as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while creating your group: {e}", response=None, body=None
             ) from e
         logger.warning(f"While creating your group PromptLayer had the following error: {e}")
@@ -1284,7 +1286,7 @@ async def apromptlayer_create_group(api_key: str, base_url: str, throw_on_error:
         return response.json()["id"]
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while creating your group: {str(e)}", response=None, body=None
             ) from e
         logger.warning(f"While creating your group PromptLayer had the following error: {e}")
@@ -1316,7 +1318,7 @@ def promptlayer_track_group(api_key: str, base_url: str, throw_on_error: bool, r
                 return False
     except requests.exceptions.RequestException as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while tracking your group: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your group PromptLayer had the following error: {e}")
@@ -1353,7 +1355,7 @@ async def apromptlayer_track_group(api_key: str, base_url: str, throw_on_error: 
                 return False
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while tracking your group: {str(e)}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your group PromptLayer had the following error: {e}")
@@ -1390,13 +1392,13 @@ def get_prompt_template(
     except requests.exceptions.ConnectionError as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {e}"
         if throw_on_error:
-            raise _exceptions.APIConnectionError(err_msg, response=None, body=None) from e
+            raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except requests.exceptions.Timeout as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {e}"
         if throw_on_error:
-            raise _exceptions.APITimeoutError(err_msg, response=None, body=None) from e
+            raise _exceptions.PromptLayerAPITimeoutError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except requests.exceptions.RequestException as e:
@@ -1441,19 +1443,19 @@ async def aget_prompt_template(
     except (httpx.ConnectError, httpx.NetworkError) as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
-            raise _exceptions.APIConnectionError(err_msg, response=None, body=None) from e
+            raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except httpx.TimeoutException as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
-            raise _exceptions.APITimeoutError(err_msg, response=None, body=None) from e
+            raise _exceptions.PromptLayerAPITimeoutError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except httpx.RequestError as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
-            raise _exceptions.APIConnectionError(err_msg, response=None, body=None) from e
+            raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
 
@@ -1488,7 +1490,7 @@ def publish_prompt_template(
         return response.json()
     except requests.exceptions.RequestException as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while publishing your prompt template: {e}",
                 response=None,
                 body=None,
@@ -1530,7 +1532,7 @@ async def apublish_prompt_template(
         return response.json()
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while publishing your prompt template: {str(e)}",
                 response=None,
                 body=None,
@@ -1566,7 +1568,7 @@ def get_all_prompt_templates(
         return items
     except requests.exceptions.RequestException as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while getting all your prompt templates: {e}",
                 response=None,
                 body=None,
@@ -1605,7 +1607,7 @@ async def aget_all_prompt_templates(
         return items
     except httpx.RequestError as e:
         if throw_on_error:
-            raise _exceptions.APIConnectionError(
+            raise _exceptions.PromptLayerAPIConnectionError(
                 f"PromptLayer had the following error while getting all your prompt templates: {str(e)}",
                 response=None,
                 body=None,
@@ -1745,7 +1747,7 @@ def get_api_key():
     # raise an error if the api key is not set
     api_key = os.environ.get("PROMPTLAYER_API_KEY")
     if not api_key:
-        raise _exceptions.AuthenticationError(
+        raise _exceptions.PromptLayerAuthenticationError(
             "Please set your PROMPTLAYER_API_KEY environment variable or set API KEY in code using 'promptlayer.api_key = <your_api_key>'",
             response=None,
             body=None,
@@ -1773,7 +1775,7 @@ def util_log_request(api_key: str, base_url: str, throw_on_error: bool, **kwargs
         return response.json()
     except Exception as e:
         if throw_on_error:
-            raise _exceptions.APIError(
+            raise _exceptions.PromptLayerAPIError(
                 f"While logging your request PromptLayer had the following error: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")
@@ -1801,7 +1803,7 @@ async def autil_log_request(api_key: str, base_url: str, throw_on_error: bool, *
         return response.json()
     except Exception as e:
         if throw_on_error:
-            raise _exceptions.APIError(
+            raise _exceptions.PromptLayerAPIError(
                 f"While logging your request PromptLayer had the following error: {e}", response=None, body=None
             ) from e
         logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")

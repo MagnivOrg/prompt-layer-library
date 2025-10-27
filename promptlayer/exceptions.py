@@ -11,13 +11,13 @@ class PromptLayerError(Exception):
         return self.message
 
 
-class APIError(PromptLayerError):
+class PromptLayerAPIError(PromptLayerError):
     """Base exception for API-related errors."""
 
     pass
 
 
-class BadRequestError(APIError):
+class PromptLayerBadRequestError(PromptLayerAPIError):
     """Exception raised for 400 Bad Request errors.
 
     Indicates that the request was malformed or contained invalid parameters.
@@ -26,7 +26,7 @@ class BadRequestError(APIError):
     pass
 
 
-class AuthenticationError(APIError):
+class PromptLayerAuthenticationError(PromptLayerAPIError):
     """Exception raised for 401 Unauthorized errors.
 
     Indicates that the API key is missing, invalid, or expired.
@@ -35,7 +35,7 @@ class AuthenticationError(APIError):
     pass
 
 
-class PermissionDeniedError(APIError):
+class PromptLayerPermissionDeniedError(PromptLayerAPIError):
     """Exception raised for 403 Forbidden errors.
 
     Indicates that the API key doesn't have permission to perform the requested operation.
@@ -44,7 +44,7 @@ class PermissionDeniedError(APIError):
     pass
 
 
-class NotFoundError(APIError):
+class PromptLayerNotFoundError(PromptLayerAPIError):
     """Exception raised for 404 Not Found errors.
 
     Indicates that the requested resource (e.g., prompt template) was not found.
@@ -53,7 +53,7 @@ class NotFoundError(APIError):
     pass
 
 
-class ConflictError(APIError):
+class PromptLayerConflictError(PromptLayerAPIError):
     """Exception raised for 409 Conflict errors.
 
     Indicates that the request conflicts with the current state of the resource.
@@ -62,7 +62,7 @@ class ConflictError(APIError):
     pass
 
 
-class UnprocessableEntityError(APIError):
+class PromptLayerUnprocessableEntityError(PromptLayerAPIError):
     """Exception raised for 422 Unprocessable Entity errors.
 
     Indicates that the request was well-formed but contains semantic errors.
@@ -71,7 +71,7 @@ class UnprocessableEntityError(APIError):
     pass
 
 
-class RateLimitError(APIError):
+class PromptLayerRateLimitError(PromptLayerAPIError):
     """Exception raised for 429 Too Many Requests errors.
 
     Indicates that the API rate limit has been exceeded.
@@ -80,7 +80,7 @@ class RateLimitError(APIError):
     pass
 
 
-class InternalServerError(APIError):
+class PromptLayerInternalServerError(PromptLayerAPIError):
     """Exception raised for 500+ Internal Server errors.
 
     Indicates that the PromptLayer API encountered an internal error.
@@ -89,13 +89,13 @@ class InternalServerError(APIError):
     pass
 
 
-class APIStatusError(APIError):
+class PromptLayerAPIStatusError(PromptLayerAPIError):
     """Exception raised for other API errors not covered by specific exception classes."""
 
     pass
 
 
-class APIConnectionError(PromptLayerError):
+class PromptLayerAPIConnectionError(PromptLayerError):
     """Exception raised when unable to connect to the API.
 
     This can be due to network issues, timeouts, or connection errors.
@@ -104,13 +104,13 @@ class APIConnectionError(PromptLayerError):
     pass
 
 
-class APITimeoutError(PromptLayerError):
+class PromptLayerAPITimeoutError(PromptLayerError):
     """Exception raised when an API request times out."""
 
     pass
 
 
-class ValidationError(PromptLayerError):
+class PromptLayerValidationError(PromptLayerError):
     """Exception raised when input validation fails.
 
     This can be due to invalid types, out of range values, or malformed data.

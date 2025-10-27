@@ -153,7 +153,7 @@ class PromptLayer(PromptLayerMixin):
         )
         prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
         if not prompt_blueprint:
-            raise _exceptions.NotFoundError(
+            raise _exceptions.PromptLayerNotFoundError(
                 f"Prompt template '{prompt_name}' not found.",
                 response=None,
                 body=None,
@@ -312,12 +312,12 @@ class PromptLayer(PromptLayerMixin):
             if not return_all_outputs and is_workflow_results_dict(results):
                 output_nodes = [node_data for node_data in results.values() if node_data.get("is_output_node")]
                 if not output_nodes:
-                    raise _exceptions.APIError(
+                    raise _exceptions.PromptLayerNotFoundError(
                         f"Output nodes not found: {json.dumps(results, indent=4)}", response=None, body=results
                     )
 
                 if not any(node.get("status") == "SUCCESS" for node in output_nodes):
-                    raise _exceptions.APIError(
+                    raise _exceptions.PromptLayerAPIError(
                         f"None of the output nodes have succeeded: {json.dumps(results, indent=4)}",
                         response=None,
                         body=results,
@@ -329,7 +329,9 @@ class PromptLayer(PromptLayerMixin):
             if RERAISE_ORIGINAL_EXCEPTION:
                 raise
             else:
-                raise _exceptions.APIError(f"Error running workflow: {str(ex)}", response=None, body=None) from ex
+                raise _exceptions.PromptLayerAPIError(
+                    f"Error running workflow: {str(ex)}", response=None, body=None
+                ) from ex
 
     def log_request(
         self,
@@ -462,7 +464,9 @@ class AsyncPromptLayer(PromptLayerMixin):
             if RERAISE_ORIGINAL_EXCEPTION:
                 raise
             else:
-                raise _exceptions.APIError(f"Error running workflow: {str(ex)}", response=None, body=None) from ex
+                raise _exceptions.PromptLayerAPIError(
+                    f"Error running workflow: {str(ex)}", response=None, body=None
+                ) from ex
 
     async def run(
         self,
@@ -621,7 +625,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         )
         prompt_blueprint = await self.templates.get(prompt_name, get_prompt_template_params)
         if not prompt_blueprint:
-            raise _exceptions.NotFoundError(
+            raise _exceptions.PromptLayerNotFoundError(
                 f"Prompt template '{prompt_name}' not found.",
                 response=None,
                 body=None,

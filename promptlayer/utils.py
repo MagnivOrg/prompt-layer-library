@@ -1635,7 +1635,7 @@ def openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: d
 
     client = OpenAI(**client_kwargs)
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
-    
+
     if api_type is None:
         api_type = "chat-completions"
 

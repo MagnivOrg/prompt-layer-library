@@ -341,7 +341,8 @@ class PromptLayerMixin:
                 provider_function_name = "anthropic"
 
         if provider_function_name in ("openai", "openai.azure"):
-            provider_function_name = f"{provider_function_name}:{api_type}"
+            api = api_type if api_type is not None else "chat-completions"
+            provider_function_name = f"{provider_function_name}:{api}"
 
         if is_async:
             config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider_function_name][prompt_template["type"]]

@@ -104,7 +104,7 @@ class TestLatencyRecording:
         # Mock the track request to capture the timing
         tracked_times = {}
 
-        def capture_track_request(**kwargs):
+        def capture_track_request(*args, **kwargs):
             tracked_times["start"] = kwargs.get("request_start_time")
             tracked_times["end"] = kwargs.get("request_end_time")
             return {"request_id": "test_id", "prompt_blueprint": {}}
@@ -165,7 +165,7 @@ class TestLatencyRecording:
         # Mock the track request to capture the timing
         tracked_times = {}
 
-        async def capture_track_request(**kwargs):
+        async def capture_track_request(*args, **kwargs):
             tracked_times["start"] = kwargs.get("request_start_time")
             tracked_times["end"] = kwargs.get("request_end_time")
             return {"request_id": "test_id", "prompt_blueprint": {}}
@@ -216,7 +216,7 @@ class TestLatencyRecording:
                 "id": 1,
                 "prompt_template": {"type": "chat"},
                 "metadata": {"model": {"provider": "openai", "name": "gpt-4"}},
-                "llm_kwargs": {},
+                "llm_kwargs": {"model": "gpt-4"},
             }
 
             # Mock the LLM request to return a generator (streaming response)

@@ -111,6 +111,7 @@ class PromptLayer(PromptLayerMixin):
         input_variables,
         group_id,
         pl_run_span_id: Union[str, None] = None,
+        request_start_time: Union[float, None] = None,
     ):
         def _track_request(**body):
             track_request_kwargs = self._prepare_track_request_kwargs(
@@ -120,6 +121,7 @@ class PromptLayer(PromptLayerMixin):
                 input_variables,
                 group_id,
                 pl_run_span_id,
+                request_start_time=request_start_time,
                 **body,
             )
             return track_request(self.base_url, self.throw_on_error, **track_request_kwargs)
@@ -142,6 +144,8 @@ class PromptLayer(PromptLayerMixin):
         provider: Union[str, None] = None,
         model: Union[str, None] = None,
     ) -> Dict[str, Any]:
+        import datetime
+
         get_prompt_template_params = self._prepare_get_prompt_template_params(
             prompt_version=prompt_version,
             prompt_release_label=prompt_release_label,
@@ -168,6 +172,9 @@ class PromptLayer(PromptLayerMixin):
             stream=stream,
         )
 
+        # Capture start time before making the LLM request
+        request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+
         # response is just whatever the LLM call returns
         # streaming=False > Pydantic model instance
         # streaming=True > generator that yields ChatCompletionChunk pieces as they arrive
@@ -176,6 +183,9 @@ class PromptLayer(PromptLayerMixin):
             client_kwargs=llm_data["client_kwargs"],
             function_kwargs=llm_data["function_kwargs"],
         )
+
+        # Capture end time after the LLM request completes
+        request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
         if stream:
             return stream_response(
@@ -186,6 +196,7 @@ class PromptLayer(PromptLayerMixin):
                     input_variables=input_variables,
                     group_id=group_id,
                     pl_run_span_id=pl_run_span_id,
+                    request_start_time=request_start_time,
                 ),
                 map_results=llm_data["stream_function"],
                 metadata=llm_data["prompt_blueprint"]["metadata"],
@@ -204,6 +215,8 @@ class PromptLayer(PromptLayerMixin):
             pl_run_span_id,
             metadata=metadata,
             request_response=request_response,
+            request_start_time=request_start_time,
+            request_end_time=request_end_time,
         )
 
         return {
@@ -561,6 +574,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         input_variables,
         group_id,
         pl_run_span_id: Union[str, None] = None,
+        request_start_time: Union[float, None] = None,
     ):
         async def _track_request(**body):
             track_request_kwargs = self._prepare_track_request_kwargs(
@@ -570,6 +584,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 input_variables,
                 group_id,
                 pl_run_span_id,
+                request_start_time=request_start_time,
                 **body,
             )
             return await atrack_request(self.base_url, self.throw_on_error, **track_request_kwargs)
@@ -614,6 +629,8 @@ class AsyncPromptLayer(PromptLayerMixin):
         provider: Union[str, None] = None,
         model: Union[str, None] = None,
     ) -> Dict[str, Any]:
+        import datetime
+
         get_prompt_template_params = self._prepare_get_prompt_template_params(
             prompt_version=prompt_version,
             prompt_release_label=prompt_release_label,
@@ -641,11 +658,17 @@ class AsyncPromptLayer(PromptLayerMixin):
             is_async=True,
         )
 
+        # Capture start time before making the LLM request
+        request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+
         response = await llm_data["request_function"](
             prompt_blueprint=llm_data["prompt_blueprint"],
             client_kwargs=llm_data["client_kwargs"],
             function_kwargs=llm_data["function_kwargs"],
         )
+
+        # Capture end time after the LLM request completes
+        request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
         if hasattr(response, "model_dump"):
             request_response = response.model_dump(mode="json")
@@ -659,6 +682,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 input_variables=input_variables,
                 group_id=group_id,
                 pl_run_span_id=pl_run_span_id,
+                request_start_time=request_start_time,
             )
             return astream_response(
                 request_response,
@@ -675,6 +699,8 @@ class AsyncPromptLayer(PromptLayerMixin):
             pl_run_span_id,
             metadata=metadata,
             request_response=request_response,
+            request_start_time=request_start_time,
+            request_end_time=request_end_time,
         )
 
         return {

@@ -389,16 +389,25 @@ class PromptLayerMixin:
         group_id,
         pl_run_span_id: Union[str, None] = None,
         metadata: Union[Dict[str, str], None] = None,
+        request_start_time: Union[float, None] = None,
+        request_end_time: Union[float, None] = None,
         **body,
     ):
+        # If timestamps are not provided, generate them (for backward compatibility)
+        # But note that this is the old buggy behavior
+        if request_start_time is None:
+            request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+        if request_end_time is None:
+            request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+
         return {
             "function_name": request_params["function_name"],
             "provider_type": request_params["provider"],
             "args": [],
             "kwargs": request_params["function_kwargs"],
             "tags": tags,
-            "request_start_time": datetime.datetime.now(datetime.timezone.utc).timestamp(),
-            "request_end_time": datetime.datetime.now(datetime.timezone.utc).timestamp(),
+            "request_start_time": request_start_time,
+            "request_end_time": request_end_time,
             "api_key": api_key,
             "metadata": metadata,
             "prompt_id": request_params["prompt_blueprint"]["id"],

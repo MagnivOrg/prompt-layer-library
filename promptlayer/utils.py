@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from copy import deepcopy
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
+from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
@@ -1423,11 +1424,10 @@ async def aget_prompt_template(
             json_body.update(params)
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{base_url}/prompt-templates/{prompt_name}",
+                f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )
-
             if response.status_code != 200:
                 if throw_on_error:
                     raise_on_bad_response(

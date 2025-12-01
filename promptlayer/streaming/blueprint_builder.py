@@ -134,7 +134,13 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
         elif item_type == "function_call":
             tool_calls.append(_create_tool_call(item.get("call_id", ""), item.get("name", ""), "", tool_id=item_id))
         elif item_type == "message":
-            assistant_content.append(_create_content_item("text", item_id=item_id, text="[Message started]"))
+            assistant_content.append(_create_content_item("text", item_id=item_id, text=""))
+        elif item_type == "code_interpreter_call":
+            assistant_content.append(
+                _create_content_item(
+                    "code", item_id=item_id, code=item.get("code", ""), container_id=item.get("container_id")
+                )
+            )
 
     elif event_type == "response.content_part.added":
         item_id = event_dict.get("item_id")
@@ -143,9 +149,78 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
 
         if part_type == "output_text":
             text = part.get("text", "")
-            assistant_content.append(
-                _create_content_item("text", item_id=item_id, text=text if text else "[Content part added]")
+            assistant_content.append(_create_content_item("text", item_id=item_id, text=text if text else ""))
+
+    elif event_type == "response.output_text.annotation.added":
+        annotation = event_dict.get("annotation", {}) or {}
+        atype = annotation.get("type")
+        mapped_annotation = None
+
+        if atype == "url_citation":
+            mapped_annotation = {
+                "type": "url_citation",
+                "title": annotation.get("title"),
+                "url": annotation.get("url"),
+                "start_index": annotation.get("start_index"),
+                "end_index": annotation.get("end_index"),
+            }
+        elif atype == "file_citation":
+            mapped_annotation = {
+                "type": "file_citation",
+                "index": annotation.get("index"),
+                "file_id": annotation.get("file_id"),
+                "filename": annotation.get("filename"),
+            }
+        else:
+            mapped_annotation = annotation
+
+        assistant_content.append(
+            _create_content_item("text", item_id=event_dict.get("item_id"), text="", annotation=[mapped_annotation])
+        )
+
+    elif event_type == "response.code_interpreter_call.in_progress":
+        item_id = event_dict.get("item_id")
+        assistant_content.append(
+            _create_content_item(
+                "code", item_id=item_id, code=event_dict.get("code"), container_id=event_dict.get("container_id")
             )
+        )
+
+    elif event_type == "response.code_interpreter_call_code.delta":
+        item_id = event_dict.get("item_id")
+        delta_code = event_dict.get("delta", "")
+        if delta_code:
+            assistant_content.append(
+                _create_content_item(
+                    "code", item_id=item_id, code=delta_code, container_id=event_dict.get("container_id")
+                )
+            )
+
+    elif event_type == "response.code_interpreter_call_code.done":
+        item_id = event_dict.get("item_id")
+        final_code = event_dict.get("code", "")
+        if final_code:
+            assistant_content.append(
+                _create_content_item(
+                    "code", item_id=item_id, code=final_code, container_id=event_dict.get("container_id")
+                )
+            )
+
+    elif event_type == "response.code_interpreter_call.interpreting":
+        item_id = event_dict.get("item_id")
+        assistant_content.append(
+            _create_content_item(
+                "code", item_id=item_id, code=event_dict.get("code"), container_id=event_dict.get("container_id")
+            )
+        )
+
+    elif event_type == "response.code_interpreter_call.completed":
+        item_id = event_dict.get("item_id")
+        assistant_content.append(
+            _create_content_item(
+                "code", item_id=item_id, code=event_dict.get("code"), container_id=event_dict.get("container_id")
+            )
+        )
 
     elif event_type == "response.output_text.delta":
         item_id = event_dict.get("item_id")
@@ -188,6 +263,13 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
                     text = content_part.get("text", "")
                     if text:
                         assistant_content.append(_create_content_item("text", item_id=item_id, text=text))
+
+        elif item_type == "code_interpreter_call":
+            assistant_content.append(
+                _create_content_item(
+                    "code", item_id=item_id, code=item.get("code", ""), container_id=item.get("container_id")
+                )
+            )
 
     assistant_message = _build_assistant_message(assistant_content, tool_calls or None)
     return _build_prompt_blueprint(assistant_message, metadata)

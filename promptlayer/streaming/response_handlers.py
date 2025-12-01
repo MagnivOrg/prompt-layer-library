@@ -253,6 +253,15 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                 "status": item.get("status", "in_progress"),
             }
 
+        elif item_type == "code_interpreter_call":
+            current_items[item_id] = {
+                "type": "code_interpreter_call",
+                "id": item_id,
+                "code": item.get("code", ""),
+                "container_id": item.get("container_id"),
+                "status": item.get("status", "in_progress"),
+            }
+
     elif event_type == "response.reasoning_summary_part.added":
         item_id = chunk_dict.get("item_id")
         part = chunk_dict.get("part", {})

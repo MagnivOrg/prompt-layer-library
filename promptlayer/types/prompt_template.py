@@ -18,10 +18,33 @@ class ImageUrl(TypedDict, total=False):
     url: str
 
 
+class WebAnnotation(TypedDict, total=False):
+    type: Literal["web_annotation"]
+    title: str
+    url: str
+    start_index: int
+    end_index: int
+
+
+class FileAnnotation(TypedDict, total=False):
+    type: Literal["file_annotation"]
+    index: int
+    file_id: str
+    filename: str
+
+
 class TextContent(TypedDict, total=False):
     type: Literal["text"]
     text: str
     id: Union[str, None]
+    annotations: Union[List[Union[WebAnnotation, FileAnnotation]], None]
+
+
+class CodeContent(TypedDict, total=False):
+    type: Literal["code"]
+    code: str
+    id: Union[str, None]
+    container_id: Union[str, None]
 
 
 class ThinkingContent(TypedDict, total=False):
@@ -52,7 +75,7 @@ class MediaVariable(TypedDict, total=False):
     name: str
 
 
-Content = Union[TextContent, ThinkingContent, ImageContent, MediaContnt, MediaVariable]
+Content = Union[TextContent, ThinkingContent, CodeContent, ImageContent, MediaContnt, MediaVariable]
 
 
 class Function(TypedDict, total=False):

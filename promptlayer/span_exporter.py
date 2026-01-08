@@ -4,7 +4,7 @@ import requests
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from promptlayer.utils import raise_on_bad_response, retry_on_api_error
+from promptlayer.utils import _make_requests_session, raise_on_bad_response, retry_on_api_error
 
 
 class PromptLayerSpanExporter(SpanExporter):
@@ -15,7 +15,7 @@ class PromptLayerSpanExporter(SpanExporter):
 
     @retry_on_api_error
     def _post_spans(self, request_data):
-        response = requests.post(
+        response = _make_requests_session().post(
             self.url,
             headers={"X-Api-Key": self.api_key, "Content-Type": "application/json"},
             json={"spans": request_data},

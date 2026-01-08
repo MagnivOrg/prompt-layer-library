@@ -34,7 +34,11 @@ from tenacity import (
     wait_exponential,
 )
 
+from importlib.metadata import version as get_package_version
+
 from promptlayer import exceptions as _exceptions
+
+SDK_VERSION = get_package_version("promptlayer")
 from promptlayer.types import RequestLog
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
@@ -100,12 +104,27 @@ def _get_http_timeout():
         return DEFAULT_HTTP_TIMEOUT
 
 
+USER_AGENT = f"promptlayer-python/{SDK_VERSION}"
+
+
 def _make_httpx_client():
-    return httpx.AsyncClient(timeout=_get_http_timeout())
+    return httpx.AsyncClient(
+        timeout=_get_http_timeout(),
+        headers={"User-Agent": USER_AGENT},
+    )
 
 
 def _make_simple_httpx_client():
-    return httpx.Client(timeout=_get_http_timeout())
+    return httpx.Client(
+        timeout=_get_http_timeout(),
+        headers={"User-Agent": USER_AGENT},
+    )
+
+
+def _make_requests_session():
+    session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
+    return session
 
 
 def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
@@ -119,7 +138,7 @@ def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
 async def _get_final_output(
     base_url: str, execution_id: int, return_all_outputs: bool, *, headers: Dict[str, str]
 ) -> Dict[str, Any]:
-    async with httpx.AsyncClient() as client:
+    async with _make_httpx_client() as client:
         response = await client.get(
             f"{base_url}/workflow-version-execution-results",
             headers=headers,
@@ -497,7 +516,7 @@ def promptlayer_api_request(
     if hasattr(response, "dict"):  # added this for anthropic 3.0 changes, they return a completion object
         response = response.dict()
     try:
-        request_response = requests.post(
+        request_response = _make_requests_session().post(
             f"{base_url}/track-request",
             json={
                 "function_name": function_name,
@@ -530,7 +549,7 @@ def promptlayer_api_request(
 @retry_on_api_error
 def track_request(base_url: str, throw_on_error: bool, **body):
     try:
-        response = requests.post(
+        response = _make_requests_session().post(
             f"{base_url}/track-request",
             json=body,
         )
@@ -614,7 +633,7 @@ def promptlayer_get_prompt(
     label: The specific label of a prompt you want to get. Setting this will supercede version
     """
     try:
-        request_response = requests.get(
+        request_response = _make_requests_session().get(
             f"{base_url}/library-get-prompt-template",
             headers={"X-API-KEY": api_key},
             params={"prompt_name": prompt_name, "version": version, "label": label},
@@ -647,7 +666,7 @@ def promptlayer_publish_prompt(
     api_key: str, base_url: str, throw_on_error: bool, prompt_name, prompt_template, commit_message, tags, metadata=None
 ):
     try:
-        request_response = requests.post(
+        request_response = _make_requests_session().post(
             f"{base_url}/library-publish-prompt-template",
             json={
                 "prompt_name": prompt_name,
@@ -685,7 +704,7 @@ def promptlayer_track_prompt(
     api_key: str, base_url: str, throw_on_error: bool, request_id, prompt_name, input_variables, version, label
 ):
     try:
-        request_response = requests.post(
+        request_response = _make_requests_session().post(
             f"{base_url}/library-track-prompt",
             json={
                 "request_id": request_id,
@@ -765,7 +784,7 @@ async def apromptlayer_track_prompt(
 @retry_on_api_error
 def promptlayer_track_metadata(api_key: str, base_url: str, throw_on_error: bool, request_id, metadata):
     try:
-        request_response = requests.post(
+        request_response = _make_requests_session().post(
             f"{base_url}/library-track-metadata",
             json={
                 "request_id": request_id,
@@ -838,7 +857,7 @@ def promptlayer_track_score(api_key: str, base_url: str, throw_on_error: bool, r
         data = {"request_id": request_id, "score": score, "api_key": api_key}
         if score_name is not None:
             data["name"] = score_name
-        request_response = requests.post(
+        request_response = _make_requests_session().post(
             f"{base_url}/library-track-score",
             json=data,
         )
@@ -1233,7 +1252,7 @@ async def async_wrapper(
 @retry_on_api_error
 def promptlayer_create_group(api_key: str, base_url: str, throw_on_error: bool):
     try:
-        request_response = requests.post(
+        request_response = _make_requests_session().post(
             f"{base_url}/create-group",
             json={
                 "api_key": api_key,
@@ -1297,7 +1316,7 @@ async def apromptlayer_create_group(api_key: str, base_url: str, throw_on_error:
 @retry_on_api_error
 def promptlayer_track_group(api_key: str, base_url: str, throw_on_error: bool, request_id, group_id):
     try:
-        request_response = requests.post(
+        request_response = _make_requests_session().post(
             f"{base_url}/track-group",
             json={
                 "api_key": api_key,
@@ -1373,7 +1392,7 @@ def get_prompt_template(
         json_body = {"api_key": api_key}
         if params:
             json_body = {**json_body, **params}
-        response = requests.post(
+        response = _make_requests_session().post(
             f"{base_url}/prompt-templates/{prompt_name}",
             headers={"X-API-KEY": api_key},
             json=json_body,
@@ -1468,7 +1487,7 @@ def publish_prompt_template(
     body: PublishPromptTemplate,
 ) -> PublishPromptTemplateResponse:
     try:
-        response = requests.post(
+        response = _make_requests_session().post(
             f"{base_url}/rest/prompt-templates",
             headers={"X-API-KEY": api_key},
             json={
@@ -1549,7 +1568,7 @@ def get_all_prompt_templates(
         params = {"page": page, "per_page": per_page}
         if label:
             params["label"] = label
-        response = requests.get(
+        response = _make_requests_session().get(
             f"{base_url}/prompt-templates",
             headers={"X-API-KEY": api_key},
             params=params,
@@ -1761,7 +1780,7 @@ def get_api_key():
 @retry_on_api_error
 def util_log_request(api_key: str, base_url: str, throw_on_error: bool, **kwargs) -> Union[RequestLog, None]:
     try:
-        response = requests.post(
+        response = _make_requests_session().post(
             f"{base_url}/log-request",
             headers={"X-API-KEY": api_key},
             json=kwargs,

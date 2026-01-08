@@ -5,10 +5,12 @@ import functools
 import json
 import logging
 import os
+import sys
 import types
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from enum import Enum
+from importlib.metadata import version as get_package_version
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 from urllib.parse import quote
 from uuid import uuid4
@@ -34,11 +36,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from importlib.metadata import version as get_package_version
-
 from promptlayer import exceptions as _exceptions
-
-SDK_VERSION = get_package_version("promptlayer")
 from promptlayer.types import RequestLog
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
@@ -52,6 +50,15 @@ from promptlayer.types.prompt_template import (
 RERAISE_ORIGINAL_EXCEPTION = os.getenv("PROMPTLAYER_RE_RAISE_ORIGINAL_EXCEPTION", "False").lower() == "true"
 RAISE_FOR_STATUS = os.getenv("PROMPTLAYER_RAISE_FOR_STATUS", "False").lower() == "true"
 DEFAULT_HTTP_TIMEOUT = 5
+
+# SDK version and HTTP headers
+SDK_VERSION = get_package_version("promptlayer")
+_PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
+USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VERSION})"
+DEFAULT_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "X-SDK-Version": SDK_VERSION,
+}
 
 WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
 WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
@@ -104,26 +111,23 @@ def _get_http_timeout():
         return DEFAULT_HTTP_TIMEOUT
 
 
-USER_AGENT = f"promptlayer-python/{SDK_VERSION}"
-
-
 def _make_httpx_client():
     return httpx.AsyncClient(
         timeout=_get_http_timeout(),
-        headers={"User-Agent": USER_AGENT},
+        headers=DEFAULT_HEADERS,
     )
 
 
 def _make_simple_httpx_client():
     return httpx.Client(
         timeout=_get_http_timeout(),
-        headers={"User-Agent": USER_AGENT},
+        headers=DEFAULT_HEADERS,
     )
 
 
 def _make_requests_session():
     session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
+    session.headers.update(DEFAULT_HEADERS)
     return session
 
 

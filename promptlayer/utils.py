@@ -54,11 +54,7 @@ DEFAULT_HTTP_TIMEOUT = 5
 # SDK version and HTTP headers
 SDK_VERSION = get_package_version("promptlayer")
 _PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
-USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VERSION})"
-DEFAULT_HEADERS = {
-    "User-Agent": USER_AGENT,
-    "X-SDK-Version": SDK_VERSION,
-}
+_PROMPTLAYER_USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VERSION})"
 
 WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
 WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
@@ -112,22 +108,29 @@ def _get_http_timeout():
 
 
 def _make_httpx_client():
-    return httpx.AsyncClient(
-        timeout=_get_http_timeout(),
-        headers=DEFAULT_HEADERS,
-    )
+    client = httpx.AsyncClient(timeout=_get_http_timeout())
+    # Extend default User-Agent instead of replacing
+    default_ua = client.headers.get("user-agent", "")
+    client.headers["user-agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
+    client.headers["X-SDK-Version"] = SDK_VERSION
+    return client
 
 
 def _make_simple_httpx_client():
-    return httpx.Client(
-        timeout=_get_http_timeout(),
-        headers=DEFAULT_HEADERS,
-    )
+    client = httpx.Client(timeout=_get_http_timeout())
+    # Extend default User-Agent instead of replacing
+    default_ua = client.headers.get("user-agent", "")
+    client.headers["user-agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
+    client.headers["X-SDK-Version"] = SDK_VERSION
+    return client
 
 
 def _make_requests_session():
     session = requests.Session()
-    session.headers.update(DEFAULT_HEADERS)
+    # Extend default User-Agent instead of replacing
+    default_ua = session.headers.get("User-Agent", "")
+    session.headers["User-Agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
+    session.headers["X-SDK-Version"] = SDK_VERSION
     return session
 
 

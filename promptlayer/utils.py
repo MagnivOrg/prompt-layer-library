@@ -353,7 +353,8 @@ async def arun_workflow_request(
     execution_id_future = asyncio.Future[int]()
 
     if ably_token.get("messaging_backend") == "centrifugo":
-        address = urllib3.util.parse_url(base_url)._replace(scheme="wss", path="/connection/websocket").url
+        ws_scheme = "wss" if urllib3.util.parse_url(base_url).scheme == "https" else "ws"
+        address = urllib3.util.parse_url(base_url)._replace(scheme=ws_scheme, path="/connection/websocket").url
         async with centrifugo_client(address, token) as client:
             results_future = asyncio.Future[dict[str, Any]]()
             async with centrifugo_subscription(

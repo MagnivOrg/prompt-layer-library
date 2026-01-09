@@ -109,7 +109,6 @@ def _get_http_timeout():
 
 def _make_httpx_client():
     client = httpx.AsyncClient(timeout=_get_http_timeout())
-    # Extend default User-Agent instead of replacing
     default_ua = client.headers.get("user-agent", "")
     client.headers["user-agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
     client.headers["X-SDK-Version"] = SDK_VERSION
@@ -118,7 +117,6 @@ def _make_httpx_client():
 
 def _make_simple_httpx_client():
     client = httpx.Client(timeout=_get_http_timeout())
-    # Extend default User-Agent instead of replacing
     default_ua = client.headers.get("user-agent", "")
     client.headers["user-agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
     client.headers["X-SDK-Version"] = SDK_VERSION
@@ -127,7 +125,6 @@ def _make_simple_httpx_client():
 
 def _make_requests_session():
     session = requests.Session()
-    # Extend default User-Agent instead of replacing
     default_ua = session.headers.get("User-Agent", "")
     session.headers["User-Agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
     session.headers["X-SDK-Version"] = SDK_VERSION

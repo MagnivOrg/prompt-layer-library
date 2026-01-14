@@ -5,10 +5,13 @@ import functools
 import json
 import logging
 import os
+import sys
+import threading
 import types
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from enum import Enum
+from importlib.metadata import version as get_package_version
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 from urllib.parse import quote
 from uuid import uuid4
@@ -49,6 +52,11 @@ RERAISE_ORIGINAL_EXCEPTION = os.getenv("PROMPTLAYER_RE_RAISE_ORIGINAL_EXCEPTION"
 RAISE_FOR_STATUS = os.getenv("PROMPTLAYER_RAISE_FOR_STATUS", "False").lower() == "true"
 DEFAULT_HTTP_TIMEOUT = 5
 
+# SDK version and HTTP headers
+SDK_VERSION = get_package_version("promptlayer")
+_PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
+_PROMPTLAYER_USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VERSION})"
+
 WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
 WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
 SET_WORKFLOW_COMPLETE_MESSAGE = "SET_WORKFLOW_COMPLETE"
@@ -59,6 +67,47 @@ WS_TOKEN_REQUEST_LIBRARY_URL = (
 
 logger = logging.getLogger(__name__)
 
+# Module-level session for connection pooling (thread-safe initialization)
+_requests_session: Optional[requests.Session] = None
+_requests_session_lock = threading.Lock()
+
+
+def _get_requests_session() -> requests.Session:
+    """Get or create a module-level requests.Session for connection pooling.
+
+    Using a shared session prevents connection pool exhaustion under high concurrency
+    by reusing TCP connections instead of creating new ones for each request.
+
+    Thread-safe: uses double-checked locking pattern.
+
+    The session is configured with connection pool limits that can be customized
+    via environment variables for high-traffic production workloads:
+    - PROMPTLAYER_POOL_CONNECTIONS: Number of connection pools to cache (default: 100)
+    - PROMPTLAYER_POOL_MAXSIZE: Max connections per pool (default: 100)
+    """
+    global _requests_session
+    if _requests_session is None:
+        with _requests_session_lock:
+            # Double-check after acquiring lock
+            if _requests_session is None:
+                session = requests.Session()
+                # Set User-Agent and SDK version headers for debugging
+                default_ua = session.headers.get("User-Agent", "")
+                session.headers["User-Agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
+                session.headers["X-SDK-Version"] = SDK_VERSION
+                # Connection pool configuration - can be tuned via environment variables
+                pool_connections = int(os.getenv("PROMPTLAYER_POOL_CONNECTIONS", 100))
+                pool_maxsize = int(os.getenv("PROMPTLAYER_POOL_MAXSIZE", 100))
+                adapter = requests.adapters.HTTPAdapter(
+                    pool_connections=pool_connections,
+                    pool_maxsize=pool_maxsize,
+                    max_retries=0,  # We handle retries at application level via should_retry_error()
+                )
+                session.mount("https://", adapter)
+                session.mount("http://", adapter)
+                _requests_session = session
+    return _requests_session
+
 
 class FinalOutputCode(Enum):
     OK = "OK"
@@ -68,8 +117,22 @@ class FinalOutputCode(Enum):
 def should_retry_error(exception):
     """Check if an exception should trigger a retry.
 
-    Only retries on server errors (5xx) and rate limits (429).
+    Retries on:
+    - Server errors (5xx) and rate limits (429)
+    - Connection errors (connection pool exhaustion, network issues)
     """
+    # Check for connection errors that should be retried
+    if isinstance(
+        exception,
+        (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            urllib3.exceptions.NewConnectionError,
+            urllib3.exceptions.MaxRetryError,
+        ),
+    ):
+        return True
+
     if hasattr(exception, "response"):
         response = exception.response
         if hasattr(response, "status_code"):
@@ -101,11 +164,19 @@ def _get_http_timeout():
 
 
 def _make_httpx_client():
-    return httpx.AsyncClient(timeout=_get_http_timeout())
+    client = httpx.AsyncClient(timeout=_get_http_timeout())
+    default_ua = client.headers.get("user-agent", "")
+    client.headers["user-agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
+    client.headers["X-SDK-Version"] = SDK_VERSION
+    return client
 
 
 def _make_simple_httpx_client():
-    return httpx.Client(timeout=_get_http_timeout())
+    client = httpx.Client(timeout=_get_http_timeout())
+    default_ua = client.headers.get("user-agent", "")
+    client.headers["user-agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
+    client.headers["X-SDK-Version"] = SDK_VERSION
+    return client
 
 
 def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
@@ -119,7 +190,7 @@ def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
 async def _get_final_output(
     base_url: str, execution_id: int, return_all_outputs: bool, *, headers: Dict[str, str]
 ) -> Dict[str, Any]:
-    async with httpx.AsyncClient() as client:
+    async with _make_httpx_client() as client:
         response = await client.get(
             f"{base_url}/workflow-version-execution-results",
             headers=headers,
@@ -330,7 +401,8 @@ async def arun_workflow_request(
     execution_id_future = asyncio.Future[int]()
 
     if ably_token.get("messaging_backend") == "centrifugo":
-        address = urllib3.util.parse_url(base_url)._replace(scheme="wss", path="/connection/websocket").url
+        ws_scheme = "wss" if urllib3.util.parse_url(base_url).scheme == "https" else "ws"
+        address = urllib3.util.parse_url(base_url)._replace(scheme=ws_scheme, path="/connection/websocket").url
         async with centrifugo_client(address, token) as client:
             results_future = asyncio.Future[dict[str, Any]]()
             async with centrifugo_subscription(
@@ -497,7 +569,7 @@ def promptlayer_api_request(
     if hasattr(response, "dict"):  # added this for anthropic 3.0 changes, they return a completion object
         response = response.dict()
     try:
-        request_response = requests.post(
+        request_response = _get_requests_session().post(
             f"{base_url}/track-request",
             json={
                 "function_name": function_name,
@@ -530,7 +602,7 @@ def promptlayer_api_request(
 @retry_on_api_error
 def track_request(base_url: str, throw_on_error: bool, **body):
     try:
-        response = requests.post(
+        response = _get_requests_session().post(
             f"{base_url}/track-request",
             json=body,
         )
@@ -614,7 +686,7 @@ def promptlayer_get_prompt(
     label: The specific label of a prompt you want to get. Setting this will supercede version
     """
     try:
-        request_response = requests.get(
+        request_response = _get_requests_session().get(
             f"{base_url}/library-get-prompt-template",
             headers={"X-API-KEY": api_key},
             params={"prompt_name": prompt_name, "version": version, "label": label},
@@ -647,7 +719,7 @@ def promptlayer_publish_prompt(
     api_key: str, base_url: str, throw_on_error: bool, prompt_name, prompt_template, commit_message, tags, metadata=None
 ):
     try:
-        request_response = requests.post(
+        request_response = _get_requests_session().post(
             f"{base_url}/library-publish-prompt-template",
             json={
                 "prompt_name": prompt_name,
@@ -685,7 +757,7 @@ def promptlayer_track_prompt(
     api_key: str, base_url: str, throw_on_error: bool, request_id, prompt_name, input_variables, version, label
 ):
     try:
-        request_response = requests.post(
+        request_response = _get_requests_session().post(
             f"{base_url}/library-track-prompt",
             json={
                 "request_id": request_id,
@@ -765,7 +837,7 @@ async def apromptlayer_track_prompt(
 @retry_on_api_error
 def promptlayer_track_metadata(api_key: str, base_url: str, throw_on_error: bool, request_id, metadata):
     try:
-        request_response = requests.post(
+        request_response = _get_requests_session().post(
             f"{base_url}/library-track-metadata",
             json={
                 "request_id": request_id,
@@ -838,7 +910,7 @@ def promptlayer_track_score(api_key: str, base_url: str, throw_on_error: bool, r
         data = {"request_id": request_id, "score": score, "api_key": api_key}
         if score_name is not None:
             data["name"] = score_name
-        request_response = requests.post(
+        request_response = _get_requests_session().post(
             f"{base_url}/library-track-score",
             json=data,
         )
@@ -1233,7 +1305,7 @@ async def async_wrapper(
 @retry_on_api_error
 def promptlayer_create_group(api_key: str, base_url: str, throw_on_error: bool):
     try:
-        request_response = requests.post(
+        request_response = _get_requests_session().post(
             f"{base_url}/create-group",
             json={
                 "api_key": api_key,
@@ -1297,7 +1369,7 @@ async def apromptlayer_create_group(api_key: str, base_url: str, throw_on_error:
 @retry_on_api_error
 def promptlayer_track_group(api_key: str, base_url: str, throw_on_error: bool, request_id, group_id):
     try:
-        request_response = requests.post(
+        request_response = _get_requests_session().post(
             f"{base_url}/track-group",
             json={
                 "api_key": api_key,
@@ -1373,7 +1445,7 @@ def get_prompt_template(
         json_body = {"api_key": api_key}
         if params:
             json_body = {**json_body, **params}
-        response = requests.post(
+        response = _get_requests_session().post(
             f"{base_url}/prompt-templates/{prompt_name}",
             headers={"X-API-KEY": api_key},
             json=json_body,
@@ -1468,7 +1540,7 @@ def publish_prompt_template(
     body: PublishPromptTemplate,
 ) -> PublishPromptTemplateResponse:
     try:
-        response = requests.post(
+        response = _get_requests_session().post(
             f"{base_url}/rest/prompt-templates",
             headers={"X-API-KEY": api_key},
             json={
@@ -1549,7 +1621,7 @@ def get_all_prompt_templates(
         params = {"page": page, "per_page": per_page}
         if label:
             params["label"] = label
-        response = requests.get(
+        response = _get_requests_session().get(
             f"{base_url}/prompt-templates",
             headers={"X-API-KEY": api_key},
             params=params,
@@ -1761,7 +1833,7 @@ def get_api_key():
 @retry_on_api_error
 def util_log_request(api_key: str, base_url: str, throw_on_error: bool, **kwargs) -> Union[RequestLog, None]:
     try:
-        response = requests.post(
+        response = _get_requests_session().post(
             f"{base_url}/log-request",
             headers={"X-API-KEY": api_key},
             json=kwargs,

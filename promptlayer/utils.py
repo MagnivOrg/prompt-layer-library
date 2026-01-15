@@ -22,6 +22,7 @@ import urllib3
 import urllib3.util
 from ably import AblyRealtime
 from ably.types.message import Message
+from cachetools import LRUCache
 from centrifuge import (
     Client,
     PublicationContext,
@@ -107,6 +108,21 @@ def _get_requests_session() -> requests.Session:
                 session.mount("http://", adapter)
                 _requests_session = session
     return _requests_session
+
+
+# Generic LLM client cache - prevents connection pool exhaustion under high concurrency
+# Uses LRUCache to limit memory growth in long-running systems
+_llm_client_cache: LRUCache = LRUCache(maxsize=100)
+_llm_client_cache_lock = threading.Lock()
+
+
+def _get_cached_client(cache_key: str, factory: Callable[[], Any]) -> Any:
+    """Generic client caching with thread-safe double-checked locking."""
+    if cache_key not in _llm_client_cache:
+        with _llm_client_cache_lock:
+            if cache_key not in _llm_client_cache:
+                _llm_client_cache[cache_key] = factory()
+    return _llm_client_cache[cache_key]
 
 
 class FinalOutputCode(Enum):
@@ -1705,7 +1721,8 @@ MAP_TYPE_TO_OPENAI_FUNCTION = {
 def openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from openai import OpenAI
 
-    client = OpenAI(**client_kwargs)
+    cache_key = f"openai:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
+    client = _get_cached_client(cache_key, lambda: OpenAI(**client_kwargs))
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type is None:
@@ -1735,7 +1752,8 @@ AMAP_TYPE_TO_OPENAI_FUNCTION = {
 async def aopenai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from openai import AsyncOpenAI
 
-    client = AsyncOpenAI(**client_kwargs)
+    cache_key = f"async_openai:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
+    client = _get_cached_client(cache_key, lambda: AsyncOpenAI(**client_kwargs))
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
@@ -1748,7 +1766,9 @@ async def aopenai_request(prompt_blueprint: GetPromptTemplateResponse, client_kw
 def azure_openai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from openai import AzureOpenAI
 
-    client = AzureOpenAI(azure_endpoint=client_kwargs.pop("base_url", None))
+    azure_endpoint = client_kwargs.pop("base_url", None)
+    cache_key = f"azure_openai:{client_kwargs.get('api_key', '')}:{azure_endpoint or ''}"
+    client = _get_cached_client(cache_key, lambda: AzureOpenAI(azure_endpoint=azure_endpoint, **client_kwargs))
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
@@ -1763,7 +1783,9 @@ async def aazure_openai_request(
 ):
     from openai import AsyncAzureOpenAI
 
-    client = AsyncAzureOpenAI(azure_endpoint=client_kwargs.pop("base_url", None))
+    azure_endpoint = client_kwargs.pop("base_url", None)
+    cache_key = f"async_azure_openai:{client_kwargs.get('api_key', '')}:{azure_endpoint or ''}"
+    client = _get_cached_client(cache_key, lambda: AsyncAzureOpenAI(azure_endpoint=azure_endpoint, **client_kwargs))
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
@@ -1790,7 +1812,8 @@ MAP_TYPE_TO_ANTHROPIC_FUNCTION = {
 def anthropic_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from anthropic import Anthropic
 
-    client = Anthropic(**client_kwargs)
+    cache_key = f"anthropic:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
+    client = _get_cached_client(cache_key, lambda: Anthropic(**client_kwargs))
     request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **function_kwargs)
 
@@ -1812,7 +1835,8 @@ AMAP_TYPE_TO_ANTHROPIC_FUNCTION = {
 async def aanthropic_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from anthropic import AsyncAnthropic
 
-    client = AsyncAnthropic(**client_kwargs)
+    cache_key = f"async_anthropic:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
+    client = _get_cached_client(cache_key, lambda: AsyncAnthropic(**client_kwargs))
     request_to_make = AMAP_TYPE_TO_ANTHROPIC_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 
@@ -1888,7 +1912,9 @@ async def autil_log_request(api_key: str, base_url: str, throw_on_error: bool, *
 def mistral_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from mistralai import Mistral
 
-    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"), client=_make_simple_httpx_client())
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    cache_key = f"mistral:{api_key or ''}"
+    client = _get_cached_client(cache_key, lambda: Mistral(api_key=api_key, client=_make_simple_httpx_client()))
     if "stream" in function_kwargs and function_kwargs["stream"]:
         function_kwargs.pop("stream")
         return client.chat.stream(**function_kwargs)
@@ -1904,7 +1930,9 @@ async def amistral_request(
 ):
     from mistralai import Mistral
 
-    client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"), async_client=_make_httpx_client())
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    cache_key = f"async_mistral:{api_key or ''}"
+    client = _get_cached_client(cache_key, lambda: Mistral(api_key=api_key, async_client=_make_httpx_client()))
     if "stream" in function_kwargs and function_kwargs["stream"]:
         return await client.chat.stream_async(**function_kwargs)
     return await client.chat.complete_async(**function_kwargs)
@@ -1965,14 +1993,19 @@ MAP_TYPE_TO_GOOGLE_FUNCTION = {
 def google_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
-    if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI") == "true":
-        client = genai.Client(
-            vertexai=True,
-            project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
-            location=os.environ.get("GOOGLE_CLOUD_LOCATION"),
-        )
-    else:
-        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    use_vertexai = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI") == "true"
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+    cache_key = f"google_genai:{api_key or ''}:{project or ''}:{location or ''}"
+
+    def create_client():
+        if use_vertexai:
+            return genai.Client(vertexai=True, project=project, location=location)
+        return genai.Client(api_key=api_key)
+
+    client = _get_cached_client(cache_key, create_client)
     request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **function_kwargs)
 
@@ -2012,14 +2045,19 @@ AMAP_TYPE_TO_GOOGLE_FUNCTION = {
 async def agoogle_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from google import genai
 
-    if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI") == "true":
-        client = genai.Client(
-            vertexai=True,
-            project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
-            location=os.environ.get("GOOGLE_CLOUD_LOCATION"),
-        )
-    else:
-        client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+    use_vertexai = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI") == "true"
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+
+    cache_key = f"async_google_genai:{api_key or ''}:{project or ''}:{location or ''}"
+
+    def create_client():
+        if use_vertexai:
+            return genai.Client(vertexai=True, project=project, location=location)
+        return genai.Client(api_key=api_key)
+
+    client = _get_cached_client(cache_key, create_client)
     request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 
@@ -2035,7 +2073,8 @@ def vertexai_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs:
     if "claude" in prompt_blueprint["metadata"]["model"]["name"]:
         from anthropic import AnthropicVertex
 
-        client = AnthropicVertex(**client_kwargs)
+        cache_key = f"anthropic_vertex:{client_kwargs.get('project_id', '')}:{client_kwargs.get('region', '')}"
+        client = _get_cached_client(cache_key, lambda: AnthropicVertex(**client_kwargs))
         if prompt_blueprint["prompt_template"]["type"] == "chat":
             return anthropic_chat_request(client=client, **function_kwargs)
         raise NotImplementedError(
@@ -2058,7 +2097,8 @@ async def avertexai_request(prompt_blueprint: GetPromptTemplateResponse, client_
     if "claude" in prompt_blueprint["metadata"]["model"]["name"]:
         from anthropic import AsyncAnthropicVertex
 
-        client = AsyncAnthropicVertex(**client_kwargs)
+        cache_key = f"async_anthropic_vertex:{client_kwargs.get('project_id', '')}:{client_kwargs.get('region', '')}"
+        client = _get_cached_client(cache_key, lambda: AsyncAnthropicVertex(**client_kwargs))
         if prompt_blueprint["prompt_template"]["type"] == "chat":
             return await aanthropic_chat_request(client=client, **function_kwargs)
         raise NotImplementedError(
@@ -2073,11 +2113,19 @@ async def avertexai_request(prompt_blueprint: GetPromptTemplateResponse, client_
 def amazon_bedrock_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     import boto3
 
-    bedrock_client = boto3.client(
-        "bedrock-runtime",
-        aws_access_key_id=function_kwargs.pop("aws_access_key", None),
-        aws_secret_access_key=function_kwargs.pop("aws_secret_key", None),
-        region_name=function_kwargs.pop("aws_region", "us-east-1"),
+    aws_access_key_id = function_kwargs.pop("aws_access_key", None)
+    aws_secret_access_key = function_kwargs.pop("aws_secret_key", None)
+    region_name = function_kwargs.pop("aws_region", "us-east-1")
+
+    cache_key = f"boto3_bedrock:{aws_access_key_id or ''}:{region_name}"
+    bedrock_client = _get_cached_client(
+        cache_key,
+        lambda: boto3.client(
+            "bedrock-runtime",
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            region_name=region_name,
+        ),
     )
 
     stream = function_kwargs.pop("stream", False)
@@ -2118,13 +2166,23 @@ async def aamazon_bedrock_request(
 def anthropic_bedrock_request(prompt_blueprint: GetPromptTemplateResponse, client_kwargs: dict, function_kwargs: dict):
     from anthropic import AnthropicBedrock
 
-    client = AnthropicBedrock(
-        aws_access_key=function_kwargs.pop("aws_access_key", None),
-        aws_secret_key=function_kwargs.pop("aws_secret_key", None),
-        aws_region=function_kwargs.pop("aws_region", None),
-        aws_session_token=function_kwargs.pop("aws_session_token", None),
-        base_url=function_kwargs.pop("base_url", None),
-        **client_kwargs,
+    aws_access_key = function_kwargs.pop("aws_access_key", None)
+    aws_secret_key = function_kwargs.pop("aws_secret_key", None)
+    aws_region = function_kwargs.pop("aws_region", None)
+    aws_session_token = function_kwargs.pop("aws_session_token", None)
+    base_url = function_kwargs.pop("base_url", None)
+
+    cache_key = f"anthropic_bedrock:{aws_access_key or ''}:{aws_region or ''}:{base_url or ''}"
+    client = _get_cached_client(
+        cache_key,
+        lambda: AnthropicBedrock(
+            aws_access_key=aws_access_key,
+            aws_secret_key=aws_secret_key,
+            aws_region=aws_region,
+            aws_session_token=aws_session_token,
+            base_url=base_url,
+            **client_kwargs,
+        ),
     )
     if prompt_blueprint["prompt_template"]["type"] == "chat":
         return anthropic_chat_request(client=client, **function_kwargs)
@@ -2140,13 +2198,23 @@ async def aanthropic_bedrock_request(
 ):
     from anthropic import AsyncAnthropicBedrock
 
-    client = AsyncAnthropicBedrock(
-        aws_access_key=function_kwargs.pop("aws_access_key", None),
-        aws_secret_key=function_kwargs.pop("aws_secret_key", None),
-        aws_region=function_kwargs.pop("aws_region", None),
-        aws_session_token=function_kwargs.pop("aws_session_token", None),
-        base_url=function_kwargs.pop("base_url", None),
-        **client_kwargs,
+    aws_access_key = function_kwargs.pop("aws_access_key", None)
+    aws_secret_key = function_kwargs.pop("aws_secret_key", None)
+    aws_region = function_kwargs.pop("aws_region", None)
+    aws_session_token = function_kwargs.pop("aws_session_token", None)
+    base_url = function_kwargs.pop("base_url", None)
+
+    cache_key = f"async_anthropic_bedrock:{aws_access_key or ''}:{aws_region or ''}:{base_url or ''}"
+    client = _get_cached_client(
+        cache_key,
+        lambda: AsyncAnthropicBedrock(
+            aws_access_key=aws_access_key,
+            aws_secret_key=aws_secret_key,
+            aws_region=aws_region,
+            aws_session_token=aws_session_token,
+            base_url=base_url,
+            **client_kwargs,
+        ),
     )
     if prompt_blueprint["prompt_template"]["type"] == "chat":
         return await aanthropic_chat_request(client=client, **function_kwargs)

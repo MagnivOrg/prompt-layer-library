@@ -17,6 +17,7 @@ httpx = "^0.28.1"
 nest-asyncio = "^1.6.0"
 centrifuge-python = "^0.4.1"
 tenacity = "^9.1.2"
+cachetools = "^5.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"

@@ -22,6 +22,7 @@ import urllib3
 import urllib3.util
 from ably import AblyRealtime
 from ably.types.message import Message
+from cachetools import LRUCache
 from centrifuge import (
     Client,
     PublicationContext,
@@ -110,7 +111,8 @@ def _get_requests_session() -> requests.Session:
 
 
 # Generic LLM client cache - prevents connection pool exhaustion under high concurrency
-_llm_client_cache: Dict[str, Any] = {}
+# Uses LRUCache to limit memory growth in long-running systems
+_llm_client_cache: LRUCache = LRUCache(maxsize=100)
 _llm_client_cache_lock = threading.Lock()
 
 

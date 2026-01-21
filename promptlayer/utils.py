@@ -49,9 +49,7 @@ from promptlayer.types.prompt_template import (
 )
 
 # Configuration
-RERAISE_ORIGINAL_EXCEPTION = (
-    os.getenv("PROMPTLAYER_RE_RAISE_ORIGINAL_EXCEPTION", "False").lower() == "true"
-)
+RERAISE_ORIGINAL_EXCEPTION = os.getenv("PROMPTLAYER_RE_RAISE_ORIGINAL_EXCEPTION", "False").lower() == "true"
 RAISE_FOR_STATUS = os.getenv("PROMPTLAYER_RAISE_FOR_STATUS", "False").lower() == "true"
 DEFAULT_HTTP_TIMEOUT = 5
 
@@ -63,7 +61,9 @@ _PROMPTLAYER_USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VE
 WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
 WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
 SET_WORKFLOW_COMPLETE_MESSAGE = "SET_WORKFLOW_COMPLETE"
-WS_TOKEN_REQUEST_LIBRARY_URL = f"{os.getenv('PROMPTLAYER_BASE_URL', 'https://api.promptlayer.com')}/ws-token-request-library"
+WS_TOKEN_REQUEST_LIBRARY_URL = (
+    f"{os.getenv('PROMPTLAYER_BASE_URL', 'https://api.promptlayer.com')}/ws-token-request-library"
+)
 
 
 logger = logging.getLogger(__name__)
@@ -94,9 +94,7 @@ def _get_requests_session() -> requests.Session:
                 session = requests.Session()
                 # Set User-Agent and SDK version headers for debugging
                 default_ua = session.headers.get("User-Agent", "")
-                session.headers["User-Agent"] = (
-                    f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
-                )
+                session.headers["User-Agent"] = f"{_PROMPTLAYER_USER_AGENT} {default_ua}".strip()
                 session.headers["X-SDK-Version"] = SDK_VERSION
                 # Connection pool configuration - can be tuned via environment variables
                 pool_connections = int(os.getenv("PROMPTLAYER_POOL_CONNECTIONS", 100))
@@ -205,14 +203,8 @@ def _make_simple_httpx_client():
 
 def _get_workflow_workflow_id_or_name(workflow_id_or_name, workflow_name):
     # This is backward compatibility code
-    if (
-        workflow_id_or_name := (
-            workflow_name if workflow_id_or_name is None else workflow_id_or_name
-        )
-    ) is None:
-        raise ValueError(
-            'Either "workflow_id_or_name" or "workflow_name" must be provided'
-        )
+    if (workflow_id_or_name := (workflow_name if workflow_id_or_name is None else workflow_id_or_name)) is None:
+        raise ValueError('Either "workflow_id_or_name" or "workflow_name" must be provided')
 
     return workflow_id_or_name
 
@@ -243,22 +235,16 @@ async def _get_final_output(
 
 # TODO(dmu) MEDIUM: Consider putting all these functions into a class, so we do not have to pass
 #                   `authorization_headers` into each function
-async def _resolve_workflow_id(
-    base_url: str, workflow_id_or_name: Union[int, str], headers
-):
+async def _resolve_workflow_id(base_url: str, workflow_id_or_name: Union[int, str], headers):
     if isinstance(workflow_id_or_name, int):
         return workflow_id_or_name
 
     # TODO(dmu) LOW: Should we warn user here to avoid using workflow names in favor of workflow id?
     async with _make_httpx_client() as client:
         # TODO(dmu) MEDIUM: Generalize the way we make async calls to PromptLayer API and reuse it everywhere
-        response = await client.get(
-            f"{base_url}/workflows/{workflow_id_or_name}", headers=headers
-        )
+        response = await client.get(f"{base_url}/workflows/{workflow_id_or_name}", headers=headers)
         if response.status_code != 200:
-            raise_on_bad_response(
-                response, "PromptLayer had the following error while resolving workflow"
-            )
+            raise_on_bad_response(response, "PromptLayer had the following error while resolving workflow")
 
         return response.json()["workflow"]["id"]
 
@@ -283,22 +269,16 @@ async def _get_ably_token(base_url: str, channel_name, authentication_headers):
         if RERAISE_ORIGINAL_EXCEPTION:
             raise
         else:
-            raise _exceptions.PromptLayerAPIError(
-                error_message, response=None, body=None
-            ) from ex
+            raise _exceptions.PromptLayerAPIError(error_message, response=None, body=None) from ex
 
 
-def _make_message_listener(
-    base_url: str, results_future, execution_id_future, return_all_outputs, headers
-):
+def _make_message_listener(base_url: str, results_future, execution_id_future, return_all_outputs, headers):
     # We need this function to be mocked by unittests
     async def message_listener(message: Message):
         if results_future.cancelled() or message.name != SET_WORKFLOW_COMPLETE_MESSAGE:
             return  # TODO(dmu) LOW: Do we really need this check?
 
-        execution_id = await asyncio.wait_for(
-            execution_id_future, _get_http_timeout() * 1.1
-        )
+        execution_id = await asyncio.wait_for(execution_id_future, _get_http_timeout() * 1.1)
         message_data = json.loads(message.data)
         if message_data["workflow_version_execution_id"] != execution_id:
             return
@@ -309,9 +289,7 @@ def _make_message_listener(
         ):
             results = message_data["final_output"]
         elif result_code == FinalOutputCode.EXCEEDS_SIZE_LIMIT.value:
-            results = await _get_final_output(
-                base_url, execution_id, return_all_outputs, headers=headers
-            )
+            results = await _get_final_output(base_url, execution_id, return_all_outputs, headers=headers)
         else:
             raise NotImplementedError(f"Unsupported final output code: {result_code}")
 
@@ -355,9 +333,7 @@ async def _post_workflow_id_run(
     }
     try:
         async with _make_httpx_client() as client:
-            response = await client.post(
-                url, json=payload, headers=authentication_headers
-            )
+            response = await client.post(url, json=payload, headers=authentication_headers)
             if response.status_code != 201:
                 raise_on_bad_response(
                     response,
@@ -373,16 +349,12 @@ async def _post_workflow_id_run(
         if RERAISE_ORIGINAL_EXCEPTION:
             raise
         else:
-            raise _exceptions.PromptLayerAPIError(
-                error_message, response=None, body=None
-            ) from ex
+            raise _exceptions.PromptLayerAPIError(error_message, response=None, body=None) from ex
 
     return result.get("workflow_version_execution_id")
 
 
-async def _wait_for_workflow_completion(
-    channel, results_future, message_listener, timeout
-):
+async def _wait_for_workflow_completion(channel, results_future, message_listener, timeout):
     # We need this function for mocking in unittests
     try:
         return await asyncio.wait_for(results_future, timeout)
@@ -424,9 +396,7 @@ async def centrifugo_client(address: str, token: str):
 
 
 @asynccontextmanager
-async def centrifugo_subscription(
-    client: Client, topic: str, message_listener: MessageCallback
-):
+async def centrifugo_subscription(client: Client, topic: str, message_listener: MessageCallback):
     subscription = client.new_subscription(
         topic,
         events=SubscriptionEventLoggerHandler(message_listener),
@@ -471,14 +441,8 @@ async def arun_workflow_request(
     execution_id_future = asyncio.Future[int]()
 
     if ably_token.get("messaging_backend") == "centrifugo":
-        ws_scheme = (
-            "wss" if urllib3.util.parse_url(base_url).scheme == "https" else "ws"
-        )
-        address = (
-            urllib3.util.parse_url(base_url)
-            ._replace(scheme=ws_scheme, path="/connection/websocket")
-            .url
-        )
+        ws_scheme = "wss" if urllib3.util.parse_url(base_url).scheme == "https" else "ws"
+        address = urllib3.util.parse_url(base_url)._replace(scheme=ws_scheme, path="/connection/websocket").url
         async with centrifugo_client(address, token) as client:
             results_future = asyncio.Future[dict[str, Any]]()
             async with centrifugo_subscription(
@@ -510,10 +474,8 @@ async def arun_workflow_request(
     async with AblyRealtime(token=token) as ably_client:
         # It is crucial to subscribe before running a workflow, otherwise we may miss a completion message
         channel = ably_client.channels.get(channel_name)
-        results_future, message_listener = (
-            await _subscribe_to_workflow_completion_channel(
-                base_url, channel, execution_id_future, return_all_outputs, headers
-            )
+        results_future, message_listener = await _subscribe_to_workflow_completion_channel(
+            base_url, channel, execution_id_future, return_all_outputs, headers
         )
 
         execution_id = await _post_workflow_id_run(
@@ -529,9 +491,7 @@ async def arun_workflow_request(
         )
         execution_id_future.set_result(execution_id)
 
-        return await _wait_for_workflow_completion(
-            channel, results_future, message_listener, timeout
-        )
+        return await _wait_for_workflow_completion(channel, results_future, message_listener, timeout)
 
 
 def promptlayer_api_handler(
@@ -635,10 +595,7 @@ def convert_native_object_to_dict(native_object):
     if isinstance(native_object, Enum):
         return native_object.value
     if hasattr(native_object, "__dict__"):
-        return {
-            k: convert_native_object_to_dict(v)
-            for k, v in native_object.__dict__.items()
-        }
+        return {k: convert_native_object_to_dict(v) for k, v in native_object.__dict__.items()}
     return native_object
 
 
@@ -661,9 +618,7 @@ def promptlayer_api_request(
     if isinstance(response, dict) and hasattr(response, "to_dict_recursive"):
         response = response.to_dict_recursive()
     request_response = None
-    if hasattr(
-        response, "dict"
-    ):  # added this for anthropic 3.0 changes, they return a completion object
+    if hasattr(response, "dict"):  # added this for anthropic 3.0 changes, they return a completion object
         response = response.dict()
     try:
         request_response = _get_requests_session().post(
@@ -693,9 +648,7 @@ def promptlayer_api_request(
                 "WARNING: While logging your request PromptLayer had the following error",
             )
     except Exception as e:
-        logger.warning(
-            f"While logging your request PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While logging your request PromptLayer had the following error: {e}")
     if request_response is not None and return_pl_id:
         return request_response.json().get("request_id")
 
@@ -726,16 +679,12 @@ def track_request(base_url: str, throw_on_error: bool, **body):
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While logging your request PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While logging your request PromptLayer had the following error: {e}")
         return {}
 
 
 @retry_on_api_error
-async def atrack_request(
-    base_url: str, throw_on_error: bool, **body: Any
-) -> Dict[str, Any]:
+async def atrack_request(base_url: str, throw_on_error: bool, **body: Any) -> Dict[str, Any]:
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
@@ -761,9 +710,7 @@ async def atrack_request(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While logging your request PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While logging your request PromptLayer had the following error: {e}")
         return {}
 
 
@@ -822,9 +769,7 @@ def promptlayer_get_prompt(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"PromptLayer had the following error while getting your prompt: {e}"
-        )
+        logger.warning(f"PromptLayer had the following error while getting your prompt: {e}")
         return None
     if request_response.status_code != 200:
         if throw_on_error:
@@ -872,9 +817,7 @@ def promptlayer_publish_prompt(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"PromptLayer had the following error while publishing your prompt: {e}"
-        )
+        logger.warning(f"PromptLayer had the following error while publishing your prompt: {e}")
         return False
     if request_response.status_code != 200:
         if throw_on_error:
@@ -933,9 +876,7 @@ def promptlayer_track_prompt(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your prompt PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")
         return False
     return True
 
@@ -983,18 +924,14 @@ async def apromptlayer_track_prompt(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your prompt PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")
         return False
 
     return True
 
 
 @retry_on_api_error
-def promptlayer_track_metadata(
-    api_key: str, base_url: str, throw_on_error: bool, request_id, metadata
-):
+def promptlayer_track_metadata(api_key: str, base_url: str, throw_on_error: bool, request_id, metadata):
     try:
         request_response = _get_requests_session().post(
             f"{base_url}/library-track-metadata",
@@ -1023,9 +960,7 @@ def promptlayer_track_metadata(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your metadata PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your metadata PromptLayer had the following error: {e}")
         return False
     return True
 
@@ -1067,18 +1002,14 @@ async def apromptlayer_track_metadata(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your metadata PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your metadata PromptLayer had the following error: {e}")
         return False
 
     return True
 
 
 @retry_on_api_error
-def promptlayer_track_score(
-    api_key: str, base_url: str, throw_on_error: bool, request_id, score, score_name
-):
+def promptlayer_track_score(api_key: str, base_url: str, throw_on_error: bool, request_id, score, score_name):
     try:
         data = {"request_id": request_id, "score": score, "api_key": api_key}
         if score_name is not None:
@@ -1106,9 +1037,7 @@ def promptlayer_track_score(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your score PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your score PromptLayer had the following error: {e}")
         return False
     return True
 
@@ -1153,9 +1082,7 @@ async def apromptlayer_track_score(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your score PromptLayer had the following error: {str(e)}"
-        )
+        logger.warning(f"While tracking your score PromptLayer had the following error: {str(e)}")
         return False
 
     return True
@@ -1291,8 +1218,7 @@ class GeneratorProxy:
                 end_anthropic = True
 
         end_openai = provider_type == "openai" and (
-            result.choices[0].finish_reason == "stop"
-            or result.choices[0].finish_reason == "length"
+            result.choices[0].finish_reason == "stop" or result.choices[0].finish_reason == "length"
         )
 
         if end_anthropic or end_openai:
@@ -1308,9 +1234,7 @@ class GeneratorProxy:
                 request_end_time=self.api_request_arugments["request_end_time"],
                 api_key=self.api_key,
                 return_pl_id=self.api_request_arugments["return_pl_id"],
-                llm_request_span_id=self.api_request_arugments.get(
-                    "llm_request_span_id"
-                ),
+                llm_request_span_id=self.api_request_arugments.get("llm_request_span_id"),
             )
 
             if self.api_request_arugments["return_pl_id"]:
@@ -1347,9 +1271,7 @@ class GeneratorProxy:
             if getattr(last_event, "type", None) == "message_stop":
                 final_result = deepcopy(self.results[0].message)
 
-                content_blocks, usage, stop_reason = build_anthropic_content_blocks(
-                    self.results
-                )
+                content_blocks, usage, stop_reason = build_anthropic_content_blocks(self.results)
             final_result.content = content_blocks
             if usage:
                 final_result.usage.output_tokens = usage.output_tokens
@@ -1365,20 +1287,12 @@ class GeneratorProxy:
             final_result = deepcopy(self.results[-1])
             final_result.choices[0].text = response
             return final_result
-        elif hasattr(
-            self.results[0].choices[0], "delta"
-        ):  # this is completion with delta
+        elif hasattr(self.results[0].choices[0], "delta"):  # this is completion with delta
             response = {"role": "", "content": ""}
             for result in self.results:
-                if (
-                    hasattr(result.choices[0].delta, "role")
-                    and result.choices[0].delta.role is not None
-                ):
+                if hasattr(result.choices[0].delta, "role") and result.choices[0].delta.role is not None:
                     response["role"] = result.choices[0].delta.role
-                if (
-                    hasattr(result.choices[0].delta, "content")
-                    and result.choices[0].delta.content is not None
-                ):
+                if hasattr(result.choices[0].delta, "content") and result.choices[0].delta.content is not None:
                     response["content"] = response["content"] = (
                         f"{response['content']}{result.choices[0].delta.content}"
                     )
@@ -1416,9 +1330,7 @@ def raise_on_bad_response(request_response, main_message):
     if hasattr(request_response, "json"):
         try:
             body = request_response.json()
-            error_detail = (
-                body.get("message") or body.get("error") or body.get("detail")
-            )
+            error_detail = body.get("message") or body.get("error") or body.get("detail")
         except (json.JSONDecodeError, AttributeError):
             body = getattr(request_response, "text", str(request_response))
             error_detail = body
@@ -1432,48 +1344,30 @@ def raise_on_bad_response(request_response, main_message):
         err_msg = main_message
 
     if status_code == 400:
-        raise _exceptions.PromptLayerBadRequestError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerBadRequestError(err_msg, response=request_response, body=body)
 
     if status_code == 401:
-        raise _exceptions.PromptLayerAuthenticationError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerAuthenticationError(err_msg, response=request_response, body=body)
 
     if status_code == 403:
-        raise _exceptions.PromptLayerPermissionDeniedError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerPermissionDeniedError(err_msg, response=request_response, body=body)
 
     if status_code == 404:
-        raise _exceptions.PromptLayerNotFoundError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerNotFoundError(err_msg, response=request_response, body=body)
 
     if status_code == 409:
-        raise _exceptions.PromptLayerConflictError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerConflictError(err_msg, response=request_response, body=body)
 
     if status_code == 422:
-        raise _exceptions.PromptLayerUnprocessableEntityError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerUnprocessableEntityError(err_msg, response=request_response, body=body)
 
     if status_code == 429:
-        raise _exceptions.PromptLayerRateLimitError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerRateLimitError(err_msg, response=request_response, body=body)
 
     if status_code and status_code >= 500:
-        raise _exceptions.PromptLayerInternalServerError(
-            err_msg, response=request_response, body=body
-        )
+        raise _exceptions.PromptLayerInternalServerError(err_msg, response=request_response, body=body)
 
-    raise _exceptions.PromptLayerAPIStatusError(
-        err_msg, response=request_response, body=body
-    )
+    raise _exceptions.PromptLayerAPIStatusError(err_msg, response=request_response, body=body)
 
 
 async def async_wrapper(
@@ -1549,9 +1443,7 @@ def promptlayer_create_group(api_key: str, base_url: str, throw_on_error: bool):
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While creating your group PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While creating your group PromptLayer had the following error: {e}")
         return False
     return request_response.json()["id"]
 
@@ -1587,16 +1479,12 @@ async def apromptlayer_create_group(api_key: str, base_url: str, throw_on_error:
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While creating your group PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While creating your group PromptLayer had the following error: {e}")
         return False
 
 
 @retry_on_api_error
-def promptlayer_track_group(
-    api_key: str, base_url: str, throw_on_error: bool, request_id, group_id
-):
+def promptlayer_track_group(api_key: str, base_url: str, throw_on_error: bool, request_id, group_id):
     try:
         request_response = _get_requests_session().post(
             f"{base_url}/track-group",
@@ -1625,17 +1513,13 @@ def promptlayer_track_group(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your group PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your group PromptLayer had the following error: {e}")
         return False
     return True
 
 
 @retry_on_api_error
-async def apromptlayer_track_group(
-    api_key: str, base_url: str, throw_on_error: bool, request_id, group_id
-):
+async def apromptlayer_track_group(api_key: str, base_url: str, throw_on_error: bool, request_id, group_id):
     try:
         payload = {
             "api_key": api_key,
@@ -1668,9 +1552,7 @@ async def apromptlayer_track_group(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your group PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your group PromptLayer had the following error: {e}")
         return False
 
     return True
@@ -1710,17 +1592,13 @@ def get_prompt_template(
     except requests.exceptions.ConnectionError as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {e}"
         if throw_on_error:
-            raise _exceptions.PromptLayerAPIConnectionError(
-                err_msg, response=None, body=None
-            ) from e
+            raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except requests.exceptions.Timeout as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {e}"
         if throw_on_error:
-            raise _exceptions.PromptLayerAPITimeoutError(
-                err_msg, response=None, body=None
-            ) from e
+            raise _exceptions.PromptLayerAPITimeoutError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except requests.exceptions.RequestException as e:
@@ -1765,25 +1643,19 @@ async def aget_prompt_template(
     except (httpx.ConnectError, httpx.NetworkError) as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
-            raise _exceptions.PromptLayerAPIConnectionError(
-                err_msg, response=None, body=None
-            ) from e
+            raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except httpx.TimeoutException as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
-            raise _exceptions.PromptLayerAPITimeoutError(
-                err_msg, response=None, body=None
-            ) from e
+            raise _exceptions.PromptLayerAPITimeoutError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
     except httpx.RequestError as e:
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
-            raise _exceptions.PromptLayerAPIConnectionError(
-                err_msg, response=None, body=None
-            ) from e
+            raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
         logger.warning(err_msg)
         return None
 
@@ -1825,9 +1697,7 @@ def publish_prompt_template(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"PromptLayer had the following error while publishing your prompt template: {e}"
-        )
+        logger.warning(f"PromptLayer had the following error while publishing your prompt template: {e}")
         return None
 
 
@@ -1870,9 +1740,7 @@ async def apublish_prompt_template(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"PromptLayer had the following error while publishing your prompt template: {e}"
-        )
+        logger.warning(f"PromptLayer had the following error while publishing your prompt template: {e}")
         return None
 
 
@@ -1915,9 +1783,7 @@ def get_all_prompt_templates(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"PromptLayer had the following error while getting all your prompt templates: {e}"
-        )
+        logger.warning(f"PromptLayer had the following error while getting all your prompt templates: {e}")
         return []
 
 
@@ -1962,9 +1828,7 @@ async def aget_all_prompt_templates(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"PromptLayer had the following error while getting all your prompt templates: {e}"
-        )
+        logger.warning(f"PromptLayer had the following error while getting all your prompt templates: {e}")
         return []
 
 
@@ -1989,9 +1853,7 @@ def openai_request(
 ):
     from openai import OpenAI
 
-    cache_key = (
-        f"openai:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
-    )
+    cache_key = f"openai:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
     client = _get_cached_client(cache_key, lambda: OpenAI(**client_kwargs))
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
@@ -1999,9 +1861,7 @@ def openai_request(
         api_type = "chat-completions"
 
     if api_type == "chat-completions":
-        request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
-            prompt_blueprint["prompt_template"]["type"]
-        ]
+        request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return request_to_make(client, **function_kwargs)
     else:
         return client.responses.create(**function_kwargs)
@@ -2033,9 +1893,7 @@ async def aopenai_request(
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
-        request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[
-            prompt_blueprint["prompt_template"]["type"]
-        ]
+        request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return await request_to_make(client, **function_kwargs)
     else:
         return await client.responses.create(**function_kwargs)
@@ -2049,18 +1907,12 @@ def azure_openai_request(
     from openai import AzureOpenAI
 
     azure_endpoint = client_kwargs.pop("base_url", None)
-    cache_key = (
-        f"azure_openai:{client_kwargs.get('api_key', '')}:{azure_endpoint or ''}"
-    )
-    client = _get_cached_client(
-        cache_key, lambda: AzureOpenAI(azure_endpoint=azure_endpoint, **client_kwargs)
-    )
+    cache_key = f"azure_openai:{client_kwargs.get('api_key', '')}:{azure_endpoint or ''}"
+    client = _get_cached_client(cache_key, lambda: AzureOpenAI(azure_endpoint=azure_endpoint, **client_kwargs))
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
-        request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[
-            prompt_blueprint["prompt_template"]["type"]
-        ]
+        request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return request_to_make(client, **function_kwargs)
     else:
         return client.responses.create(**function_kwargs)
@@ -2074,9 +1926,7 @@ async def aazure_openai_request(
     from openai import AsyncAzureOpenAI
 
     azure_endpoint = client_kwargs.pop("base_url", None)
-    cache_key = (
-        f"async_azure_openai:{client_kwargs.get('api_key', '')}:{azure_endpoint or ''}"
-    )
+    cache_key = f"async_azure_openai:{client_kwargs.get('api_key', '')}:{azure_endpoint or ''}"
     client = _get_cached_client(
         cache_key,
         lambda: AsyncAzureOpenAI(azure_endpoint=azure_endpoint, **client_kwargs),
@@ -2084,9 +1934,7 @@ async def aazure_openai_request(
     api_type = prompt_blueprint["metadata"]["model"].get("api_type", "chat-completions")
 
     if api_type == "chat-completions":
-        request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[
-            prompt_blueprint["prompt_template"]["type"]
-        ]
+        request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return await request_to_make(client, **function_kwargs)
     else:
         return await client.responses.create(**function_kwargs)
@@ -2115,9 +1963,7 @@ def anthropic_request(
 
     cache_key = f"anthropic:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
     client = _get_cached_client(cache_key, lambda: Anthropic(**client_kwargs))
-    request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = MAP_TYPE_TO_ANTHROPIC_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **function_kwargs)
 
 
@@ -2144,9 +1990,7 @@ async def aanthropic_request(
 
     cache_key = f"async_anthropic:{client_kwargs.get('api_key', '')}:{client_kwargs.get('base_url', '')}"
     client = _get_cached_client(cache_key, lambda: AsyncAnthropic(**client_kwargs))
-    request_to_make = AMAP_TYPE_TO_ANTHROPIC_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = AMAP_TYPE_TO_ANTHROPIC_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 
 
@@ -2164,9 +2008,7 @@ def get_api_key():
 
 
 @retry_on_api_error
-def util_log_request(
-    api_key: str, base_url: str, throw_on_error: bool, **kwargs
-) -> Union[RequestLog, None]:
+def util_log_request(api_key: str, base_url: str, throw_on_error: bool, **kwargs) -> Union[RequestLog, None]:
     try:
         response = _get_requests_session().post(
             f"{base_url}/log-request",
@@ -2193,16 +2035,12 @@ def util_log_request(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your prompt PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")
         return None
 
 
 @retry_on_api_error
-async def autil_log_request(
-    api_key: str, base_url: str, throw_on_error: bool, **kwargs
-) -> Union[RequestLog, None]:
+async def autil_log_request(api_key: str, base_url: str, throw_on_error: bool, **kwargs) -> Union[RequestLog, None]:
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
@@ -2230,9 +2068,7 @@ async def autil_log_request(
                 response=None,
                 body=None,
             ) from e
-        logger.warning(
-            f"While tracking your prompt PromptLayer had the following error: {e}"
-        )
+        logger.warning(f"While tracking your prompt PromptLayer had the following error: {e}")
         return None
 
 
@@ -2245,9 +2081,7 @@ def mistral_request(
 
     api_key = os.environ.get("MISTRAL_API_KEY")
     cache_key = f"mistral:{api_key or ''}"
-    client = _get_cached_client(
-        cache_key, lambda: Mistral(api_key=api_key, client=_make_simple_httpx_client())
-    )
+    client = _get_cached_client(cache_key, lambda: Mistral(api_key=api_key, client=_make_simple_httpx_client()))
     if "stream" in function_kwargs and function_kwargs["stream"]:
         function_kwargs.pop("stream")
         return client.chat.stream(**function_kwargs)
@@ -2265,9 +2099,7 @@ async def amistral_request(
 
     api_key = os.environ.get("MISTRAL_API_KEY")
     cache_key = f"async_mistral:{api_key or ''}"
-    client = _get_cached_client(
-        cache_key, lambda: Mistral(api_key=api_key, async_client=_make_httpx_client())
-    )
+    client = _get_cached_client(cache_key, lambda: Mistral(api_key=api_key, async_client=_make_httpx_client()))
     if "stream" in function_kwargs and function_kwargs["stream"]:
         return await client.chat.stream_async(**function_kwargs)
     return await client.chat.complete_async(**function_kwargs)
@@ -2314,9 +2146,7 @@ def google_completions_request(client, **kwargs):
     contents = kwargs.get("contents", [])
     stream = kwargs.pop("stream", False)
     if stream:
-        stream_gen = client.models.generate_content_stream(
-            model=model, contents=contents, config=config
-        )
+        stream_gen = client.models.generate_content_stream(model=model, contents=contents, config=config)
         return _GoogleStreamWrapper(stream_gen, client)
     return client.models.generate_content(model=model, contents=contents, config=config)
 
@@ -2347,9 +2177,7 @@ def google_request(
         return genai.Client(api_key=api_key)
 
     client = _get_cached_client(cache_key, create_client)
-    request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = MAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return request_to_make(client, **function_kwargs)
 
 
@@ -2360,9 +2188,7 @@ async def agoogle_chat_request(client, **kwargs):
     model = kwargs.get("model", "gemini-2.0-flash")
     history = [Content(**item) for item in kwargs.get("history", [])]
     generation_config = kwargs.get("generation_config", {})
-    chat = client.aio.chats.create(
-        model=model, history=history, config=generation_config
-    )
+    chat = client.aio.chats.create(model=model, history=history, config=generation_config)
     last_message = history[-1].parts[0] if history else ""
     if stream:
         stream_gen = await chat.send_message_stream(message=last_message)
@@ -2376,13 +2202,9 @@ async def agoogle_completions_request(client, **kwargs):
     contents = kwargs.get("contents", [])
     stream = kwargs.pop("stream", False)
     if stream:
-        stream_gen = await client.aio.models.generate_content_stream(
-            model=model, contents=contents, config=config
-        )
+        stream_gen = await client.aio.models.generate_content_stream(model=model, contents=contents, config=config)
         return _GoogleStreamWrapper(stream_gen, client)
-    return await client.aio.models.generate_content(
-        model=model, contents=contents, config=config
-    )
+    return await client.aio.models.generate_content(model=model, contents=contents, config=config)
 
 
 AMAP_TYPE_TO_GOOGLE_FUNCTION = {
@@ -2411,9 +2233,7 @@ async def agoogle_request(
         return genai.Client(api_key=api_key)
 
     client = _get_cached_client(cache_key, create_client)
-    request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[
-        prompt_blueprint["prompt_template"]["type"]
-    ]
+    request_to_make = AMAP_TYPE_TO_GOOGLE_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
     return await request_to_make(client, **function_kwargs)
 
 
@@ -2461,9 +2281,7 @@ async def avertexai_request(
         from anthropic import AsyncAnthropicVertex
 
         cache_key = f"async_anthropic_vertex:{client_kwargs.get('project_id', '')}:{client_kwargs.get('region', '')}"
-        client = _get_cached_client(
-            cache_key, lambda: AsyncAnthropicVertex(**client_kwargs)
-        )
+        client = _get_cached_client(cache_key, lambda: AsyncAnthropicVertex(**client_kwargs))
         if prompt_blueprint["prompt_template"]["type"] == "chat":
             return await aanthropic_chat_request(client=client, **function_kwargs)
         raise NotImplementedError(
@@ -2547,9 +2365,7 @@ def anthropic_bedrock_request(
     aws_session_token = function_kwargs.pop("aws_session_token", None)
     base_url = function_kwargs.pop("base_url", None)
 
-    cache_key = (
-        f"anthropic_bedrock:{aws_access_key or ''}:{aws_region or ''}:{base_url or ''}"
-    )
+    cache_key = f"anthropic_bedrock:{aws_access_key or ''}:{aws_region or ''}:{base_url or ''}"
     client = _get_cached_client(
         cache_key,
         lambda: AnthropicBedrock(

@@ -71,7 +71,7 @@ interactions:
       x-api-key:
       - sanitized
     method: POST
-    uri: http://localhost:8000/prompt-templates/test_template:test
+    uri: http://localhost:8000/prompt-templates/test_template%3Atest
   response:
     body:
       string: '{"id":5,"prompt_name":"test_template:test","tags":[],"workspace_id":1,"commit_message":null,"metadata":null,"prompt_template":{"messages":[{"input_variables":[],"template_format":"f-string","content":[{"type":"text","text":"You

@@ -298,7 +298,7 @@ class PromptLayer(PromptLayerMixin):
         # Allows `workflow_name` to be passed both as keyword and positional argument
         # (virtually identical to `workflow_id_or_name`)
         workflow_name: Optional[str] = None,
-        timeout: Optional[float] = None,
+        timeout: Optional[Union[int, float]] = None,
     ) -> Union[Dict[str, Any], Any]:
         try:
             try:
@@ -337,6 +337,12 @@ class PromptLayer(PromptLayerMixin):
                     )
 
             return results
+        except (asyncio.TimeoutError, TimeoutError) as ex:
+            raise _exceptions.PromptLayerAPITimeoutError(
+                "Workflow execution timed out", response=None, body=None
+            ) from ex
+        except _exceptions.PromptLayerAPITimeoutError:
+            raise  # Re-raise as-is (from inner arun_workflow_request)
         except Exception as ex:
             logger.exception("Error running workflow")
             if RERAISE_ORIGINAL_EXCEPTION:
@@ -461,7 +467,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         # Allows `workflow_name` to be passed both as keyword and positional argument
         # (virtually identical to `workflow_id_or_name`)
         workflow_name: Optional[str] = None,
-        timeout: Optional[float] = None,
+        timeout: Optional[Union[int, float]] = None,
     ) -> Union[Dict[str, Any], Any]:
         try:
             coro = arun_workflow_request(
@@ -476,6 +482,12 @@ class AsyncPromptLayer(PromptLayerMixin):
                 return_all_outputs=return_all_outputs,
             )
             return await asyncio.wait_for(coro, timeout=timeout)
+        except (asyncio.TimeoutError, TimeoutError) as ex:
+            raise _exceptions.PromptLayerAPITimeoutError(
+                "Workflow execution timed out", response=None, body=None
+            ) from ex
+        except _exceptions.PromptLayerAPITimeoutError:
+            raise  # Re-raise as-is (from inner arun_workflow_request)
         except Exception as ex:
             logger.exception("Error running workflow")
             if RERAISE_ORIGINAL_EXCEPTION:

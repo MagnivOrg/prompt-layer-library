@@ -18,6 +18,7 @@ nest-asyncio = "^1.6.0"
 centrifuge-python = "^0.4.1"
 tenacity = "^9.1.2"
 cachetools = "^5.0.0"
+mcp = "^1.26.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"
@@ -33,6 +34,9 @@ pydantic = "^2.11.7"
 pydantic-settings = "^2.10.1"
 boto3 = "^1.35.0"
 aioboto3 = "^13.0.0"
+
+[tool.poetry.scripts]
+promptlayer-mcp = "promptlayer.mcp_server:main"
 
 [build-system]
 requires = ["poetry-core"]

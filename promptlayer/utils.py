@@ -242,7 +242,7 @@ async def _resolve_workflow_id(base_url: str, workflow_id_or_name: Union[int, st
     # TODO(dmu) LOW: Should we warn user here to avoid using workflow names in favor of workflow id?
     async with _make_httpx_client() as client:
         # TODO(dmu) MEDIUM: Generalize the way we make async calls to PromptLayer API and reuse it everywhere
-        response = await client.get(f"{base_url}/workflows/{workflow_id_or_name}", headers=headers)
+        response = await client.get(f"{base_url}/workflows/{quote(str(workflow_id_or_name), safe='')}", headers=headers)
         if response.status_code != 200:
             raise_on_bad_response(response, "PromptLayer had the following error while resolving workflow")
 

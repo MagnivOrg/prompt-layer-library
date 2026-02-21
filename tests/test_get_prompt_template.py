@@ -235,3 +235,86 @@ def test_get_prompt_template_provider_base_url_name(capsys, promptlayer_client):
             prompt_registry_name, {"provider": "openai", "model": "gpt-3.5-turbo"}
         )
         assert response["provider_base_url"] is None
+
+
+class TestUrlEncodingInResolveWorkflowId:
+    """Tests for URL encoding of workflow names in _resolve_workflow_id.
+
+    Covers the bug reported in issue #254: workflow names containing special
+    characters (like slashes) must be URL-encoded before being appended to the
+    API path, otherwise the server interprets them as path separators.
+    """
+
+    @pytest.mark.asyncio
+    async def test_resolve_workflow_id_encodes_slashes(self, base_url, headers):
+        """Workflow names with slashes must be URL-encoded."""
+        from promptlayer.utils import _resolve_workflow_id
+
+        workflow_name = "team/my-workflow"
+        expected_encoded = "team%2Fmy-workflow"
+        workflow_id = 42
+
+        # httpx response.json() is synchronous, so use MagicMock for the response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"workflow": {"id": workflow_id}}
+
+        with patch("promptlayer.utils._make_httpx_client") as mock_client_factory:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client_factory.return_value = mock_client
+
+            result = await _resolve_workflow_id(base_url, workflow_name, headers)
+
+        assert result == workflow_id
+        call_args = mock_client.get.call_args
+        actual_url = call_args[0][0]
+        assert expected_encoded in actual_url, (
+            f"Expected encoded slash ({expected_encoded}) in URL, got: {actual_url}"
+        )
+        assert "/team/my-workflow" not in actual_url, (
+            "Unencoded slash found in workflow URL — would be misinterpreted as path separator"
+        )
+
+    @pytest.mark.asyncio
+    async def test_resolve_workflow_id_encodes_special_chars(self, base_url, headers):
+        """Workflow names with various special characters should be URL-encoded."""
+        from promptlayer.utils import _resolve_workflow_id
+
+        workflow_name = "org/project:v2@prod"
+        workflow_id = 99
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"workflow": {"id": workflow_id}}
+
+        with patch("promptlayer.utils._make_httpx_client") as mock_client_factory:
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client_factory.return_value = mock_client
+
+            result = await _resolve_workflow_id(base_url, workflow_name, headers)
+
+        assert result == workflow_id
+        call_args = mock_client.get.call_args
+        actual_url = call_args[0][0]
+        assert "%2F" in actual_url, "Slash not URL-encoded in workflow URL"
+        assert "%3A" in actual_url, "Colon not URL-encoded in workflow URL"
+        assert "%40" in actual_url, "At-sign not URL-encoded in workflow URL"
+
+    @pytest.mark.asyncio
+    async def test_resolve_workflow_id_integer_unchanged(self, base_url, headers):
+        """Integer workflow IDs should be returned immediately without an HTTP call."""
+        from promptlayer.utils import _resolve_workflow_id
+
+        workflow_id = 7
+
+        with patch("promptlayer.utils._make_httpx_client") as mock_client_factory:
+            result = await _resolve_workflow_id(base_url, workflow_id, headers)
+
+        assert result == workflow_id
+        mock_client_factory.assert_not_called()

@@ -1,0 +1,232 @@
+interactions:
+- request:
+    body: '{"api_key": "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '50'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - promptlayer-python/1.0.82 (python 3.9) python-requests/2.31.0
+      X-SDK-Version:
+      - 1.0.82
+      x-api-key:
+      - sanitized
+    method: POST
+    uri: http://localhost:8000/prompt-templates/error_tracking_test
+  response:
+    body:
+      string: "{\n  \"id\": 1,\n  \"workspace_id\": 2,\n  \"prompt_name\": \"error_tracking_test\",\n
+        \ \"tags\": [\n    \"test\"\n  ],\n  \"provider_id\": null,\n  \"custom_provider\":
+        null,\n  \"prompt_template\": {\n    \"messages\": [\n      {\n        \"input_variables\":
+        [],\n        \"template_format\": \"f-string\",\n        \"content\": [\n
+        \         {\n            \"type\": \"text\",\n            \"text\": \"Say
+        hello\",\n            \"id\": null,\n            \"annotations\": null\n          }\n
+        \       ],\n        \"raw_request_display_role\": \"\",\n        \"dataset_examples\":
+        [],\n        \"role\": \"user\",\n        \"name\": null\n      }\n    ],\n
+        \   \"functions\": [],\n    \"tools\": null,\n    \"function_call\": \"none\",\n
+        \   \"tool_choice\": null,\n    \"type\": \"chat\",\n    \"input_variables\":
+        [],\n    \"dataset_examples\": []\n  },\n  \"snippets\": [],\n  \"version\":
+        1,\n  \"metadata\": {\n    \"model\": {\n      \"provider\": \"openai\",\n
+        \     \"model_config_display_name\": null,\n      \"base_model\": null,\n
+        \     \"name\": \"gpt-4o-mini\",\n      \"parameters\": {\n        \"model\":
+        \"gpt-4o-mini\",\n        \"temperature\": 1,\n        \"max_tokens\": 256\n
+        \     },\n      \"display_params\": {},\n      \"api_type\": \"chat-completions\"\n
+        \   }\n  },\n  \"commit_message\": \"test template for error tracking\",\n
+        \ \"llm_kwargs\": {\n    \"messages\": [\n      {\n        \"role\": \"user\",\n
+        \       \"content\": [\n          {\n            \"type\": \"text\",\n            \"text\":
+        \"Say hello\"\n          }\n        ]\n      }\n    ],\n    \"model\": \"gpt-4o-mini\",\n
+        \   \"temperature\": 1,\n    \"max_tokens\": 256\n  },\n  \"provider_base_url\":
+        null,\n  \"warning\": null,\n  \"request_id\": \"02fc80dfe1334e66a5d4c025e0bf1520\"\n}\n"
+    headers:
+      Content-Length:
+      - '1561'
+      Content-Security-Policy:
+      - default-src 'self'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 23 Feb 2026 16:37:08 GMT
+      Server:
+      - Werkzeug/3.0.6 Python/3.12.12
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages": [{"role": "user", "content": [{"type": "text", "text": "Say
+      hello"}]}], "model": "gpt-4o-mini", "max_tokens": 256, "stream": false, "temperature":
+      1}'
+    headers:
+      Authorization:
+      - sanitized
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '147'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.60.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.60.1
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.9.6
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n  \"error\": {\n    \"message\": \"Incorrect API key provided: sk-inval**************ting.
+        You can find your API key at https://platform.openai.com/account/api-keys.\",\n
+        \   \"type\": \"invalid_request_error\",\n    \"code\": \"invalid_api_key\",\n
+        \   \"param\": null\n  },\n  \"status\": 401\n}"
+    headers:
+      CF-RAY:
+      - 9d282567dcb00c17-NAG
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '272'
+      Content-Type:
+      - text/plain
+      Date:
+      - Mon, 23 Feb 2026 16:37:08 GMT
+      Server:
+      - cloudflare
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      set-cookie:
+      - __cf_bm=kdCH_auZkxEiXs5Vcq1BVp98qHw0svofzIKWq9Xwa2U-1771864628.459103-1.0.1.1-6gWSWwkY4ypMS9H4o0j2FwWWmawEc6DCjD_1WdDCujVycu0Bs1AETwRDwR6cX3jDdTquVLHUpUJWtA0c_ylNDjGL1qD1s_vQdr8dIxNBGzy5grCYf8v76.gvWNDHAJfg;
+        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Mon, 23 Feb 2026
+        17:07:08 GMT
+      - _cfuvid=UvDLcow1P5ROiUhYpV0mAYrj35J2WJ.4uPkUcJe88z4-1771864628.459103-1.0.1.1-aXungLg9hvfL40AYwOULOfDnAV.Rl2M5RpAWA6SQIFo;
+        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.openai.com
+      x-datadog-parent-id:
+      - '1555598724540823376'
+      x-datadog-sampling-priority:
+      - '0'
+      x-datadog-trace-id:
+      - '6549941215227871872'
+      x-error-json:
+      - ewogICJlcnJvciI6IHsKICAgICJtZXNzYWdlIjogIkluY29ycmVjdCBBUEkga2V5IHByb3ZpZGVkOiBzay1pbnZhbCoqKioqKioqKioqKioqdGluZy4gWW91IGNhbiBmaW5kIHlvdXIgQVBJIGtleSBhdCBodHRwczovL3BsYXRmb3JtLm9wZW5haS5jb20vYWNjb3VudC9hcGkta2V5cy4iLAogICAgInR5cGUiOiAiaW52YWxpZF9yZXF1ZXN0X2Vycm9yIiwKICAgICJjb2RlIjogImludmFsaWRfYXBpX2tleSIsCiAgICAicGFyYW0iOiBudWxsCiAgfSwKICAic3RhdHVzIjogNDAxCn0=
+      x-openai-authorization-error:
+      - '401'
+      x-openai-ide-error-code:
+      - invalid_api_key
+      x-openai-internal-caller:
+      - unknown_through_ide
+      x-openai-proxy-wasm:
+      - v0.1
+      x-request-id:
+      - req_966a6deeae4749388b9cb275170e84c2
+    status:
+      code: 401
+      message: Unauthorized
+- request:
+    body: '{"function_name": "openai.chat.completions.create", "provider_type": "openai",
+      "args": [], "kwargs": {"messages": [{"role": "user", "content": [{"type": "text",
+      "text": "Say hello"}]}], "model": "gpt-4o-mini", "temperature": 1, "max_tokens":
+      256, "stream": false}, "tags": null, "request_start_time": 1771864628.244238,
+      "request_end_time": 1771864628.731049, "metadata": null, "prompt_id": 1, "prompt_version":
+      1, "prompt_input_variables": {}, "group_id": null, "return_prompt_blueprint":
+      true, "span_id": null, "request_response": {}, "status": "ERROR", "error_type":
+      "PROVIDER_AUTH_ERROR", "error_message": "Error code: 401 - {''error'': {''message'':
+      ''Incorrect API key provided: sk-inval**************ting. You can find your
+      API key at https://platform.openai.com/account/api-keys.'', ''type'': ''invalid_request_error'',
+      ''code'': ''invalid_api_key'', ''param'': None}, ''status'': 401}", "api_key":
+      "sanitized"}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '926'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - promptlayer-python/1.0.82 (python 3.9) python-requests/2.31.0
+      X-SDK-Version:
+      - 1.0.82
+    method: POST
+    uri: http://localhost:8000/track-request
+  response:
+    body:
+      string: "{\n  \"success\": true,\n  \"request_id\": 5,\n  \"prompt_blueprint\":
+        {\n    \"prompt_template\": {\n      \"messages\": [\n        {\n          \"input_variables\":
+        [],\n          \"template_format\": \"f-string\",\n          \"content\":
+        [\n            {\n              \"type\": \"text\",\n              \"text\":
+        \"Say hello\",\n              \"id\": null,\n              \"annotations\":
+        null\n            }\n          ],\n          \"raw_request_display_role\":
+        \"user\",\n          \"dataset_examples\": [],\n          \"role\": \"user\",\n
+        \         \"name\": null\n        }\n      ],\n      \"functions\": [],\n
+        \     \"tools\": [],\n      \"function_call\": null,\n      \"tool_choice\":
+        null,\n      \"type\": \"chat\",\n      \"input_variables\": [],\n      \"dataset_examples\":
+        []\n    },\n    \"commit_message\": null,\n    \"metadata\": {\n      \"model\":
+        {\n        \"provider\": \"openai\",\n        \"model_config_display_name\":
+        null,\n        \"base_model\": null,\n        \"name\": \"gpt-4o-mini\",\n
+        \       \"parameters\": {\n          \"temperature\": 1,\n          \"max_tokens\":
+        256,\n          \"stream\": false\n        },\n        \"display_params\":
+        {\n          \"temperature\": \"1\",\n          \"max_tokens\": \"256\",\n
+        \         \"stream\": false\n        },\n        \"api_type\": \"chat-completions\"\n
+        \     }\n    },\n    \"provider_base_url_name\": null,\n    \"report_id\":
+        null,\n    \"inference_client_name\": null,\n    \"provider_id\": null\n  },\n
+        \ \"message\": \"Request tracked successfully\"\n}\n"
+    headers:
+      Content-Length:
+      - '1377'
+      Content-Security-Policy:
+      - default-src 'self'
+      Content-Type:
+      - application/json
+      Date:
+      - Mon, 23 Feb 2026 16:37:08 GMT
+      Server:
+      - Werkzeug/3.0.6 Python/3.12.12
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -130,12 +130,6 @@ interactions:
       - h3=":443"; ma=86400
       cf-cache-status:
       - DYNAMIC
-      set-cookie:
-      - __cf_bm=kdCH_auZkxEiXs5Vcq1BVp98qHw0svofzIKWq9Xwa2U-1771864628.459103-1.0.1.1-6gWSWwkY4ypMS9H4o0j2FwWWmawEc6DCjD_1WdDCujVycu0Bs1AETwRDwR6cX3jDdTquVLHUpUJWtA0c_ylNDjGL1qD1s_vQdr8dIxNBGzy5grCYf8v76.gvWNDHAJfg;
-        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Mon, 23 Feb 2026
-        17:07:08 GMT
-      - _cfuvid=UvDLcow1P5ROiUhYpV0mAYrj35J2WJ.4uPkUcJe88z4-1771864628.459103-1.0.1.1-aXungLg9hvfL40AYwOULOfDnAV.Rl2M5RpAWA6SQIFo;
-        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.openai.com
       x-datadog-parent-id:
       - '1555598724540823376'
       x-datadog-sampling-priority:

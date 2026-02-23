@@ -15,6 +15,8 @@ VCR_DEFAULT_KWARGS = {
     "filter_headers": [
         ("Authorization", "sanitized"),
         ("x-api-key", "sanitized"),
+        ("set-cookie", None),
+        ("cookie", None),
     ],
     "filter_post_data_parameters": [("api_key", "sanitized")],
 }

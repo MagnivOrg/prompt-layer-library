@@ -13,6 +13,7 @@ from promptlayer.promptlayer_mixins import PromptLayerMixin
 from promptlayer.streaming import astream_response, stream_response
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
 from promptlayer.track import AsyncTrackManager, TrackManager
+from promptlayer.track.error_tracking import categorize_error
 from promptlayer.types.prompt_template import PromptTemplate
 from promptlayer.utils import (
     RERAISE_ORIGINAL_EXCEPTION,
@@ -178,11 +179,32 @@ class PromptLayer(PromptLayerMixin):
         # response is just whatever the LLM call returns
         # streaming=False > Pydantic model instance
         # streaming=True > generator that yields ChatCompletionChunk pieces as they arrive
-        response = llm_data["request_function"](
-            prompt_blueprint=llm_data["prompt_blueprint"],
-            client_kwargs=llm_data["client_kwargs"],
-            function_kwargs=llm_data["function_kwargs"],
-        )
+        try:
+            response = llm_data["request_function"](
+                prompt_blueprint=llm_data["prompt_blueprint"],
+                client_kwargs=llm_data["client_kwargs"],
+                function_kwargs=llm_data["function_kwargs"],
+            )
+        except Exception as e:
+            request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            try:
+                self._track_request_log(
+                    llm_data,
+                    tags,
+                    input_variables,
+                    group_id,
+                    pl_run_span_id,
+                    metadata=metadata,
+                    request_response={},
+                    request_start_time=request_start_time,
+                    request_end_time=request_end_time,
+                    status="ERROR",
+                    error_type=categorize_error(e),
+                    error_message=str(e)[:1024],
+                )
+            except Exception:
+                logger.debug("Failed to log error to PromptLayer", exc_info=True)
+            raise
 
         # Capture end time after the LLM request completes
         request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
@@ -377,6 +399,9 @@ class PromptLayer(PromptLayerMixin):
         prompt_id: Union[int, None] = None,
         score_name: Union[str, None] = None,
         api_type: Union[str, None] = None,
+        status: str = "SUCCESS",
+        error_type: Optional[str] = None,
+        error_message: Optional[str] = None,
     ):
         return util_log_request(
             self.api_key,
@@ -402,6 +427,9 @@ class PromptLayer(PromptLayerMixin):
             prompt_id=prompt_id,
             score_name=score_name,
             api_type=api_type,
+            status=status,
+            error_type=error_type,
+            error_message=error_message,
         )
 
 
@@ -557,6 +585,9 @@ class AsyncPromptLayer(PromptLayerMixin):
         function_name: str = "",
         score: int = 0,
         prompt_id: Union[int, None] = None,
+        status: str = "SUCCESS",
+        error_type: Optional[str] = None,
+        error_message: Optional[str] = None,
     ):
         return await autil_log_request(
             self.api_key,
@@ -580,6 +611,9 @@ class AsyncPromptLayer(PromptLayerMixin):
             function_name=function_name,
             score=score,
             prompt_id=prompt_id,
+            status=status,
+            error_type=error_type,
+            error_message=error_message,
         )
 
     async def _create_track_request_callable(
@@ -677,11 +711,32 @@ class AsyncPromptLayer(PromptLayerMixin):
         # Capture start time before making the LLM request
         request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
-        response = await llm_data["request_function"](
-            prompt_blueprint=llm_data["prompt_blueprint"],
-            client_kwargs=llm_data["client_kwargs"],
-            function_kwargs=llm_data["function_kwargs"],
-        )
+        try:
+            response = await llm_data["request_function"](
+                prompt_blueprint=llm_data["prompt_blueprint"],
+                client_kwargs=llm_data["client_kwargs"],
+                function_kwargs=llm_data["function_kwargs"],
+            )
+        except Exception as e:
+            request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            try:
+                await self._track_request_log(
+                    llm_data,
+                    tags,
+                    input_variables,
+                    group_id,
+                    pl_run_span_id,
+                    metadata=metadata,
+                    request_response={},
+                    request_start_time=request_start_time,
+                    request_end_time=request_end_time,
+                    status="ERROR",
+                    error_type=categorize_error(e),
+                    error_message=str(e)[:1024],
+                )
+            except Exception:
+                logger.debug("Failed to log error to PromptLayer", exc_info=True)
+            raise
 
         # Capture end time after the LLM request completes
         request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()

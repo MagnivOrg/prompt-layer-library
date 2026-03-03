@@ -1576,7 +1576,7 @@ def get_prompt_template(
         if params:
             json_body = {**json_body, **params}
         response = _get_requests_session().post(
-            f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+            f"{base_url}/prompt-templates/{quote(urllib.parse.quote(prompt_name), safe='')}",
             headers={"X-API-KEY": api_key},
             json=json_body,
         )
@@ -1628,7 +1628,7 @@ async def aget_prompt_template(
             json_body.update(params)
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+                f"{base_url}/prompt-templates/{quote(urllib.parse.quote(prompt_name), safe='')}",
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )

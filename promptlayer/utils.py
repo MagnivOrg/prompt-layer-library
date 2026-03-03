@@ -1152,6 +1152,8 @@ class GeneratorProxy:
         self.api_request_arugments = api_request_arguments
         self.api_key = api_key
         self.base_url = base_url
+\tfrom urllib.parse import quote
+	prompt_name = quote(prompt_name)
 
     def __iter__(self):
         return self

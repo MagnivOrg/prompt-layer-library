@@ -29,6 +29,7 @@ anthropic = {extras = ["vertex"], version = "^0.57.1"}
 vcrpy = "<7.0.0"
 pytest-network = "^0.0.1"
 pytest-parametrize-cases = "^0.1.2"
+opentelemetry-processor-baggage = ">=0.60b0"
 pydantic = "^2.11.7"
 pydantic-settings = "^2.10.1"
 boto3 = "^1.35.0"

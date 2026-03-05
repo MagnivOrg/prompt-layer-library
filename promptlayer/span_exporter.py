@@ -1,10 +1,40 @@
-from typing import Sequence
+from typing import Any, Dict, Optional, Sequence
 
 import requests
+from opentelemetry import trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from promptlayer.utils import _get_requests_session, raise_on_bad_response, retry_on_api_error
+
+
+def set_prompt_span_attributes(
+    prompt_blueprint: Dict[str, Any],
+    prompt_name: str,
+    *,
+    label: Optional[str] = None,
+) -> None:
+    """Set ``promptlayer.prompt.*`` attributes on the current OTEL span.
+
+    This allows any OTEL exporter (including PromptLayer's own OTLP endpoint)
+    to automatically link traces back to the prompt template that was used.
+    """
+    span = trace.get_current_span()
+    if not span.is_recording():
+        return
+
+    span.set_attribute("promptlayer.prompt.name", prompt_name)
+
+    prompt_id = prompt_blueprint.get("id")
+    if prompt_id is not None:
+        span.set_attribute("promptlayer.prompt.id", prompt_id)
+
+    version = prompt_blueprint.get("version")
+    if version is not None:
+        span.set_attribute("promptlayer.prompt.version", version)
+
+    if label is not None:
+        span.set_attribute("promptlayer.prompt.label", label)
 
 
 class PromptLayerSpanExporter(SpanExporter):

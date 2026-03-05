@@ -1,11 +1,18 @@
 from typing import Any, Dict, Optional, Sequence
 
 import requests
-from opentelemetry import trace
+from opentelemetry import baggage, context, trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
 from promptlayer.utils import _get_requests_session, raise_on_bad_response, retry_on_api_error
+
+_BAGGAGE_KEYS = (
+    "promptlayer.prompt.name",
+    "promptlayer.prompt.id",
+    "promptlayer.prompt.version",
+    "promptlayer.prompt.label",
+)
 
 
 def set_prompt_span_attributes(
@@ -14,27 +21,45 @@ def set_prompt_span_attributes(
     *,
     label: Optional[str] = None,
 ) -> None:
-    """Set ``promptlayer.prompt.*`` attributes on the current OTEL span.
+    """Set ``promptlayer.prompt.*`` as OTEL baggage so child spans inherit them.
 
-    This allows any OTEL exporter (including PromptLayer's own OTLP endpoint)
-    to automatically link traces back to the prompt template that was used.
+    When used with a ``BaggageSpanProcessor``, these baggage entries are
+    automatically copied as attributes onto every child span — including
+    auto-instrumented LLM spans (e.g. from ``OpenAIInstrumentor``).
+
+    Also sets the attributes on the current span for direct visibility.
     """
     span = trace.get_current_span()
     if not span.is_recording():
         return
 
-    span.set_attribute("promptlayer.prompt.name", prompt_name)
+    # Build the set of entries to propagate
+    entries: Dict[str, str] = {"promptlayer.prompt.name": prompt_name}
 
     prompt_id = prompt_blueprint.get("id")
     if prompt_id is not None:
-        span.set_attribute("promptlayer.prompt.id", prompt_id)
+        entries["promptlayer.prompt.id"] = str(prompt_id)
 
     version = prompt_blueprint.get("version")
     if version is not None:
-        span.set_attribute("promptlayer.prompt.version", version)
+        entries["promptlayer.prompt.version"] = str(version)
 
     if label is not None:
-        span.set_attribute("promptlayer.prompt.label", label)
+        entries["promptlayer.prompt.label"] = label
+
+    # Set on current span
+    for key, value in entries.items():
+        span.set_attribute(key, value)
+
+    # Set as baggage so BaggageSpanProcessor copies them onto child spans.
+    # Clear any stale keys from a previous prompt fetch first.
+    ctx = context.get_current()
+    for key in _BAGGAGE_KEYS:
+        if key in entries:
+            ctx = baggage.set_baggage(key, entries[key], ctx)
+        else:
+            ctx = baggage.remove_baggage(key, ctx)
+    context.attach(ctx)
 
 
 class PromptLayerSpanExporter(SpanExporter):

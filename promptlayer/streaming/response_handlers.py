@@ -269,6 +269,15 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                 "status": item.get("status", "in_progress"),
             }
 
+        elif item_type == "file_search_call":
+            current_items[item_id] = {
+                "type": "file_search_call",
+                "id": item_id,
+                "status": item.get("status", "in_progress"),
+                "queries": item.get("queries", []),
+                "results": item.get("results"),
+            }
+
         elif item_type == "shell_call":
             current_items[item_id] = {
                 "type": "shell_call",
@@ -617,6 +626,15 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                         ),
                     }
                 )
+            elif done_type == "file_search_call":
+                current_items[item_id].update(
+                    {
+                        "status": item.get("status", current_items[item_id].get("status", "completed")),
+                        "queries": item.get("queries", current_items[item_id].get("queries", [])),
+                        "results": item.get("results", current_items[item_id].get("results")),
+                    }
+                )
+
             elif done_type == "image_generation_call":
                 current_items[item_id].update(
                     {

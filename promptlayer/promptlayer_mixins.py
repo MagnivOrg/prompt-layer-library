@@ -198,10 +198,6 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
         },
     },
     "openai:images": {
-        "chat": {
-            "function_name": "openai.images.generate",
-            "stream_function": aopenai_images_stream,
-        },
         "completion": {
             "function_name": "openai.images.generate",
             "stream_function": aopenai_images_stream,
@@ -238,10 +234,6 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
         },
     },
     "openai.azure:images": {
-        "chat": {
-            "function_name": "openai.AzureOpenAI.images.generate",
-            "stream_function": aopenai_images_stream,
-        },
         "completion": {
             "function_name": "openai.AzureOpenAI.images.generate",
             "stream_function": aopenai_images_stream,

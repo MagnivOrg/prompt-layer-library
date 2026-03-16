@@ -114,7 +114,7 @@ def _map_output_item_to_blueprint_content(item, assistant_content, tool_calls, m
             )
         )
 
-    elif item_type == "web_search_call":
+    elif item_type in ("web_search_call", "file_search_call"):
         pass
 
     elif item_type == "shell_call":
@@ -304,7 +304,7 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
                     "code", item_id=item_id, code=item.get("code", ""), container_id=item.get("container_id")
                 )
             )
-        elif item_type == "web_search_call":
+        elif item_type in ("web_search_call", "file_search_call"):
             assistant_content.append(_create_content_item("text", item_id=item_id, text="", annotation=[]))
         elif item_type == "shell_call":
             assistant_content.append(

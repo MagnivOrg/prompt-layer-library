@@ -168,13 +168,11 @@ async def test_get_template_async(sample_template_name, promptlayer_async_client
 @pytest.mark.asyncio
 async def test_run_prompt_async(sample_template_name, promptlayer_async_client):
     client = promptlayer_async_client
-    with (
-        patch.dict(os.environ, {"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "sk-sanitized")}),
-        assert_played("test_run_prompt_async.yaml"),
-    ):
-        response = await client.run(prompt_name=sample_template_name, input_variables={})
-        assert response == {
-            "request_id": 129,
+    with patch.dict(os.environ, {"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "sk-sanitized")}):
+        with assert_played("test_run_prompt_async.yaml"):
+            response = await client.run(prompt_name=sample_template_name, input_variables={})
+            assert response == {
+                "request_id": 129,
             "raw_response": ChatCompletion(
                 id="chatcmpl-BMAu3fBRyPYaswyFgBBnBQcB0YxUK",
                 choices=[

@@ -27,9 +27,7 @@ def test_run_logs_error_on_llm_auth_failure(promptlayer_api_key, base_url):
     """
     client = PromptLayer(api_key=promptlayer_api_key, base_url=base_url)
 
-    with (
-        patch.dict(os.environ, {"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "sk-invalid-for-test")}),
-        assert_played("test_run_logs_error_on_llm_auth_failure.yaml"),
-    ):
-        with pytest.raises(openai.AuthenticationError):
-            client.run(prompt_name="error_tracking_test", input_variables={})
+    with patch.dict(os.environ, {"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "sk-invalid-for-test")}):
+        with assert_played("test_run_logs_error_on_llm_auth_failure.yaml"):
+            with pytest.raises(openai.AuthenticationError):
+                client.run(prompt_name="error_tracking_test", input_variables={})

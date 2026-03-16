@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,25 +21,31 @@ async def test_arun_workflow_request(base_url: str, throw_on_error: bool, prompt
     is_recording = is_cassette_recording()
     results_future = MagicMock()
     message_listener = MagicMock()
-    with (
-        assert_played("test_arun_workflow_request.yaml") as cassette,
-        patch(
-            "promptlayer.utils._make_channel_name_suffix", return_value="8dd7e4d404754c60a50e78f70f74aade"
-        ) as _make_channel_name_suffix_mock,
-        nullcontext()
-        if is_recording
-        else patch(
-            "promptlayer.utils._subscribe_to_workflow_completion_channel",
-            return_value=(results_future, message_listener),
-        ) as _subscribe_to_workflow_completion_channel_mock,
-        nullcontext()
-        if is_recording
-        else patch(
-            "promptlayer.utils._wait_for_workflow_completion",
-            new_callable=AsyncMock,
-            return_value={"Node 2": "False", "Node 3": "AAA"},
-        ) as _wait_for_workflow_completion_mock,
-    ):
+    with ExitStack() as stack:
+        cassette = stack.enter_context(assert_played("test_arun_workflow_request.yaml"))
+        _make_channel_name_suffix_mock = stack.enter_context(
+            patch(
+                "promptlayer.utils._make_channel_name_suffix",
+                return_value="8dd7e4d404754c60a50e78f70f74aade",
+            )
+        )
+        _subscribe_to_workflow_completion_channel_mock = stack.enter_context(
+            nullcontext()
+            if is_recording
+            else patch(
+                "promptlayer.utils._subscribe_to_workflow_completion_channel",
+                return_value=(results_future, message_listener),
+            )
+        )
+        _wait_for_workflow_completion_mock = stack.enter_context(
+            nullcontext()
+            if is_recording
+            else patch(
+                "promptlayer.utils._wait_for_workflow_completion",
+                new_callable=AsyncMock,
+                return_value={"Node 2": "False", "Node 3": "AAA"},
+            )
+        )
         assert await arun_workflow_request(
             api_key=promptlayer_api_key, base_url=base_url, throw_on_error=throw_on_error, **kwargs
         ) == {

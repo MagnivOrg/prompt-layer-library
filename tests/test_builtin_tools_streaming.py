@@ -18,9 +18,9 @@ from promptlayer.types.prompt_template import (
     ApplyPatchCallOutputContent,
     BashCodeExecutionToolResultContent,
     BuiltInTool,
+    CodeContent,
     CodeExecutionResultContent,
     ContainerFileAnnotation,
-    CodeContent,
     MapAnnotation,
     McpApprovalRequestContent,
     McpApprovalResponseContent,
@@ -45,7 +45,13 @@ class TestTypeInstantiation:
     """Verify new TypedDicts can be instantiated."""
 
     def test_map_annotation(self):
-        a: MapAnnotation = {"type": "map_citation", "title": "Place", "url": "https://maps.google.com", "start_index": 0, "end_index": 5}
+        a: MapAnnotation = {
+            "type": "map_citation",
+            "title": "Place",
+            "url": "https://maps.google.com",
+            "start_index": 0,
+            "end_index": 5,
+        }
         assert a["type"] == "map_citation"
 
     def test_container_file_annotation(self):
@@ -53,7 +59,12 @@ class TestTypeInstantiation:
         assert a["type"] == "container_file_citation"
 
     def test_server_tool_use_content(self):
-        c: ServerToolUseContent = {"type": "server_tool_use", "id": "stu_1", "name": "web_search", "input": {"query": "test"}}
+        c: ServerToolUseContent = {
+            "type": "server_tool_use",
+            "id": "stu_1",
+            "name": "web_search",
+            "input": {"query": "test"},
+        }
         assert c["name"] == "web_search"
 
     def test_web_search_result(self):
@@ -65,11 +76,19 @@ class TestTypeInstantiation:
         assert c["type"] == "web_search_tool_result"
 
     def test_bash_code_execution_tool_result(self):
-        c: BashCodeExecutionToolResultContent = {"type": "bash_code_execution_tool_result", "tool_use_id": "stu_2", "content": {}}
+        c: BashCodeExecutionToolResultContent = {
+            "type": "bash_code_execution_tool_result",
+            "tool_use_id": "stu_2",
+            "content": {},
+        }
         assert c["type"] == "bash_code_execution_tool_result"
 
     def test_text_editor_code_execution_tool_result(self):
-        c: TextEditorCodeExecutionToolResultContent = {"type": "text_editor_code_execution_tool_result", "tool_use_id": "stu_3", "content": {}}
+        c: TextEditorCodeExecutionToolResultContent = {
+            "type": "text_editor_code_execution_tool_result",
+            "tool_use_id": "stu_3",
+            "content": {},
+        }
         assert c["type"] == "text_editor_code_execution_tool_result"
 
     def test_code_execution_result_content(self):
@@ -82,15 +101,29 @@ class TestTypeInstantiation:
         assert c["language"] == "PYTHON"
 
     def test_shell_call_content(self):
-        c: ShellCallContent = {"type": "shell_call", "id": "sc_1", "call_id": "call_1", "action": {"commands": ["ls"]}, "status": "completed"}
+        c: ShellCallContent = {
+            "type": "shell_call",
+            "id": "sc_1",
+            "call_id": "call_1",
+            "action": {"commands": ["ls"]},
+            "status": "completed",
+        }
         assert c["action"]["commands"] == ["ls"]
 
     def test_shell_call_output_content(self):
-        c: ShellCallOutputContent = {"type": "shell_call_output", "id": "sco_1", "output": [{"type": "stdout", "text": "hello"}]}
+        c: ShellCallOutputContent = {
+            "type": "shell_call_output",
+            "id": "sco_1",
+            "output": [{"type": "stdout", "text": "hello"}],
+        }
         assert c["output"][0]["text"] == "hello"
 
     def test_apply_patch_call_content(self):
-        c: ApplyPatchCallContent = {"type": "apply_patch_call", "id": "ap_1", "operation": {"type": "create", "path": "/tmp/f"}}
+        c: ApplyPatchCallContent = {
+            "type": "apply_patch_call",
+            "id": "ap_1",
+            "operation": {"type": "create", "path": "/tmp/f"},
+        }
         assert c["operation"]["type"] == "create"
 
     def test_apply_patch_call_output_content(self):
@@ -106,15 +139,29 @@ class TestTypeInstantiation:
         assert c["name"] == "tool1"
 
     def test_mcp_approval_request_content(self):
-        c: McpApprovalRequestContent = {"type": "mcp_approval_request", "name": "tool1", "arguments": "{}", "server_label": "srv"}
+        c: McpApprovalRequestContent = {
+            "type": "mcp_approval_request",
+            "name": "tool1",
+            "arguments": "{}",
+            "server_label": "srv",
+        }
         assert c["type"] == "mcp_approval_request"
 
     def test_mcp_approval_response_content(self):
-        c: McpApprovalResponseContent = {"type": "mcp_approval_response", "approval_request_id": "req_1", "approve": True}
+        c: McpApprovalResponseContent = {
+            "type": "mcp_approval_response",
+            "approval_request_id": "req_1",
+            "approve": True,
+        }
         assert c["approve"] is True
 
     def test_output_media_content(self):
-        c: OutputMediaContent = {"type": "output_media", "url": "https://img.png", "mime_type": "image/png", "media_type": "image"}
+        c: OutputMediaContent = {
+            "type": "output_media",
+            "url": "https://img.png",
+            "mime_type": "image/png",
+            "media_type": "image",
+        }
         assert c["url"] == "https://img.png"
 
     def test_builtin_tool(self):
@@ -196,9 +243,7 @@ class TestAnthropicBlueprintBuilder:
 
     def test_text_and_tool_use_still_work(self):
         # text
-        event = _make_anthropic_event(
-            "content_block_start", content_block=SimpleNamespace(type="text", text="")
-        )
+        event = _make_anthropic_event("content_block_start", content_block=SimpleNamespace(type="text", text=""))
         bp = build_prompt_blueprint_from_anthropic_event(event, METADATA)
         assert bp["prompt_template"]["messages"][0]["content"][0]["type"] == "text"
 
@@ -564,7 +609,9 @@ class TestOpenAIResponseHandler:
 def _make_google_event(parts, grounding_metadata=None, url_context_metadata=None):
     """Create a mock Google streaming event with given parts."""
     content = SimpleNamespace(parts=parts)
-    candidate = SimpleNamespace(content=content, grounding_metadata=grounding_metadata, url_context_metadata=url_context_metadata)
+    candidate = SimpleNamespace(
+        content=content, grounding_metadata=grounding_metadata, url_context_metadata=url_context_metadata
+    )
     event = SimpleNamespace(candidates=[candidate])
     return event
 
@@ -680,8 +727,12 @@ class TestGoogleBlueprintBuilder:
     def test_web_search_grounding_annotations(self):
         """Grounding metadata with web chunks produces url_citation annotations on text."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="Paris is the capital.", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="Paris is the capital.",
+            function_call=None,
         )
         grounding = {
             "grounding_chunks": [
@@ -711,8 +762,12 @@ class TestGoogleBlueprintBuilder:
     def test_maps_grounding_annotations(self):
         """Grounding metadata with maps chunks produces map_citation annotations."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="The Eiffel Tower is in Paris.", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="The Eiffel Tower is in Paris.",
+            function_call=None,
         )
         grounding = {
             "grounding_chunks": [
@@ -737,8 +792,12 @@ class TestGoogleBlueprintBuilder:
     def test_file_search_grounding_annotations(self):
         """Grounding metadata with retrieved_context chunks produces file_citation annotations."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="According to the doc...", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="According to the doc...",
+            function_call=None,
         )
         grounding = {
             "grounding_chunks": [
@@ -763,8 +822,12 @@ class TestGoogleBlueprintBuilder:
     def test_grounding_chunks_only_fallback(self):
         """When grounding_supports is absent, annotations are built from chunks alone."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="Some text.", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="Some text.",
+            function_call=None,
         )
         grounding = {
             "grounding_chunks": [
@@ -784,8 +847,12 @@ class TestGoogleBlueprintBuilder:
     def test_no_grounding_metadata(self):
         """Without grounding_metadata, no annotations are added."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="Hello", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="Hello",
+            function_call=None,
         )
         event = _make_google_event([text_part])
         bp = build_prompt_blueprint_from_google_event(event, METADATA)
@@ -796,8 +863,12 @@ class TestGoogleBlueprintBuilder:
     def test_mixed_grounding_chunk_types(self):
         """Grounding with web + maps + file chunks in one response."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="Mixed results.", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="Mixed results.",
+            function_call=None,
         )
         grounding = {
             "grounding_chunks": [
@@ -824,8 +895,12 @@ class TestGoogleBlueprintBuilder:
     def test_url_context_metadata_annotations(self):
         """url_context_metadata should produce url_citation annotations on text content."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="I was unable to access the URL.", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="I was unable to access the URL.",
+            function_call=None,
         )
         url_meta = SimpleNamespace(
             retrieved_url="https://www.example.com/recipe",
@@ -845,8 +920,12 @@ class TestGoogleBlueprintBuilder:
     def test_url_context_metadata_no_url(self):
         """url_context_metadata with no retrieved_url should not produce annotations."""
         text_part = SimpleNamespace(
-            thought=False, executable_code=None, code_execution_result=None,
-            inline_data=None, text="Some text.", function_call=None,
+            thought=False,
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text="Some text.",
+            function_call=None,
         )
         url_meta = SimpleNamespace(retrieved_url=None)
         url_context = SimpleNamespace(url_metadata=[url_meta])
@@ -950,7 +1029,9 @@ class TestImageGenerationCallEnriched:
 
     def test_blueprint_image_generation_call_with_output_format(self):
         """output_item.done mime_type should be derived from metadata parameters, not from event item."""
-        webp_metadata = {"model": {"provider": "openai", "name": "gpt-image-1", "parameters": {"output_format": "webp"}}}
+        webp_metadata = {
+            "model": {"provider": "openai", "name": "gpt-image-1", "parameters": {"output_format": "webp"}}
+        }
         event = _make_openai_response_event(
             "response.output_item.done",
             item={
@@ -1015,7 +1096,9 @@ class TestImageGenerationCallEnriched:
 
     def test_blueprint_response_completed_with_image_generation_call(self):
         """response.completed with image_generation_call in output should map correctly."""
-        jpeg_metadata = {"model": {"provider": "openai", "name": "gpt-image-1", "parameters": {"output_format": "jpeg"}}}
+        jpeg_metadata = {
+            "model": {"provider": "openai", "name": "gpt-image-1", "parameters": {"output_format": "jpeg"}}
+        }
         event = _make_openai_response_event(
             "response.completed",
             response={
@@ -1039,7 +1122,9 @@ class TestImageGenerationCallEnriched:
 
     def test_blueprint_output_item_added_with_result(self):
         """output_item.added with a result already present should emit output_media without provider_metadata."""
-        webp_metadata = {"model": {"provider": "openai", "name": "gpt-image-1", "parameters": {"output_format": "webp"}}}
+        webp_metadata = {
+            "model": {"provider": "openai", "name": "gpt-image-1", "parameters": {"output_format": "webp"}}
+        }
         event = _make_openai_response_event(
             "response.output_item.added",
             item={

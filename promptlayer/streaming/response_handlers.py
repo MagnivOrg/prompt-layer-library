@@ -612,7 +612,9 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                         "output": item.get("output", current_items[item_id].get("output")),
                         "server_label": item.get("server_label", current_items[item_id].get("server_label", "")),
                         "error": item.get("error", current_items[item_id].get("error")),
-                        "approval_request_id": item.get("approval_request_id", current_items[item_id].get("approval_request_id")),
+                        "approval_request_id": item.get(
+                            "approval_request_id", current_items[item_id].get("approval_request_id")
+                        ),
                     }
                 )
             elif done_type == "image_generation_call":

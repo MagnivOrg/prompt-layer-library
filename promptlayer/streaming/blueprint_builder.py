@@ -97,9 +97,7 @@ def _map_output_item_to_blueprint_content(item, assistant_content, tool_calls, m
 
     elif item_type == "function_call":
         tool_calls.append(
-            _create_tool_call(
-                item.get("call_id", ""), item.get("name", ""), item.get("arguments", ""), tool_id=item_id
-            )
+            _create_tool_call(item.get("call_id", ""), item.get("name", ""), item.get("arguments", ""), tool_id=item_id)
         )
 
     elif item_type == "message":
@@ -227,13 +225,14 @@ def _map_output_item_to_blueprint_content(item, assistant_content, tool_calls, m
                 if val is not None:
                     provider_metadata[key] = val
             content_kwargs = dict(
-                item_id=item_id, url=result, mime_type=mime_type, media_type="image",
+                item_id=item_id,
+                url=result,
+                mime_type=mime_type,
+                media_type="image",
             )
             if provider_metadata:
                 content_kwargs["provider_metadata"] = provider_metadata
-            assistant_content.append(
-                _create_content_item("output_media", **content_kwargs)
-            )
+            assistant_content.append(_create_content_item("output_media", **content_kwargs))
 
 
 def build_prompt_blueprint_from_openai_responses_event(event, metadata):
@@ -306,9 +305,7 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
                 )
             )
         elif item_type == "web_search_call":
-            assistant_content.append(
-                _create_content_item("text", item_id=item_id, text="", annotation=[])
-            )
+            assistant_content.append(_create_content_item("text", item_id=item_id, text="", annotation=[]))
         elif item_type == "shell_call":
             assistant_content.append(
                 _create_content_item(
@@ -407,13 +404,14 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
                 if val is not None:
                     provider_metadata[key] = val
             content_kwargs = dict(
-                item_id=item_id, url=result, mime_type=mime_type, media_type="image",
+                item_id=item_id,
+                url=result,
+                mime_type=mime_type,
+                media_type="image",
             )
             if provider_metadata:
                 content_kwargs["provider_metadata"] = provider_metadata
-            assistant_content.append(
-                _create_content_item("output_media", **content_kwargs)
-            )
+            assistant_content.append(_create_content_item("output_media", **content_kwargs))
 
     elif event_type == "response.content_part.added":
         item_id = event_dict.get("item_id")
@@ -438,20 +436,24 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
                 for ann in annotations:
                     atype = ann.get("type")
                     if atype == "url_citation":
-                        mapped_annotations.append({
-                            "type": "url_citation",
-                            "title": ann.get("title"),
-                            "url": ann.get("url"),
-                            "start_index": ann.get("start_index"),
-                            "end_index": ann.get("end_index"),
-                        })
+                        mapped_annotations.append(
+                            {
+                                "type": "url_citation",
+                                "title": ann.get("title"),
+                                "url": ann.get("url"),
+                                "start_index": ann.get("start_index"),
+                                "end_index": ann.get("end_index"),
+                            }
+                        )
                     elif atype == "file_citation":
-                        mapped_annotations.append({
-                            "type": "file_citation",
-                            "index": ann.get("index"),
-                            "file_id": ann.get("file_id"),
-                            "filename": ann.get("filename"),
-                        })
+                        mapped_annotations.append(
+                            {
+                                "type": "file_citation",
+                                "index": ann.get("index"),
+                                "file_id": ann.get("file_id"),
+                                "filename": ann.get("filename"),
+                            }
+                        )
                     else:
                         mapped_annotations.append(ann)
                 content_item["annotations"] = mapped_annotations
@@ -556,16 +558,18 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
         delta = event_dict.get("delta", {})
         if delta:
             assistant_content.append(
-                _create_content_item("shell_call_output", item_id=item_id, output=[delta] if isinstance(delta, dict) else [{"stdout": delta}])
+                _create_content_item(
+                    "shell_call_output",
+                    item_id=item_id,
+                    output=[delta] if isinstance(delta, dict) else [{"stdout": delta}],
+                )
             )
 
     elif event_type == "response.shell_call_output_content.done":
         item_id = event_dict.get("item_id")
         output = event_dict.get("output", [])
         if output:
-            assistant_content.append(
-                _create_content_item("shell_call_output", item_id=item_id, output=output)
-            )
+            assistant_content.append(_create_content_item("shell_call_output", item_id=item_id, output=output))
 
     elif event_type == "response.apply_patch_call_operation_diff.delta":
         item_id = event_dict.get("item_id")
@@ -587,17 +591,13 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
         item_id = event_dict.get("item_id")
         delta_args = event_dict.get("delta", "")
         if delta_args:
-            assistant_content.append(
-                _create_content_item("mcp_call", item_id=item_id, arguments=delta_args)
-            )
+            assistant_content.append(_create_content_item("mcp_call", item_id=item_id, arguments=delta_args))
 
     elif event_type == "response.mcp_call_arguments.done":
         item_id = event_dict.get("item_id")
         final_args = event_dict.get("arguments", "")
         if final_args:
-            assistant_content.append(
-                _create_content_item("mcp_call", item_id=item_id, arguments=final_args)
-            )
+            assistant_content.append(_create_content_item("mcp_call", item_id=item_id, arguments=final_args))
 
     elif event_type == "response.output_text.delta":
         item_id = event_dict.get("item_id")
@@ -812,11 +812,7 @@ def _grounding_metadata_to_annotations(grounding_metadata) -> List[Dict[str, Any
                 segment = segment.model_dump()
             elif not isinstance(segment, dict):
                 segment = {}
-            chunk_indices = (
-                support.get("grounding_chunk_indices")
-                or support.get("groundingChunkIndices")
-                or []
-            )
+            chunk_indices = support.get("grounding_chunk_indices") or support.get("groundingChunkIndices") or []
             start_index = segment.get("start_index") or segment.get("startIndex") or 0
             end_index = segment.get("end_index") or segment.get("endIndex") or 0
             cited_text = segment.get("text")
@@ -852,12 +848,14 @@ def _grounding_metadata_to_annotations(grounding_metadata) -> List[Dict[str, Any
                 if isinstance(retrieved, dict):
                     title = retrieved.get("title") or ""
                     if title:
-                        annotations.append({
-                            "type": "file_citation",
-                            "file_id": title,
-                            "filename": title,
-                            "index": chunk_idx,
-                        })
+                        annotations.append(
+                            {
+                                "type": "file_citation",
+                                "file_id": title,
+                                "filename": title,
+                                "index": chunk_idx,
+                            }
+                        )
                     continue
 
                 uri, title = _get_chunk_web_info(chunk)
@@ -902,23 +900,27 @@ def _grounding_metadata_to_annotations(grounding_metadata) -> List[Dict[str, Any
         if isinstance(retrieved, dict):
             title = retrieved.get("title") or ""
             if title:
-                annotations.append({
-                    "type": "file_citation",
-                    "file_id": title,
-                    "filename": title,
-                    "index": idx,
-                })
+                annotations.append(
+                    {
+                        "type": "file_citation",
+                        "file_id": title,
+                        "filename": title,
+                        "index": idx,
+                    }
+                )
             continue
 
         uri, title = _get_chunk_web_info(chunk)
         if uri:
-            annotations.append({
-                "type": "url_citation",
-                "url": uri,
-                "title": title or uri,
-                "start_index": 0,
-                "end_index": 0,
-            })
+            annotations.append(
+                {
+                    "type": "url_citation",
+                    "url": uri,
+                    "title": title or uri,
+                    "start_index": 0,
+                    "end_index": 0,
+                }
+            )
     return annotations
 
 
@@ -973,13 +975,9 @@ def build_prompt_blueprint_from_google_event(event, metadata):
                 content_kwargs = dict(url=data, mime_type=mime_type, media_type="image")
                 if thought_sig is not None:
                     content_kwargs["provider_metadata"] = {"thought_signature": thought_sig}
-                assistant_content.append(
-                    _create_content_item("output_media", **content_kwargs)
-                )
+                assistant_content.append(_create_content_item("output_media", **content_kwargs))
             elif hasattr(part, "thought") and part.thought is True and hasattr(part, "text") and part.text:
-                assistant_content.append(
-                    _create_content_item("thinking", thinking=part.text, signature=None)
-                )
+                assistant_content.append(_create_content_item("thinking", thinking=part.text, signature=None))
             elif hasattr(part, "text") and part.text is not None:
                 assistant_content.append(_create_content_item("text", text=part.text))
             elif hasattr(part, "function_call") and part.function_call:
@@ -1002,13 +1000,15 @@ def build_prompt_blueprint_from_google_event(event, metadata):
         for url_meta in url_metadata_list:
             retrieved_url = getattr(url_meta, "retrieved_url", None)
             if retrieved_url is not None:
-                annotations.append({
-                    "type": "url_citation",
-                    "url": retrieved_url,
-                    "title": None,
-                    "start_index": None,
-                    "end_index": None,
-                })
+                annotations.append(
+                    {
+                        "type": "url_citation",
+                        "url": retrieved_url,
+                        "title": None,
+                        "start_index": None,
+                        "end_index": None,
+                    }
+                )
 
     if annotations and assistant_content:
         for item in assistant_content:
@@ -1086,9 +1086,7 @@ def build_prompt_blueprint_from_openai_images_event(event_dict, metadata):
             content_kwargs = dict(url=b64, mime_type=mime_type, media_type="image")
             if provider_metadata:
                 content_kwargs["provider_metadata"] = provider_metadata
-            assistant_content.append(
-                _create_content_item("output_media", **content_kwargs)
-            )
+            assistant_content.append(_create_content_item("output_media", **content_kwargs))
 
     assistant_message = _build_assistant_message(assistant_content)
     return _build_prompt_blueprint(assistant_message, metadata)

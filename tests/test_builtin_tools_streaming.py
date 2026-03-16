@@ -3,8 +3,6 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 from promptlayer.streaming.blueprint_builder import (
     build_prompt_blueprint_from_anthropic_event,
     build_prompt_blueprint_from_google_event,

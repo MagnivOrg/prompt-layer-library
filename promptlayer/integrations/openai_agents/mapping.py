@@ -91,110 +91,72 @@ def span_data_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, 
 
 
 def _generation_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {
-        "gen_ai.provider.name": "openai.responses",
-    }
-    if span_data.model:
-        attrs["gen_ai.request.model"] = span_data.model
-
-    usage = span_data.usage or {}
-    input_tokens = usage.get("input_tokens", usage.get("prompt_tokens", _UNSET))
-    if input_tokens is not _UNSET and input_tokens is not None:
-        attrs["gen_ai.usage.input_tokens"] = int(input_tokens)
-    output_tokens = usage.get("output_tokens", usage.get("completion_tokens", _UNSET))
-    if output_tokens is not _UNSET and output_tokens is not None:
-        attrs["gen_ai.usage.output_tokens"] = int(output_tokens)
+    attrs: dict[str, Any] = {"gen_ai.provider.name": "openai.responses"}
+    _set_str_attr(attrs, "gen_ai.request.model", span_data.model)
+    _apply_usage_attributes(attrs, span_data.usage or {})
 
     _flatten_indexed_messages("gen_ai.prompt", normalize_messages(span_data.input), attrs)
     _flatten_indexed_messages("gen_ai.completion", normalize_messages(span_data.output), attrs)
 
-    if include_raw_payloads and span_data.model_config:
-        attrs["openai_agents.model_config_json"] = _json_dumps(span_data.model_config)
-    if include_raw_payloads and span_data.input is not None:
-        attrs["openai_agents.generation.raw_input_json"] = _json_dumps(_jsonable(span_data.input))
-    if include_raw_payloads and span_data.output is not None:
-        attrs["openai_agents.generation.raw_output_json"] = _json_dumps(_jsonable(span_data.output))
+    _set_json_attr(attrs, "openai_agents.model_config_json", span_data.model_config, include_raw_payloads)
+    _set_json_attr(attrs, "openai_agents.generation.raw_input_json", span_data.input, include_raw_payloads)
+    _set_json_attr(attrs, "openai_agents.generation.raw_output_json", span_data.output, include_raw_payloads)
 
     return attrs
 
 
 def _response_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {
-        "gen_ai.provider.name": "openai.responses",
-    }
+    attrs: dict[str, Any] = {"gen_ai.provider.name": "openai.responses"}
     response_obj = _jsonable(getattr(span_data, "response", None))
     if isinstance(response_obj, Mapping):
         model = response_obj.get("model")
-        if model:
-            attrs["gen_ai.request.model"] = str(model)
-            attrs["gen_ai.response.model"] = str(model)
+        _set_str_attr(attrs, "gen_ai.request.model", model)
+        _set_str_attr(attrs, "gen_ai.response.model", model)
 
-        response_id = response_obj.get("id") or response_obj.get("response_id")
-        if response_id:
-            attrs["gen_ai.response.id"] = str(response_id)
+        _set_str_attr(attrs, "gen_ai.response.id", response_obj.get("id") or response_obj.get("response_id"))
 
         usage = response_obj.get("usage") or {}
-        if isinstance(usage, Mapping):
-            input_tokens = usage.get("input_tokens", usage.get("prompt_tokens", _UNSET))
-            if input_tokens is not _UNSET and input_tokens is not None:
-                attrs["gen_ai.usage.input_tokens"] = int(input_tokens)
-            output_tokens = usage.get("output_tokens", usage.get("completion_tokens", _UNSET))
-            if output_tokens is not _UNSET and output_tokens is not None:
-                attrs["gen_ai.usage.output_tokens"] = int(output_tokens)
+        _apply_usage_attributes(attrs, usage if isinstance(usage, Mapping) else {})
 
         _flatten_indexed_messages(
             "gen_ai.prompt",
-            normalize_response_input_items(getattr(span_data, "input", None) or response_obj.get("input")),
+            normalize_response_items(getattr(span_data, "input", None) or response_obj.get("input")),
             attrs,
         )
-        _flatten_indexed_messages(
-            "gen_ai.completion", normalize_response_output_items(response_obj.get("output")), attrs
-        )
+        _flatten_indexed_messages("gen_ai.completion", normalize_response_items(response_obj.get("output")), attrs)
 
         if include_raw_payloads:
             attrs["openai_agents.response.raw_json"] = _json_dumps(response_obj)
-            if response_obj.get("object") is not None:
-                attrs["openai_agents.response.object"] = str(response_obj["object"])
+            _set_str_attr(attrs, "openai_agents.response.object", response_obj.get("object"))
 
     return attrs
 
 
 def _function_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {
-        "openai_agents.function.name": span_data.name,
-    }
-    if span_data.input is not None:
-        attrs["openai_agents.function.input"] = str(span_data.input)
+    attrs: dict[str, Any] = {"openai_agents.function.name": span_data.name}
+    _set_str_attr(attrs, "openai_agents.function.input", span_data.input)
     if span_data.output is not None:
         output = _jsonable(span_data.output)
         if isinstance(output, str):
             attrs["openai_agents.function.output"] = output
         elif include_raw_payloads:
             attrs["openai_agents.function.output_json"] = _json_dumps(output)
-    if include_raw_payloads and span_data.mcp_data is not None:
-        attrs["openai_agents.function.mcp_data_json"] = _json_dumps(_jsonable(span_data.mcp_data))
+    _set_json_attr(attrs, "openai_agents.function.mcp_data_json", span_data.mcp_data, include_raw_payloads)
     return attrs
 
 
 def _agent_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {
-        "openai_agents.agent.name": span_data.name,
-    }
-    if span_data.output_type is not None:
-        attrs["openai_agents.agent.output_type"] = str(span_data.output_type)
-    if include_raw_payloads and span_data.handoffs is not None:
-        attrs["openai_agents.agent.handoffs_json"] = _json_dumps(_jsonable(span_data.handoffs))
-    if include_raw_payloads and span_data.tools is not None:
-        attrs["openai_agents.agent.tools_json"] = _json_dumps(_jsonable(span_data.tools))
+    attrs: dict[str, Any] = {"openai_agents.agent.name": span_data.name}
+    _set_str_attr(attrs, "openai_agents.agent.output_type", span_data.output_type)
+    _set_json_attr(attrs, "openai_agents.agent.handoffs_json", span_data.handoffs, include_raw_payloads)
+    _set_json_attr(attrs, "openai_agents.agent.tools_json", span_data.tools, include_raw_payloads)
     return attrs
 
 
 def _handoff_attributes(span_data) -> dict[str, Any]:
     attrs: dict[str, Any] = {}
-    if span_data.from_agent is not None:
-        attrs["openai_agents.handoff.from_agent"] = span_data.from_agent
-    if span_data.to_agent is not None:
-        attrs["openai_agents.handoff.to_agent"] = span_data.to_agent
+    _set_str_attr(attrs, "openai_agents.handoff.from_agent", span_data.from_agent)
+    _set_str_attr(attrs, "openai_agents.handoff.to_agent", span_data.to_agent)
     return attrs
 
 
@@ -207,8 +169,7 @@ def _guardrail_attributes(span_data) -> dict[str, Any]:
 
 def _custom_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
     attrs = {"openai_agents.custom.name": span_data.name}
-    if include_raw_payloads:
-        attrs["openai_agents.custom.data_json"] = _json_dumps(_jsonable(span_data.data))
+    _set_json_attr(attrs, "openai_agents.custom.data_json", span_data.data, include_raw_payloads)
     return attrs
 
 
@@ -244,15 +205,7 @@ def normalize_messages(items: Sequence[Mapping[str, Any]] | None) -> list[dict[s
     return messages
 
 
-def normalize_response_input_items(items: Any) -> list[dict[str, Any]]:
-    return _normalize_response_items(items)
-
-
-def normalize_response_output_items(items: Any) -> list[dict[str, Any]]:
-    return _normalize_response_items(items)
-
-
-def _normalize_response_items(items: Any) -> list[dict[str, Any]]:
+def normalize_response_items(items: Any) -> list[dict[str, Any]]:
     if not isinstance(items, Sequence):
         return []
 
@@ -419,6 +372,30 @@ def _jsonable(value: Any) -> Any:
 
 def _json_dumps(value: Any) -> str:
     return json.dumps(_jsonable(value), ensure_ascii=False, sort_keys=True)
+
+
+def _set_str_attr(attrs: dict[str, Any], key: str, value: Any) -> None:
+    if value is not None:
+        attrs[key] = str(value)
+
+
+def _set_json_attr(attrs: dict[str, Any], key: str, value: Any, include_raw_payloads: bool) -> None:
+    if include_raw_payloads and value is not None:
+        attrs[key] = _json_dumps(value)
+
+
+def _apply_usage_attributes(attrs: dict[str, Any], usage: Mapping[str, Any]) -> None:
+    _set_int_attr(attrs, "gen_ai.usage.input_tokens", usage.get("input_tokens", usage.get("prompt_tokens", _UNSET)))
+    _set_int_attr(
+        attrs,
+        "gen_ai.usage.output_tokens",
+        usage.get("output_tokens", usage.get("completion_tokens", _UNSET)),
+    )
+
+
+def _set_int_attr(attrs: dict[str, Any], key: str, value: Any) -> None:
+    if value is not _UNSET and value is not None:
+        attrs[key] = int(value)
 
 
 def _sanitize_key(key: str) -> str:

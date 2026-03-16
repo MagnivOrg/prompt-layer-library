@@ -48,6 +48,24 @@ def _find_root_and_child(spans):
     return root, child
 
 
+class _FakeExporter:
+    def __init__(self, seen: dict):
+        self._seen = seen
+
+    def __call__(self, **kwargs):
+        self._seen.update(kwargs)
+        return self
+
+    def export(self, spans):
+        return None
+
+    def shutdown(self):
+        return None
+
+    def force_flush(self, timeout_millis=30000):
+        return True
+
+
 def test_instrument_openai_agents_rejects_non_sdk_provider():
     with pytest.raises(OpenAIAgentsTracingProviderError, match="TracerProvider"):
         instrument_openai_agents(tracer_provider=object())
@@ -231,22 +249,9 @@ def test_active_local_context_does_not_override_agents_trace_id_without_tracepar
 def test_create_openai_agents_tracer_provider_targets_public_v1_traces(monkeypatch):
     seen = {}
 
-    class FakeExporter:
-        def __init__(self, **kwargs):
-            seen.update(kwargs)
-
-        def export(self, spans):
-            return None
-
-        def shutdown(self):
-            return None
-
-        def force_flush(self, timeout_millis=30000):
-            return True
-
     monkeypatch.setattr(
         "promptlayer.integrations.openai_agents.instrumentation.OTLPSpanExporter",
-        FakeExporter,
+        _FakeExporter(seen),
     )
 
     provider = create_openai_agents_tracer_provider(api_key="pl_test", base_url="https://api.promptlayer.com/")
@@ -263,22 +268,9 @@ def test_create_openai_agents_tracer_provider_targets_public_v1_traces(monkeypat
 def test_create_openai_agents_tracer_provider_allows_endpoint_override(monkeypatch):
     seen = {}
 
-    class FakeExporter:
-        def __init__(self, **kwargs):
-            seen.update(kwargs)
-
-        def export(self, spans):
-            return None
-
-        def shutdown(self):
-            return None
-
-        def force_flush(self, timeout_millis=30000):
-            return True
-
     monkeypatch.setattr(
         "promptlayer.integrations.openai_agents.instrumentation.OTLPSpanExporter",
-        FakeExporter,
+        _FakeExporter(seen),
     )
 
     create_openai_agents_tracer_provider(api_key="pl_test", endpoint="https://collector.example.com/custom-traces")

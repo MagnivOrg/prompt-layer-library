@@ -19,7 +19,7 @@ class ImageUrl(TypedDict, total=False):
 
 
 class WebAnnotation(TypedDict, total=False):
-    type: Literal["web_annotation"]
+    type: Literal["url_citation"]
     title: str
     url: str
     start_index: int
@@ -27,17 +27,38 @@ class WebAnnotation(TypedDict, total=False):
 
 
 class FileAnnotation(TypedDict, total=False):
-    type: Literal["file_annotation"]
+    type: Literal["file_citation"]
     index: int
     file_id: str
     filename: str
+
+
+class MapAnnotation(TypedDict, total=False):
+    type: Literal["map_citation"]
+    title: str
+    url: str
+    place_id: Union[str, None]
+    start_index: int
+    end_index: int
+
+
+class ContainerFileAnnotation(TypedDict, total=False):
+    type: Literal["container_file_citation"]
+    container_id: str
+    start_index: Union[int, None]
+    end_index: Union[int, None]
+    filename: Union[str, None]
+    file_id: Union[str, None]
+
+
+Annotation = Union[WebAnnotation, FileAnnotation, MapAnnotation, ContainerFileAnnotation]
 
 
 class TextContent(TypedDict, total=False):
     type: Literal["text"]
     text: str
     id: Union[str, None]
-    annotations: Union[List[Union[WebAnnotation, FileAnnotation]], None]
+    annotations: Union[List[Annotation], None]
 
 
 class CodeContent(TypedDict, total=False):
@@ -45,6 +66,7 @@ class CodeContent(TypedDict, total=False):
     code: str
     id: Union[str, None]
     container_id: Union[str, None]
+    language: Union[str, None]
 
 
 class ThinkingContent(TypedDict, total=False):
@@ -75,7 +97,143 @@ class MediaVariable(TypedDict, total=False):
     name: str
 
 
-Content = Union[TextContent, ThinkingContent, CodeContent, ImageContent, MediaContnt, MediaVariable]
+class OutputMediaContent(TypedDict, total=False):
+    type: Literal["output_media"]
+    id: Union[str, None]
+    url: str
+    mime_type: str
+    media_type: str
+    provider_metadata: Union[Dict[str, Any], None]
+
+
+class ServerToolUseContent(TypedDict, total=False):
+    type: Literal["server_tool_use"]
+    id: str
+    name: str
+    input: dict
+
+
+class WebSearchResult(TypedDict, total=False):
+    type: Literal["web_search_result"]
+    url: str
+    title: str
+    encrypted_content: str
+    page_age: Union[str, None]
+
+
+class WebSearchToolResultContent(TypedDict, total=False):
+    type: Literal["web_search_tool_result"]
+    tool_use_id: str
+    content: List[Dict[str, Any]]
+
+
+class BashCodeExecutionToolResultContent(TypedDict, total=False):
+    type: Literal["bash_code_execution_tool_result"]
+    tool_use_id: str
+    content: Dict[str, Any]
+
+
+class TextEditorCodeExecutionToolResultContent(TypedDict, total=False):
+    type: Literal["text_editor_code_execution_tool_result"]
+    tool_use_id: str
+    content: Dict[str, Any]
+
+
+class CodeExecutionResultContent(TypedDict, total=False):
+    type: Literal["code_execution_result"]
+    output: str
+    outcome: str
+
+
+class ShellCallContent(TypedDict, total=False):
+    type: Literal["shell_call"]
+    id: Union[str, None]
+    call_id: Union[str, None]
+    action: Dict[str, Any]
+    status: Union[str, None]
+
+
+class ShellCallOutputContent(TypedDict, total=False):
+    type: Literal["shell_call_output"]
+    id: Union[str, None]
+    call_id: Union[str, None]
+    output: List[Dict[str, Any]]
+    status: Union[str, None]
+
+
+class ApplyPatchCallContent(TypedDict, total=False):
+    type: Literal["apply_patch_call"]
+    id: Union[str, None]
+    call_id: Union[str, None]
+    operation: Dict[str, Any]
+    status: Union[str, None]
+
+
+class ApplyPatchCallOutputContent(TypedDict, total=False):
+    type: Literal["apply_patch_call_output"]
+    id: Union[str, None]
+    call_id: Union[str, None]
+    output: Union[str, None]
+    status: Union[str, None]
+
+
+class McpListToolsContent(TypedDict, total=False):
+    type: Literal["mcp_list_tools"]
+    id: Union[str, None]
+    server_label: str
+    tools: List[Dict[str, Any]]
+    error: Union[str, Dict[str, Any], None]
+
+
+class McpCallContent(TypedDict, total=False):
+    type: Literal["mcp_call"]
+    id: Union[str, None]
+    call_id: Union[str, None]
+    name: str
+    server_label: str
+    arguments: str
+    output: Union[str, None]
+    error: Union[str, Dict[str, Any], None]
+    approval_request_id: Union[str, None]
+    status: Union[str, None]
+
+
+class McpApprovalRequestContent(TypedDict, total=False):
+    type: Literal["mcp_approval_request"]
+    id: Union[str, None]
+    name: str
+    arguments: str
+    server_label: str
+
+
+class McpApprovalResponseContent(TypedDict, total=False):
+    type: Literal["mcp_approval_response"]
+    approval_request_id: str
+    approve: bool
+
+
+Content = Union[
+    TextContent,
+    ThinkingContent,
+    CodeContent,
+    ImageContent,
+    MediaContnt,
+    MediaVariable,
+    OutputMediaContent,
+    ServerToolUseContent,
+    WebSearchToolResultContent,
+    CodeExecutionResultContent,
+    McpListToolsContent,
+    McpCallContent,
+    McpApprovalRequestContent,
+    McpApprovalResponseContent,
+    BashCodeExecutionToolResultContent,
+    TextEditorCodeExecutionToolResultContent,
+    ShellCallContent,
+    ShellCallOutputContent,
+    ApplyPatchCallContent,
+    ApplyPatchCallOutputContent,
+]
 
 
 class Function(TypedDict, total=False):
@@ -87,6 +245,11 @@ class Function(TypedDict, total=False):
 class Tool(TypedDict, total=False):
     type: Literal["function"]
     function: Function
+
+
+class BuiltInTool(TypedDict, total=False):
+    type: str
+    name: str
 
 
 class FunctionCall(TypedDict, total=False):
@@ -191,7 +354,7 @@ class ChatPromptTemplate(TypedDict, total=False):
     functions: Sequence[Function]
     function_call: Union[Literal["auto", "none"], ChatFunctionCall]
     input_variables: List[str]
-    tools: Sequence[Tool]
+    tools: Sequence[Union[Tool, BuiltInTool]]
     tool_choice: ToolChoice
 
 

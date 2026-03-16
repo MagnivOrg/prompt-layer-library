@@ -5,6 +5,7 @@ from .blueprint_builder import (
     build_prompt_blueprint_from_bedrock_event,
     build_prompt_blueprint_from_google_event,
     build_prompt_blueprint_from_openai_chunk,
+    build_prompt_blueprint_from_openai_images_event,
     build_prompt_blueprint_from_openai_responses_event,
 )
 
@@ -20,6 +21,9 @@ def _build_stream_blueprint(result: Any, metadata: Dict) -> Any:
             return build_prompt_blueprint_from_openai_chunk(result, metadata)
         elif api_type == "responses":
             return build_prompt_blueprint_from_openai_responses_event(result, metadata)
+        elif api_type == "images":
+            result_dict = result.model_dump() if hasattr(result, "model_dump") else result
+            return build_prompt_blueprint_from_openai_images_event(result_dict, metadata)
 
     elif provider == "google" or (provider == "vertexai" and model_name.startswith("gemini")):
         return build_prompt_blueprint_from_google_event(result, metadata)
@@ -61,6 +65,8 @@ def stream_response(*, generator: Generator, after_stream: Callable, map_results
     request_response = map_results(results)
     if provider == "amazon.bedrock":
         request_response["ResponseMetadata"] = response_metadata
+    elif isinstance(request_response, dict):
+        pass
     else:
         request_response = request_response.model_dump(mode="json")
 
@@ -97,6 +103,8 @@ async def astream_response(
 
     if provider == "amazon.bedrock":
         request_response["ResponseMetadata"] = response_metadata
+    elif isinstance(request_response, dict):
+        pass
     else:
         request_response = request_response.model_dump(mode="json")
 

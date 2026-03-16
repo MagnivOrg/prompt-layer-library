@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import threading
 
-from opentelemetry import context as context_api
-from opentelemetry import trace as trace_api
+from opentelemetry import context as context_api, trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.id_generator import IdGenerator
-from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from opentelemetry.trace import SpanKind
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from opentelemetry.trace.status import Status, StatusCode
 
 from .ids import hex_id_to_int, map_span_id, map_trace_id, synthetic_root_span_id

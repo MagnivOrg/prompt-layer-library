@@ -173,100 +173,103 @@ async def test_run_prompt_async(sample_template_name, promptlayer_async_client):
             response = await client.run(prompt_name=sample_template_name, input_variables={})
             assert response == {
                 "request_id": 129,
-            "raw_response": ChatCompletion(
-                id="chatcmpl-BMAu3fBRyPYaswyFgBBnBQcB0YxUK",
-                choices=[
-                    Choice(
-                        finish_reason="stop",
-                        index=0,
-                        logprobs=None,
-                        message=ChatCompletionMessage(
-                            content="Hello! Yes, I'm trained on data up to October 2023. How can I assist you today?",
-                            refusal=None,
-                            role="assistant",
-                            audio=None,
-                            function_call=None,
-                            tool_calls=None,
-                            annotations=[],
-                        ),
-                    )
-                ],
-                created=1744624827,
-                model="gpt-4o-2024-08-06",
-                object="chat.completion",
-                service_tier="default",
-                system_fingerprint="fp_92f14e8683",
-                usage=CompletionUsage(
-                    completion_tokens=23,
-                    prompt_tokens=8,
-                    total_tokens=31,
-                    completion_tokens_details=CompletionTokensDetails(
-                        accepted_prediction_tokens=0, audio_tokens=0, reasoning_tokens=0, rejected_prediction_tokens=0
-                    ),
-                    prompt_tokens_details=PromptTokensDetails(audio_tokens=0, cached_tokens=0),
-                ),
-            ),
-            "prompt_blueprint": {
-                "prompt_template": {
-                    "messages": [
-                        {
-                            "input_variables": [],
-                            "template_format": "f-string",
-                            "content": [{"type": "text", "text": "Hello"}],
-                            "raw_request_display_role": "system",
-                            "dataset_examples": [],
-                            "role": "system",
-                            "name": None,
-                        },
-                        {
-                            "input_variables": [],
-                            "template_format": "f-string",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": (
-                                        "Hello! Yes, I'm trained on data up to October 2023. "
-                                        "How can I assist you today?"
-                                    ),
-                                }
-                            ],
-                            "raw_request_display_role": "assistant",
-                            "dataset_examples": [],
-                            "role": "assistant",
-                            "function_call": None,
-                            "name": None,
-                            "tool_calls": None,
-                        },
+                "raw_response": ChatCompletion(
+                    id="chatcmpl-BMAu3fBRyPYaswyFgBBnBQcB0YxUK",
+                    choices=[
+                        Choice(
+                            finish_reason="stop",
+                            index=0,
+                            logprobs=None,
+                            message=ChatCompletionMessage(
+                                content="Hello! Yes, I'm trained on data up to October 2023. How can I assist you today?",
+                                refusal=None,
+                                role="assistant",
+                                audio=None,
+                                function_call=None,
+                                tool_calls=None,
+                                annotations=[],
+                            ),
+                        )
                     ],
-                    "functions": [],
-                    "tools": [],
-                    "function_call": None,
-                    "tool_choice": None,
-                    "type": "chat",
-                    "input_variables": [],
-                    "dataset_examples": [],
+                    created=1744624827,
+                    model="gpt-4o-2024-08-06",
+                    object="chat.completion",
+                    service_tier="default",
+                    system_fingerprint="fp_92f14e8683",
+                    usage=CompletionUsage(
+                        completion_tokens=23,
+                        prompt_tokens=8,
+                        total_tokens=31,
+                        completion_tokens_details=CompletionTokensDetails(
+                            accepted_prediction_tokens=0,
+                            audio_tokens=0,
+                            reasoning_tokens=0,
+                            rejected_prediction_tokens=0,
+                        ),
+                        prompt_tokens_details=PromptTokensDetails(audio_tokens=0, cached_tokens=0),
+                    ),
+                ),
+                "prompt_blueprint": {
+                    "prompt_template": {
+                        "messages": [
+                            {
+                                "input_variables": [],
+                                "template_format": "f-string",
+                                "content": [{"type": "text", "text": "Hello"}],
+                                "raw_request_display_role": "system",
+                                "dataset_examples": [],
+                                "role": "system",
+                                "name": None,
+                            },
+                            {
+                                "input_variables": [],
+                                "template_format": "f-string",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": (
+                                            "Hello! Yes, I'm trained on data up to October 2023. "
+                                            "How can I assist you today?"
+                                        ),
+                                    }
+                                ],
+                                "raw_request_display_role": "assistant",
+                                "dataset_examples": [],
+                                "role": "assistant",
+                                "function_call": None,
+                                "name": None,
+                                "tool_calls": None,
+                            },
+                        ],
+                        "functions": [],
+                        "tools": [],
+                        "function_call": None,
+                        "tool_choice": None,
+                        "type": "chat",
+                        "input_variables": [],
+                        "dataset_examples": [],
+                    },
+                    "commit_message": None,
+                    "metadata": {
+                        "model": {
+                            "provider": "openai",
+                            "name": "gpt-4o",
+                            "parameters": {
+                                "frequency_penalty": 0,
+                                "max_tokens": 256,
+                                "presence_penalty": 0,
+                                "seed": 0,
+                                "temperature": 1,
+                                "top_p": 1,
+                                "stream": False,
+                            },
+                        }
+                    },
+                    "provider_base_url_name": None,
+                    "report_id": None,
+                    "inference_client_name": None,
                 },
-                "commit_message": None,
-                "metadata": {
-                    "model": {
-                        "provider": "openai",
-                        "name": "gpt-4o",
-                        "parameters": {
-                            "frequency_penalty": 0,
-                            "max_tokens": 256,
-                            "presence_penalty": 0,
-                            "seed": 0,
-                            "temperature": 1,
-                            "top_p": 1,
-                            "stream": False,
-                        },
-                    }
-                },
-                "provider_base_url_name": None,
-                "report_id": None,
-                "inference_client_name": None,
-            },
-        }
+            }
 
         if (pl_request_id := response["request_id"]) is not None:
             return

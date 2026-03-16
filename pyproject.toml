@@ -18,14 +18,14 @@ nest-asyncio = "^1.6.0"
 centrifuge-python = "^0.4.1"
 tenacity = "^9.1.2"
 cachetools = "^5.0.0"
-openai-agents = {version = "^0.12.3", optional = true}
+openai-agents = {version = "^0.3.3", optional = true}
 opentelemetry-exporter-otlp-proto-http = {version = "^1.26.0", optional = true}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"
 pytest-asyncio = "^0.23.6"
-openai = "^1.60.1"
-openai-agents = "^0.12.3"
+openai = "^1.107.1"
+openai-agents = "^0.3.3"
 google-genai = "^1.5.0"
 anthropic = {extras = ["vertex"], version = "^0.84.0"}
 # TODO(dmu) MEDIUM: Upgrade to vcrpy >= 7 once it supports urllib3 >= 2.2.2

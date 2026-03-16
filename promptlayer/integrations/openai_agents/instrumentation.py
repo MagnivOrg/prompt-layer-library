@@ -6,7 +6,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
-from promptlayer.utils import SDK_VERSION, _PROMPTLAYER_USER_AGENT
+from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 from .processor import PromptLayerOpenAIAgentsProcessor
 

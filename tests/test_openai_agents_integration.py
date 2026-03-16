@@ -1,6 +1,8 @@
 import json
 
 import pytest
+from agents.tracing import set_trace_processors
+from agents.tracing.create import function_span, generation_span, trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -14,10 +16,7 @@ from promptlayer.integrations.openai_agents import (
     instrument_openai_agents,
 )
 from promptlayer.integrations.openai_agents.ids import map_span_id, map_trace_id
-from promptlayer.utils import SDK_VERSION, _PROMPTLAYER_USER_AGENT
-
-from agents.tracing import set_trace_processors
-from agents.tracing.create import function_span, generation_span, trace
+from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 
 @pytest.fixture(autouse=True)

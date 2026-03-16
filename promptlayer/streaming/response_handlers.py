@@ -262,6 +262,100 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                 "status": item.get("status", "in_progress"),
             }
 
+        elif item_type == "web_search_call":
+            current_items[item_id] = {
+                "type": "web_search_call",
+                "id": item_id,
+                "status": item.get("status", "in_progress"),
+            }
+
+        elif item_type == "shell_call":
+            current_items[item_id] = {
+                "type": "shell_call",
+                "id": item_id,
+                "call_id": item.get("call_id"),
+                "action": item.get("action", {}),
+                "status": item.get("status", "in_progress"),
+            }
+
+        elif item_type == "shell_call_output":
+            current_items[item_id] = {
+                "type": "shell_call_output",
+                "id": item_id,
+                "call_id": item.get("call_id"),
+                "output": item.get("output", []),
+                "status": item.get("status"),
+            }
+
+        elif item_type == "apply_patch_call":
+            current_items[item_id] = {
+                "type": "apply_patch_call",
+                "id": item_id,
+                "call_id": item.get("call_id"),
+                "operation": item.get("operation", {}),
+                "status": item.get("status", "in_progress"),
+            }
+
+        elif item_type == "apply_patch_call_output":
+            current_items[item_id] = {
+                "type": "apply_patch_call_output",
+                "id": item_id,
+                "call_id": item.get("call_id"),
+                "output": item.get("output"),
+                "status": item.get("status"),
+            }
+
+        elif item_type == "mcp_list_tools":
+            current_items[item_id] = {
+                "type": "mcp_list_tools",
+                "id": item_id,
+                "server_label": item.get("server_label", ""),
+                "tools": item.get("tools", []),
+            }
+
+        elif item_type == "mcp_call":
+            current_items[item_id] = {
+                "type": "mcp_call",
+                "id": item_id,
+                "call_id": item.get("call_id"),
+                "name": item.get("name", ""),
+                "server_label": item.get("server_label", ""),
+                "arguments": item.get("arguments", ""),
+                "output": item.get("output"),
+                "error": item.get("error"),
+                "approval_request_id": item.get("approval_request_id"),
+            }
+
+        elif item_type == "mcp_approval_request":
+            current_items[item_id] = {
+                "type": "mcp_approval_request",
+                "id": item_id,
+                "name": item.get("name", ""),
+                "arguments": item.get("arguments", ""),
+                "server_label": item.get("server_label", ""),
+            }
+
+        elif item_type == "mcp_approval_response":
+            current_items[item_id] = {
+                "type": "mcp_approval_response",
+                "id": item_id,
+                "approval_request_id": item.get("approval_request_id", ""),
+                "approve": item.get("approve", False),
+            }
+
+        elif item_type == "image_generation_call":
+            current_items[item_id] = {
+                "type": "image_generation_call",
+                "id": item_id,
+                "result": item.get("result", ""),
+                "status": item.get("status", "in_progress"),
+                "revised_prompt": item.get("revised_prompt", ""),
+                "background": item.get("background"),
+                "size": item.get("size"),
+                "quality": item.get("quality"),
+                "output_format": item.get("output_format"),
+            }
+
     elif event_type == "response.reasoning_summary_part.added":
         item_id = chunk_dict.get("item_id")
         part = chunk_dict.get("part", {})
@@ -318,6 +412,110 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
         if item_id in current_items:
             current_items[item_id]["arguments"] = final_arguments
 
+    elif event_type == "response.mcp_call_arguments.delta":
+        item_id = chunk_dict.get("item_id")
+        delta = chunk_dict.get("delta", "")
+
+        if item_id in current_items:
+            current_items[item_id]["arguments"] += delta
+
+    elif event_type == "response.mcp_call_arguments.done":
+        item_id = chunk_dict.get("item_id")
+        final_arguments = chunk_dict.get("arguments", "")
+
+        if item_id in current_items:
+            current_items[item_id]["arguments"] = final_arguments
+
+    elif event_type == "response.shell_call_command.added":
+        item_id = chunk_dict.get("item_id")
+        command = chunk_dict.get("command", "")
+
+        if item_id in current_items:
+            action = current_items[item_id].get("action", {})
+            commands = action.get("commands", [])
+            commands.append(command)
+            action["commands"] = commands
+            current_items[item_id]["action"] = action
+
+    elif event_type == "response.shell_call_command.delta":
+        item_id = chunk_dict.get("item_id")
+        delta = chunk_dict.get("delta", "")
+        command_index = chunk_dict.get("command_index", 0)
+
+        if item_id in current_items:
+            action = current_items[item_id].get("action", {})
+            commands = action.get("commands", [])
+            while len(commands) <= command_index:
+                commands.append("")
+            commands[command_index] += delta
+            action["commands"] = commands
+            current_items[item_id]["action"] = action
+
+    elif event_type == "response.shell_call_command.done":
+        item_id = chunk_dict.get("item_id")
+        final_command = chunk_dict.get("command", "")
+        command_index = chunk_dict.get("command_index", 0)
+
+        if item_id in current_items:
+            action = current_items[item_id].get("action", {})
+            commands = action.get("commands", [])
+            while len(commands) <= command_index:
+                commands.append("")
+            commands[command_index] = final_command
+            action["commands"] = commands
+            current_items[item_id]["action"] = action
+
+    elif event_type == "response.shell_call_output_content.delta":
+        item_id = chunk_dict.get("item_id")
+        delta = chunk_dict.get("delta", {})
+
+        if item_id in current_items:
+            output = current_items[item_id].get("output", [])
+            command_index = chunk_dict.get("command_index", 0)
+            while len(output) <= command_index:
+                output.append({})
+            if isinstance(delta, dict):
+                for key, val in delta.items():
+                    output[command_index][key] = output[command_index].get(key, "") + val
+            current_items[item_id]["output"] = output
+
+    elif event_type == "response.shell_call_output_content.done":
+        item_id = chunk_dict.get("item_id")
+        final_output = chunk_dict.get("output", [])
+
+        if item_id in current_items:
+            current_items[item_id]["output"] = final_output
+
+    elif event_type == "response.apply_patch_call_operation_diff.delta":
+        item_id = chunk_dict.get("item_id")
+        delta = chunk_dict.get("delta", "")
+
+        if item_id in current_items:
+            operation = current_items[item_id].get("operation", {})
+            operation["diff"] = operation.get("diff", "") + delta
+            current_items[item_id]["operation"] = operation
+
+    elif event_type == "response.apply_patch_call_operation_diff.done":
+        item_id = chunk_dict.get("item_id")
+        final_diff = chunk_dict.get("diff", "")
+
+        if item_id in current_items:
+            operation = current_items[item_id].get("operation", {})
+            operation["diff"] = final_diff
+            current_items[item_id]["operation"] = operation
+
+    elif event_type == "response.image_generation_call.in_progress":
+        item_id = chunk_dict.get("item_id")
+        if item_id in current_items:
+            current_items[item_id]["status"] = "in_progress"
+
+    elif event_type == "response.image_generation_call.partial_image":
+        item_id = chunk_dict.get("item_id")
+        partial_b64 = chunk_dict.get("partial_image_b64", "")
+        if item_id in current_items and partial_b64:
+            current_items[item_id]["result"] = partial_b64
+            current_items[item_id]["status"] = "generating"
+
     elif event_type == "response.content_part.added":
         part = chunk_dict.get("part", {})
 
@@ -359,10 +557,11 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
 
         if item_id in current_items:
             current_items[item_id]["status"] = item.get("status", "completed")
+            done_type = item.get("type")
 
-            if item.get("type") == "reasoning":
+            if done_type == "reasoning":
                 current_items[item_id].update({"summary": item.get("summary", current_items[item_id]["summary"])})
-            elif item.get("type") == "function_call":
+            elif done_type == "function_call":
                 current_items[item_id].update(
                     {
                         "arguments": item.get("arguments", current_items[item_id]["arguments"]),
@@ -370,11 +569,61 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                         "name": item.get("name", current_items[item_id]["name"]),
                     }
                 )
-            elif item.get("type") == "message":
+            elif done_type == "message":
                 current_items[item_id].update(
                     {
                         "content": item.get("content", current_items[item_id]["content"]),
                         "role": item.get("role", current_items[item_id]["role"]),
+                    }
+                )
+            elif done_type == "shell_call":
+                current_items[item_id].update(
+                    {
+                        "action": item.get("action", current_items[item_id].get("action", {})),
+                        "call_id": item.get("call_id", current_items[item_id].get("call_id")),
+                    }
+                )
+            elif done_type == "shell_call_output":
+                current_items[item_id].update(
+                    {
+                        "output": item.get("output", current_items[item_id].get("output", [])),
+                        "call_id": item.get("call_id", current_items[item_id].get("call_id")),
+                    }
+                )
+            elif done_type == "apply_patch_call":
+                current_items[item_id].update(
+                    {
+                        "operation": item.get("operation", current_items[item_id].get("operation", {})),
+                        "call_id": item.get("call_id", current_items[item_id].get("call_id")),
+                    }
+                )
+            elif done_type == "apply_patch_call_output":
+                current_items[item_id].update(
+                    {
+                        "output": item.get("output", current_items[item_id].get("output")),
+                        "call_id": item.get("call_id", current_items[item_id].get("call_id")),
+                    }
+                )
+            elif done_type == "mcp_call":
+                current_items[item_id].update(
+                    {
+                        "name": item.get("name", current_items[item_id].get("name", "")),
+                        "arguments": item.get("arguments", current_items[item_id].get("arguments", "")),
+                        "output": item.get("output", current_items[item_id].get("output")),
+                        "server_label": item.get("server_label", current_items[item_id].get("server_label", "")),
+                        "error": item.get("error", current_items[item_id].get("error")),
+                        "approval_request_id": item.get("approval_request_id", current_items[item_id].get("approval_request_id")),
+                    }
+                )
+            elif done_type == "image_generation_call":
+                current_items[item_id].update(
+                    {
+                        "result": item.get("result", current_items[item_id].get("result", "")),
+                        "revised_prompt": item.get("revised_prompt", current_items[item_id].get("revised_prompt", "")),
+                        "background": item.get("background", current_items[item_id].get("background")),
+                        "size": item.get("size", current_items[item_id].get("size")),
+                        "quality": item.get("quality", current_items[item_id].get("quality")),
+                        "output_format": item.get("output_format", current_items[item_id].get("output_format")),
                     }
                 )
 
@@ -418,6 +667,54 @@ async def aopenai_responses_stream_chat(generator: AsyncIterable[Any]) -> Any:
         _process_openai_response_event(chunk_dict, response_data, current_items)
 
     return Response(**response_data)
+
+
+def openai_images_stream(results: list):
+    """Process OpenAI Images API streaming results and return response dict."""
+    response_data = {"created": None, "data": [], "usage": None}
+
+    for chunk in results:
+        chunk_dict = chunk.model_dump() if hasattr(chunk, "model_dump") else chunk
+        event_type = chunk_dict.get("type", "")
+
+        if event_type == "image_generation.completed":
+            response_data["created"] = chunk_dict.get("created_at")
+            response_data["usage"] = chunk_dict.get("usage")
+            image_entry = {"b64_json": chunk_dict.get("b64_json", "")}
+            revised = chunk_dict.get("revised_prompt")
+            if revised:
+                image_entry["revised_prompt"] = revised
+            response_data["data"].append(image_entry)
+            for key in ("size", "quality", "background", "output_format"):
+                val = chunk_dict.get(key)
+                if val is not None:
+                    response_data[key] = val
+
+    return response_data
+
+
+async def aopenai_images_stream(generator: AsyncIterable[Any]) -> Any:
+    """Async version of openai_images_stream."""
+    response_data = {"created": None, "data": [], "usage": None}
+
+    async for chunk in generator:
+        chunk_dict = chunk.model_dump() if hasattr(chunk, "model_dump") else chunk
+        event_type = chunk_dict.get("type", "")
+
+        if event_type == "image_generation.completed":
+            response_data["created"] = chunk_dict.get("created_at")
+            response_data["usage"] = chunk_dict.get("usage")
+            image_entry = {"b64_json": chunk_dict.get("b64_json", "")}
+            revised = chunk_dict.get("revised_prompt")
+            if revised:
+                image_entry["revised_prompt"] = revised
+            response_data["data"].append(image_entry)
+            for key in ("size", "quality", "background", "output_format"):
+                val = chunk_dict.get(key)
+                if val is not None:
+                    response_data[key] = val
+
+    return response_data
 
 
 def anthropic_stream_message(results: list):
@@ -594,8 +891,10 @@ async def aanthropic_stream_completion(generator: AsyncIterable[Any]) -> Any:
     return response
 
 
-def _build_google_response_from_parts(thought_content: str, regular_content: str, function_calls: list, last_result):
-    """Helper function to build Google response with thought, regular, and function call parts."""
+def _build_google_response_from_parts(
+    thought_content: str, regular_content: str, function_calls: list, extra_parts: list, last_result
+):
+    """Helper function to build Google response with thought, regular, function call, and extra parts."""
     from google.genai.chats import Part
 
     response = last_result.model_copy()
@@ -613,6 +912,8 @@ def _build_google_response_from_parts(thought_content: str, regular_content: str
         function_part = Part(function_call=function_call, thought=None)
         final_parts.append(function_part)
 
+    final_parts.extend(extra_parts)
+
     if final_parts:
         response.candidates[0].content.parts = final_parts
 
@@ -627,24 +928,30 @@ async def amap_google_stream_response(generator: AsyncIterable[Any]):
     thought_content = ""
     regular_content = ""
     function_calls = []
+    extra_parts = []
     last_result = None
 
     async for result in generator:
         last_result = result
         if result.candidates and result.candidates[0].content.parts:
             for part in result.candidates[0].content.parts:
-                if hasattr(part, "text") and part.text:
-                    if hasattr(part, "thought") and part.thought:
-                        thought_content = f"{thought_content}{part.text}"
-                    else:
-                        regular_content = f"{regular_content}{part.text}"
+                if hasattr(part, "executable_code") and part.executable_code:
+                    extra_parts.append(part)
+                elif hasattr(part, "code_execution_result") and part.code_execution_result:
+                    extra_parts.append(part)
+                elif hasattr(part, "inline_data") and part.inline_data:
+                    extra_parts.append(part)
+                elif hasattr(part, "thought") and part.thought and hasattr(part, "text") and part.text:
+                    thought_content = f"{thought_content}{part.text}"
+                elif hasattr(part, "text") and part.text:
+                    regular_content = f"{regular_content}{part.text}"
                 elif hasattr(part, "function_call") and part.function_call:
                     function_calls.append(part.function_call)
 
     if not last_result:
         return response
 
-    return _build_google_response_from_parts(thought_content, regular_content, function_calls, last_result)
+    return _build_google_response_from_parts(thought_content, regular_content, function_calls, extra_parts, last_result)
 
 
 async def agoogle_stream_chat(generator: AsyncIterable[Any]):
@@ -666,19 +973,25 @@ def map_google_stream_response(results: list):
     thought_content = ""
     regular_content = ""
     function_calls = []
+    extra_parts = []
 
     for result in results:
         if result.candidates and result.candidates[0].content.parts:
             for part in result.candidates[0].content.parts:
-                if hasattr(part, "text") and part.text:
-                    if hasattr(part, "thought") and part.thought:
-                        thought_content = f"{thought_content}{part.text}"
-                    else:
-                        regular_content = f"{regular_content}{part.text}"
+                if hasattr(part, "executable_code") and part.executable_code:
+                    extra_parts.append(part)
+                elif hasattr(part, "code_execution_result") and part.code_execution_result:
+                    extra_parts.append(part)
+                elif hasattr(part, "inline_data") and part.inline_data:
+                    extra_parts.append(part)
+                elif hasattr(part, "thought") and part.thought and hasattr(part, "text") and part.text:
+                    thought_content = f"{thought_content}{part.text}"
+                elif hasattr(part, "text") and part.text:
+                    regular_content = f"{regular_content}{part.text}"
                 elif hasattr(part, "function_call") and part.function_call:
                     function_calls.append(part.function_call)
 
-    return _build_google_response_from_parts(thought_content, regular_content, function_calls, results[-1])
+    return _build_google_response_from_parts(thought_content, regular_content, function_calls, extra_parts, results[-1])
 
 
 def google_stream_chat(results: list):

@@ -1095,6 +1095,7 @@ def build_anthropic_content_blocks(events):
     current_thinking = ""
     current_text = ""
     current_tool_input_json = ""
+    current_citations = []
     usage = None
     stop_reason = None
 
@@ -1106,7 +1107,10 @@ def build_anthropic_content_blocks(events):
                 current_thinking = ""
             elif current_block.type == "text":
                 current_text = ""
+                current_citations = []
             elif current_block.type == "tool_use":
+                current_tool_input_json = ""
+            elif current_block.type == "server_tool_use":
                 current_tool_input_json = ""
         elif event.type == "content_block_delta" and current_block is not None:
             if current_block.type == "thinking":
@@ -1117,7 +1121,9 @@ def build_anthropic_content_blocks(events):
             elif current_block.type == "text":
                 if hasattr(event.delta, "text"):
                     current_text += event.delta.text
-            elif current_block.type == "tool_use":
+                if hasattr(event.delta, "citation"):
+                    current_citations.append(event.delta.citation)
+            elif current_block.type in ("tool_use", "server_tool_use"):
                 if hasattr(event.delta, "partial_json"):
                     current_tool_input_json += event.delta.partial_json
         elif event.type == "content_block_stop" and current_block is not None:
@@ -1126,7 +1132,9 @@ def build_anthropic_content_blocks(events):
                 current_block.thinking = current_thinking
             elif current_block.type == "text":
                 current_block.text = current_text
-            elif current_block.type == "tool_use":
+                if current_citations:
+                    current_block.citations = current_citations
+            elif current_block.type in ("tool_use", "server_tool_use"):
                 try:
                     current_block.input = json.loads(current_tool_input_json)
                 except json.JSONDecodeError:
@@ -1137,6 +1145,7 @@ def build_anthropic_content_blocks(events):
             current_thinking = ""
             current_text = ""
             current_tool_input_json = ""
+            current_citations = []
         elif event.type == "message_delta":
             if hasattr(event, "usage"):
                 usage = event.usage
@@ -1863,6 +1872,8 @@ def openai_request(
     if api_type == "chat-completions":
         request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return request_to_make(client, **function_kwargs)
+    elif api_type == "images":
+        return client.images.generate(**function_kwargs)
     else:
         return client.responses.create(**function_kwargs)
 
@@ -1895,6 +1906,8 @@ async def aopenai_request(
     if api_type == "chat-completions":
         request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return await request_to_make(client, **function_kwargs)
+    elif api_type == "images":
+        return await client.images.generate(**function_kwargs)
     else:
         return await client.responses.create(**function_kwargs)
 
@@ -1914,6 +1927,8 @@ def azure_openai_request(
     if api_type == "chat-completions":
         request_to_make = MAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return request_to_make(client, **function_kwargs)
+    elif api_type == "images":
+        return client.images.generate(**function_kwargs)
     else:
         return client.responses.create(**function_kwargs)
 
@@ -1936,6 +1951,8 @@ async def aazure_openai_request(
     if api_type == "chat-completions":
         request_to_make = AMAP_TYPE_TO_OPENAI_FUNCTION[prompt_blueprint["prompt_template"]["type"]]
         return await request_to_make(client, **function_kwargs)
+    elif api_type == "images":
+        return await client.images.generate(**function_kwargs)
     else:
         return await client.responses.create(**function_kwargs)
 

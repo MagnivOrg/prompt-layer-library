@@ -19,6 +19,7 @@ from promptlayer.streaming import (
     amistral_stream_chat,
     anthropic_stream_completion,
     anthropic_stream_message,
+    aopenai_images_stream,
     aopenai_responses_stream_chat,
     aopenai_stream_chat,
     aopenai_stream_completion,
@@ -26,6 +27,7 @@ from promptlayer.streaming import (
     google_stream_chat,
     google_stream_completion,
     mistral_stream_chat,
+    openai_images_stream,
     openai_responses_stream_chat,
     openai_stream_chat,
     openai_stream_completion,
@@ -70,6 +72,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": openai_responses_stream_chat,
         },
     },
+    "openai:images": {
+        "chat": {
+            "function_name": "openai.images.generate",
+            "stream_function": openai_images_stream,
+        },
+        "completion": {
+            "function_name": "openai.images.generate",
+            "stream_function": openai_images_stream,
+        },
+    },
     "anthropic": {
         "chat": {
             "function_name": "anthropic.messages.create",
@@ -98,6 +110,16 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
         "completion": {
             "function_name": "openai.AzureOpenAI.responses.create",
             "stream_function": openai_responses_stream_chat,
+        },
+    },
+    "openai.azure:images": {
+        "chat": {
+            "function_name": "openai.AzureOpenAI.images.generate",
+            "stream_function": openai_images_stream,
+        },
+        "completion": {
+            "function_name": "openai.AzureOpenAI.images.generate",
+            "stream_function": openai_images_stream,
         },
     },
     "mistral": {
@@ -175,6 +197,16 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": aopenai_responses_stream_chat,
         },
     },
+    "openai:images": {
+        "chat": {
+            "function_name": "openai.images.generate",
+            "stream_function": aopenai_images_stream,
+        },
+        "completion": {
+            "function_name": "openai.images.generate",
+            "stream_function": aopenai_images_stream,
+        },
+    },
     "anthropic": {
         "chat": {
             "function_name": "anthropic.messages.create",
@@ -203,6 +235,16 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
         "completion": {
             "function_name": "openai.AzureOpenAI.responses.create",
             "stream_function": aopenai_responses_stream_chat,
+        },
+    },
+    "openai.azure:images": {
+        "chat": {
+            "function_name": "openai.AzureOpenAI.images.generate",
+            "stream_function": aopenai_images_stream,
+        },
+        "completion": {
+            "function_name": "openai.AzureOpenAI.images.generate",
+            "stream_function": aopenai_images_stream,
         },
     },
     "mistral": {

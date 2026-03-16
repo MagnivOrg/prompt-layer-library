@@ -20,6 +20,7 @@ from .response_handlers import (
     amistral_stream_chat,
     anthropic_stream_completion,
     anthropic_stream_message,
+    aopenai_images_stream,
     aopenai_responses_stream_chat,
     aopenai_stream_chat,
     aopenai_stream_completion,
@@ -27,6 +28,7 @@ from .response_handlers import (
     google_stream_chat,
     google_stream_completion,
     mistral_stream_chat,
+    openai_images_stream,
     openai_responses_stream_chat,
     openai_stream_chat,
     openai_stream_completion,
@@ -61,4 +63,6 @@ __all__ = [
     "agoogle_stream_completion",
     "mistral_stream_chat",
     "amistral_stream_chat",
+    "openai_images_stream",
+    "aopenai_images_stream",
 ]

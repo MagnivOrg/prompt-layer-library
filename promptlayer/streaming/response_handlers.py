@@ -320,6 +320,7 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                 "id": item_id,
                 "server_label": item.get("server_label", ""),
                 "tools": item.get("tools", []),
+                "error": item.get("error"),
             }
 
         elif item_type == "mcp_call":
@@ -332,6 +333,7 @@ def _process_openai_response_event(chunk_dict, response_data, current_items):
                 "arguments": item.get("arguments", ""),
                 "output": item.get("output"),
                 "error": item.get("error"),
+                "status": item.get("status", "in_progress"),
                 "approval_request_id": item.get("approval_request_id"),
             }
 

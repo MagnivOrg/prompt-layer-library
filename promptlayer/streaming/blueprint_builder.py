@@ -305,7 +305,7 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
                 )
             )
         elif item_type in ("web_search_call", "file_search_call"):
-            assistant_content.append(_create_content_item("text", item_id=item_id, text="", annotation=[]))
+            assistant_content.append(_create_content_item("text", item_id=item_id, text="", annotations=[]))
         elif item_type == "shell_call":
             assistant_content.append(
                 _create_content_item(
@@ -365,6 +365,7 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
                     name=item.get("name", ""),
                     server_label=item.get("server_label", ""),
                     arguments=item.get("arguments", ""),
+                    output=item.get("output"),
                     error=item.get("error"),
                     approval_request_id=item.get("approval_request_id"),
                     status=item.get("status", "in_progress"),
@@ -483,7 +484,7 @@ def build_prompt_blueprint_from_openai_responses_event(event, metadata):
             mapped_annotation = annotation
 
         assistant_content.append(
-            _create_content_item("text", item_id=event_dict.get("item_id"), text="", annotation=[mapped_annotation])
+            _create_content_item("text", item_id=event_dict.get("item_id"), text="", annotations=[mapped_annotation])
         )
 
     elif event_type == "response.code_interpreter_call.in_progress":

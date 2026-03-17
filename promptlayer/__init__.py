@@ -16,7 +16,7 @@ from .exceptions import (
 )
 from .promptlayer import AsyncPromptLayer, PromptLayer
 
-__version__ = "1.0.85"
+__version__ = "1.1.1"
 __all__ = [
     "PromptLayer",
     "AsyncPromptLayer",

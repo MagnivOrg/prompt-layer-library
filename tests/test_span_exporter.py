@@ -15,9 +15,11 @@ class TestSetPromptSpanAttributes:
 
         blueprint = {"id": 42, "version": 3}
 
-        with patch("promptlayer.span_exporter.trace") as mock_trace, patch(
-            "promptlayer.span_exporter.baggage"
-        ) as mock_baggage, patch("promptlayer.span_exporter.context") as mock_context:
+        with (
+            patch("promptlayer.span_exporter.trace") as mock_trace,
+            patch("promptlayer.span_exporter.baggage") as mock_baggage,
+            patch("promptlayer.span_exporter.context") as mock_context,
+        ):
             mock_trace.get_current_span.return_value = mock_span
             mock_context.get_current.return_value = {}
             mock_baggage.set_baggage.return_value = {}
@@ -35,9 +37,11 @@ class TestSetPromptSpanAttributes:
 
         blueprint = {"id": 1, "version": 1}
 
-        with patch("promptlayer.span_exporter.trace") as mock_trace, patch(
-            "promptlayer.span_exporter.baggage"
-        ) as mock_baggage, patch("promptlayer.span_exporter.context") as mock_context:
+        with (
+            patch("promptlayer.span_exporter.trace") as mock_trace,
+            patch("promptlayer.span_exporter.baggage") as mock_baggage,
+            patch("promptlayer.span_exporter.context") as mock_context,
+        ):
             mock_trace.get_current_span.return_value = mock_span
             mock_context.get_current.return_value = {}
             mock_baggage.set_baggage.return_value = {}
@@ -61,9 +65,11 @@ class TestSetPromptSpanAttributes:
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
 
-        with patch("promptlayer.span_exporter.trace") as mock_trace, patch(
-            "promptlayer.span_exporter.baggage"
-        ) as mock_baggage, patch("promptlayer.span_exporter.context") as mock_context:
+        with (
+            patch("promptlayer.span_exporter.trace") as mock_trace,
+            patch("promptlayer.span_exporter.baggage") as mock_baggage,
+            patch("promptlayer.span_exporter.context") as mock_context,
+        ):
             mock_trace.get_current_span.return_value = mock_span
             mock_context.get_current.return_value = {}
             mock_baggage.set_baggage.return_value = {}

@@ -209,9 +209,10 @@ class TestLatencyRecording:
         client = PromptLayer(api_key="test_key")
 
         # Mock the dependencies
-        with patch("promptlayer.templates.TemplateManager.get") as mock_get, patch(
-            "promptlayer.promptlayer.stream_response"
-        ) as mock_stream:
+        with (
+            patch("promptlayer.templates.TemplateManager.get") as mock_get,
+            patch("promptlayer.promptlayer.stream_response") as mock_stream,
+        ):
             mock_get.return_value = {
                 "id": 1,
                 "prompt_template": {"type": "chat"},

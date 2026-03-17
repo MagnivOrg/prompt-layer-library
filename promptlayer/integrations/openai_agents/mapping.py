@@ -7,22 +7,15 @@ from typing import Any
 
 from opentelemetry.trace import SpanKind
 
+from promptlayer.utils import SDK_VERSION
+
 _UNSET = object()
-
-
-def telemetry_source_version() -> str:
-    try:
-        from importlib.metadata import version
-
-        return version("promptlayer")
-    except Exception:
-        return "unknown"
 
 
 def base_trace_attributes(trace, *, include_raw_payloads: bool) -> dict[str, Any]:
     attrs: dict[str, Any] = {
         "promptlayer.telemetry.source": "openai-agents-python",
-        "promptlayer.telemetry.source_version": telemetry_source_version(),
+        "promptlayer.telemetry.source_version": SDK_VERSION,
         "openai_agents.trace_id_original": trace.trace_id,
         "openai_agents.workflow_name": trace.name,
     }
@@ -63,7 +56,7 @@ def span_kind_for(span) -> SpanKind:
 def base_span_attributes(span) -> dict[str, Any]:
     attrs: dict[str, Any] = {
         "promptlayer.telemetry.source": "openai-agents-python",
-        "promptlayer.telemetry.source_version": telemetry_source_version(),
+        "promptlayer.telemetry.source_version": SDK_VERSION,
         "openai_agents.span_id_original": span.span_id,
         "openai_agents.span_type": span.span_data.type,
     }

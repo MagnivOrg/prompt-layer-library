@@ -11,7 +11,7 @@ import types
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from enum import Enum
-from importlib.metadata import version as get_package_version
+from importlib.metadata import PackageNotFoundError, version as get_package_version
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
 from urllib.parse import quote
 from uuid import uuid4
@@ -53,8 +53,16 @@ RERAISE_ORIGINAL_EXCEPTION = os.getenv("PROMPTLAYER_RE_RAISE_ORIGINAL_EXCEPTION"
 RAISE_FOR_STATUS = os.getenv("PROMPTLAYER_RAISE_FOR_STATUS", "False").lower() == "true"
 DEFAULT_HTTP_TIMEOUT = 5
 
+
 # SDK version and HTTP headers
-SDK_VERSION = get_package_version("promptlayer")
+def _get_sdk_version() -> str:
+    try:
+        return get_package_version("promptlayer")
+    except PackageNotFoundError as exc:
+        raise RuntimeError("PromptLayer package metadata is unavailable; cannot determine SDK version.") from exc
+
+
+SDK_VERSION = _get_sdk_version()
 _PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 _PROMPTLAYER_USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VERSION})"
 

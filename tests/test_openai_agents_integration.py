@@ -16,6 +16,7 @@ from promptlayer.integrations.openai_agents import (
     instrument_openai_agents,
 )
 from promptlayer.integrations.openai_agents.ids import map_span_id, map_trace_id
+from promptlayer.integrations.openai_agents.mapping import normalize_response_items
 from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 
@@ -156,6 +157,10 @@ def test_function_span_stays_namespaced_without_genai_attrs(in_memory_tracer_pro
     attrs = dict(child.attributes)
 
     assert attrs["openai_agents.span_type"] == "function"
+    assert attrs["node_type"] == "CODE_EXECUTION"
+    assert attrs["tool_name"] == "weather_lookup"
+    assert attrs["function_input"] == '{"city":"Tokyo"}'
+    assert attrs["function_output"] == '{"forecast": "sunny"}'
     assert attrs["openai_agents.function.name"] == "weather_lookup"
     assert attrs["openai_agents.function.input"] == '{"city":"Tokyo"}'
     assert json.loads(attrs["openai_agents.function.output_json"]) == {"forecast": "sunny"}
@@ -275,3 +280,46 @@ def test_create_openai_agents_tracer_provider_allows_endpoint_override(monkeypat
     create_openai_agents_tracer_provider(api_key="pl_test", endpoint="https://collector.example.com/custom-traces")
 
     assert seen["endpoint"] == "https://collector.example.com/custom-traces"
+
+
+def test_normalize_response_items_keeps_message_like_inputs_without_type():
+    items = [
+        {
+            "role": "user",
+            "content": "I'm planning a trip to Tokyo. What should I know?",
+        },
+        {
+            "type": "function_call",
+            "call_id": "call_1",
+            "name": "weather_lookup",
+            "arguments": '{"city":"Tokyo"}',
+        },
+        {
+            "type": "function_call_output",
+            "call_id": "call_1",
+            "output": "{'temp_c': 24, 'condition': 'Sunny'}",
+        },
+    ]
+
+    assert normalize_response_items(items) == [
+        {
+            "role": "user",
+            "content": "I'm planning a trip to Tokyo. What should I know?",
+        },
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "tool_call",
+                    "name": "weather_lookup",
+                    "arguments": {"city": "Tokyo"},
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call_1",
+            "content": "{'temp_c': 24, 'condition': 'Sunny'}",
+        },
+    ]

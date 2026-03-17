@@ -135,10 +135,16 @@ def _response_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, 
 
 
 def _function_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {"openai_agents.function.name": span_data.name}
+    attrs: dict[str, Any] = {
+        "node_type": "CODE_EXECUTION",
+        "tool_name": span_data.name,
+        "openai_agents.function.name": span_data.name,
+    }
     _set_str_attr(attrs, "openai_agents.function.input", span_data.input)
+    _set_rendered_attr(attrs, "function_input", span_data.input)
     if span_data.output is not None:
         output = _jsonable(span_data.output)
+        _set_rendered_attr(attrs, "function_output", output)
         if isinstance(output, str):
             attrs["openai_agents.function.output"] = output
         elif include_raw_payloads:
@@ -218,11 +224,7 @@ def normalize_response_items(items: Any) -> list[dict[str, Any]]:
 
         item_type = item.get("type")
         if item_type == "message":
-            role = str(item.get("role") or "assistant")
-            content = _extract_response_content(item.get("content"))
-            message: dict[str, Any] = {"role": role}
-            if content:
-                message["content"] = content
+            message = _normalize_response_message(item)
             if message:
                 messages.append(message)
             continue
@@ -242,8 +244,39 @@ def normalize_response_items(items: Any) -> list[dict[str, Any]]:
                 "content": "" if output is None else str(output),
             }
             messages.append(message)
+            continue
+
+        # Python Agents SDK response inputs include message-like items without a "type" field,
+        # e.g. {"role": "user", "content": "..."}.
+        message = _normalize_response_message(item)
+        if message:
+            messages.append(message)
 
     return messages
+
+
+def _normalize_response_message(item: Mapping[str, Any]) -> dict[str, Any]:
+    role = item.get("role")
+    content = _extract_response_content(item.get("content"))
+    tool_calls = _normalize_tool_calls(item.get("tool_calls"))
+    tool_call_id = item.get("tool_call_id")
+
+    message: dict[str, Any] = {}
+    if role is not None:
+        message["role"] = str(role)
+    elif content or tool_calls:
+        message["role"] = "assistant"
+
+    if content:
+        message["content"] = content
+
+    if tool_calls:
+        message["tool_calls"] = tool_calls
+
+    if tool_call_id:
+        message["tool_call_id"] = str(tool_call_id)
+
+    return message
 
 
 def _normalize_response_function_call(item: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -384,6 +417,15 @@ def _set_str_attr(attrs: dict[str, Any], key: str, value: Any) -> None:
 def _set_json_attr(attrs: dict[str, Any], key: str, value: Any, include_raw_payloads: bool) -> None:
     if include_raw_payloads and value is not None:
         attrs[key] = _json_dumps(value)
+
+
+def _set_rendered_attr(attrs: dict[str, Any], key: str, value: Any) -> None:
+    if value is None:
+        return
+    if isinstance(value, str):
+        attrs[key] = value
+        return
+    attrs[key] = _json_dumps(value)
 
 
 def _apply_usage_attributes(attrs: dict[str, Any], usage: Mapping[str, Any]) -> None:

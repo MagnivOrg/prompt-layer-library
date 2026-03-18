@@ -1,0 +1,8 @@
+{
+  "name": "trace",
+  "description": "Automatically trace Claude Code conversations to PromptLayer. Captures user messages, assistant responses, and tool calls as structured spans.",
+  "version": "1.0.0",
+  "author": {
+    "name": "PromptLayer"
+  }
+}

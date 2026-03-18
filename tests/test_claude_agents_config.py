@@ -3,8 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from promptlayer.integrations.claude_agents import PromptLayerClaudeAgentsConfig, get_claude_config
-from promptlayer.integrations.claude_agents import config as claude_agents_config
+from promptlayer.integrations.claude_agents import (
+    PromptLayerClaudeAgentsConfig,
+    config as claude_agents_config,
+    get_claude_config,
+)
 
 
 def test_get_claude_config_uses_explicit_api_key(monkeypatch):

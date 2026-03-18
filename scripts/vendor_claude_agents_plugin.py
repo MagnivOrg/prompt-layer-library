@@ -8,7 +8,6 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEST_VENDOR_ROOT = REPO_ROOT / "promptlayer" / "integrations" / "claude_agents" / "vendor"
 DEST_PLUGIN_ROOT = DEST_VENDOR_ROOT / "trace"

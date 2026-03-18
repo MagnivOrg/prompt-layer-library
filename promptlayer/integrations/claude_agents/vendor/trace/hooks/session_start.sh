@@ -33,12 +33,6 @@ if [[ -n "$existing_trace_id" && -n "$existing_session_span_id" ]]; then
 	if [[ -z "$(get_session_state "$session_id" trace_context_source)" ]]; then
 		set_session_state "$session_id" trace_context_source "generated"
 	fi
-	if [[ -z "$(get_session_state "$session_id" session_end_requested)" ]]; then
-		set_session_state "$session_id" session_end_requested "false"
-	fi
-	if [[ -z "$(get_session_state "$session_id" stop_in_flight)" ]]; then
-		set_session_state "$session_id" stop_in_flight "false"
-	fi
 	log "INFO" "SessionStart ignored existing state session_id=$session_id trace_id=$existing_trace_id"
 	exit 0
 fi
@@ -59,8 +53,5 @@ set_session_state "$session_id" session_init_source "session_start_hook"
 set_session_state "$session_id" session_traceparent_version "${PL_INITIAL_TRACEPARENT_VERSION:-}"
 set_session_state "$session_id" session_trace_flags "${PL_INITIAL_TRACE_FLAGS:-}"
 set_session_state "$session_id" trace_context_source "${PL_INITIAL_TRACE_CONTEXT_SOURCE:-generated}"
-set_session_state "$session_id" session_root_emitted "false"
-set_session_state "$session_id" session_end_requested "false"
-set_session_state "$session_id" stop_in_flight "false"
 
 log "INFO" "SessionStart captured session_id=$session_id trace_id=$trace_id"

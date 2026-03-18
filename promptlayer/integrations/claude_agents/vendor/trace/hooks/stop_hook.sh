@@ -46,25 +46,20 @@ session_span_id="$(get_session_state "$session_id" session_span_id)"
 session_parent_span_id="$(get_session_state "$session_id" session_parent_span_id)"
 turn_start_ns="$(get_session_state "$session_id" current_turn_start_ns)"
 pending_tool_calls="$(get_session_state "$session_id" pending_tool_calls)"
-session_end_requested="$(get_session_state "$session_id" session_end_requested)"
 session_init_source="$(get_session_state "$session_id" session_init_source)"
 session_start_ns="$(get_session_state "$session_id" session_start_ns)"
 
 [[ -z "$trace_id" || -z "$session_span_id" ]] && exit 0
 [[ -z "$pending_tool_calls" ]] && pending_tool_calls='[]'
-[[ -z "$session_end_requested" ]] && session_end_requested="false"
 [[ -z "$session_start_ns" ]] && session_start_ns="$(now_ns)"
 
 [[ -z "$turn_start_ns" ]] && turn_start_ns="$(now_ns)"
 
 # Keep lock scope short: snapshot + clear turn-specific mutable state.
-set_session_state "$session_id" stop_in_flight "true"
 set_session_state "$session_id" current_turn_start_ns ""
 set_session_state "$session_id" pending_tool_calls "[]"
 
 release_session_lock
-
-emitted_root="false"
 
 parse_transcript_with_retry() {
 	local attempts=0
@@ -101,7 +96,6 @@ else
 	fi
 	session_attrs="{\"source\":\"claude-code\",\"hook\":\"$session_hook_attr\",\"node_type\":\"WORKFLOW\",\"session.lifecycle\":\"$session_lifecycle_attr\"}"
 	add_span_to_batch "$trace_id" "$session_span_id" "$session_parent_span_id" "Claude Code session" "1" "$session_start_ns" "$turn_end_ns" "$session_attrs" || true
-	emitted_root="true"
 
 	while IFS= read -r tool; do
 		[[ -z "$tool" ]] && continue
@@ -124,55 +118,6 @@ else
 	done < <(echo "$parsed" | jq -c '.llms[]?')
 fi
 
-# If SessionEnd arrived while Stop was running, re-emit root span with final end time.
-if [[ "$session_end_requested" == "true" ]]; then
-	end_ns="$(now_ns)"
-	session_end_attrs='{"source":"claude-code","hook":"SessionEnd","node_type":"WORKFLOW","session.lifecycle":"deferred_finalize"}'
-	add_span_to_batch "$trace_id" "$session_span_id" "$session_parent_span_id" "Claude Code session" "1" "$session_start_ns" "$end_ns" "$session_end_attrs" || true
-	emitted_root="true"
-fi
-
 emit_spans_batch_file "$spans_file" || true
-
-acquire_session_lock "$session_id" || exit 0
-
-# Stop is no longer actively processing this turn.
-set_session_state "$session_id" stop_in_flight "false"
-if [[ "$emitted_root" == "true" ]]; then
-	set_session_state "$session_id" session_root_emitted "true"
-fi
-
-latest_end_requested="$(get_session_state "$session_id" session_end_requested)"
-latest_turn_start_ns="$(get_session_state "$session_id" current_turn_start_ns)"
-latest_trace_id="$(get_session_state "$session_id" trace_id)"
-latest_session_span_id="$(get_session_state "$session_id" session_span_id)"
-latest_session_parent_span_id="$(get_session_state "$session_id" session_parent_span_id)"
-latest_session_start_ns="$(get_session_state "$session_id" session_start_ns)"
-[[ -z "$latest_end_requested" ]] && latest_end_requested="false"
-[[ -z "$latest_session_start_ns" ]] && latest_session_start_ns="$(now_ns)"
-
-need_finalize_root="false"
-if [[ "$latest_end_requested" == "true" && -z "$latest_turn_start_ns" ]]; then
-	need_finalize_root="true"
-fi
-
-if [[ "$need_finalize_root" == "true" && -n "$latest_trace_id" && -n "$latest_session_span_id" ]]; then
-	release_session_lock
-	end_ns="$(now_ns)"
-	finalize_attrs='{"source":"claude-code","hook":"SessionEnd","node_type":"WORKFLOW","session.lifecycle":"deferred_finalize"}'
-	emit_span "$latest_trace_id" "$latest_session_span_id" "$latest_session_parent_span_id" "Claude Code session" "1" "$latest_session_start_ns" "$end_ns" "$finalize_attrs" || true
-	acquire_session_lock "$session_id" || exit 0
-	set_session_state "$session_id" stop_in_flight "false"
-	set_session_state "$session_id" session_root_emitted "true"
-fi
-
-latest_end_requested="$(get_session_state "$session_id" session_end_requested)"
-latest_turn_start_ns="$(get_session_state "$session_id" current_turn_start_ns)"
-[[ -z "$latest_end_requested" ]] && latest_end_requested="false"
-
-if [[ "$latest_end_requested" == "true" && -z "$latest_turn_start_ns" ]]; then
-	rm -f "$PL_SESSION_STATE_DIR/$session_id.json"
-	log "INFO" "SessionEnd finalized by Stop session_id=$session_id"
-fi
 
 log "INFO" "Stop finalized session_id=$session_id"

@@ -244,13 +244,12 @@ ensure_session_initialized() {
 	local requested_start_ns="${2:-}"
 	[[ -z "$sid" ]] && return 1
 
-	local trace_id session_span_id session_parent_span_id session_start_ns init_source root_emitted pending_tool_calls
+	local trace_id session_span_id session_parent_span_id session_start_ns init_source pending_tool_calls
 	trace_id="$(get_session_state "$sid" trace_id)"
 	session_span_id="$(get_session_state "$sid" session_span_id)"
 	session_parent_span_id="$(get_session_state "$sid" session_parent_span_id)"
 	session_start_ns="$(get_session_state "$sid" session_start_ns)"
 	init_source="$(get_session_state "$sid" session_init_source)"
-	root_emitted="$(get_session_state "$sid" session_root_emitted)"
 	pending_tool_calls="$(get_session_state "$sid" pending_tool_calls)"
 
 	# Normal path: SessionStart already created state.
@@ -261,9 +260,6 @@ ensure_session_initialized() {
 		fi
 		if [[ -z "$init_source" ]]; then
 			set_session_state "$sid" session_init_source "unknown"
-		fi
-		if [[ -z "$root_emitted" ]]; then
-			set_session_state "$sid" session_root_emitted "false"
 		fi
 		if [[ -z "$pending_tool_calls" ]]; then
 			set_session_state "$sid" pending_tool_calls "[]"
@@ -279,12 +275,6 @@ ensure_session_initialized() {
 		fi
 		if [[ -z "$(get_session_state "$sid" trace_context_source)" ]]; then
 			set_session_state "$sid" trace_context_source "generated"
-		fi
-		if [[ -z "$(get_session_state "$sid" session_end_requested)" ]]; then
-			set_session_state "$sid" session_end_requested "false"
-		fi
-		if [[ -z "$(get_session_state "$sid" stop_in_flight)" ]]; then
-			set_session_state "$sid" stop_in_flight "false"
 		fi
 		return 0
 	fi
@@ -306,9 +296,6 @@ ensure_session_initialized() {
 	set_session_state "$sid" session_traceparent_version "${PL_INITIAL_TRACEPARENT_VERSION:-}"
 	set_session_state "$sid" session_trace_flags "${PL_INITIAL_TRACE_FLAGS:-}"
 	set_session_state "$sid" trace_context_source "${PL_INITIAL_TRACE_CONTEXT_SOURCE:-generated}"
-	set_session_state "$sid" session_root_emitted "false"
-	set_session_state "$sid" session_end_requested "false"
-	set_session_state "$sid" stop_in_flight "false"
 
 	log "INFO" "Session initialized lazily session_id=$sid trace_id=$trace_id"
 }

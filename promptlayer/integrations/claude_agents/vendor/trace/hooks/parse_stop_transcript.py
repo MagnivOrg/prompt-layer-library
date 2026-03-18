@@ -78,6 +78,17 @@ def flatten_indexed(prefix, items, out):
                 out[attr_key] = value
 
 
+def append_history_item(history, item):
+    if (
+        item.get("role") == "user"
+        and history
+        and history[-1].get("role") == "user"
+        and history[-1].get("content") == item.get("content")
+    ):
+        return
+    history.append(item)
+
+
 def is_tool_result_user(rec):
     if rec.get("type") != "user":
         return False
@@ -121,9 +132,7 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
         turn_start_idx = i
         break
 
-    turn_records = records[turn_start_idx:]
     history = []
-    llm_input_cursor = 0
     tools = []
     llms = []
     pending_tool_uses = []
@@ -134,9 +143,10 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
     turn_end_ns = turn_start_fallback
     last_input_ns = turn_start_fallback
 
-    for rec in turn_records:
+    for idx, rec in enumerate(records):
+        emit_for_turn = idx >= turn_start_idx
         timestamp_ns = parse_iso_to_ns(rec.get("timestamp"))
-        if timestamp_ns is not None:
+        if emit_for_turn and timestamp_ns is not None:
             if turn_start_ns is None or timestamp_ns < turn_start_ns:
                 turn_start_ns = timestamp_ns
             if turn_end_ns is None or timestamp_ns > turn_end_ns:
@@ -148,7 +158,7 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
             if operation == "enqueue":
                 content = content_to_text(rec.get("content"))
                 if content:
-                    history.append({"role": "user", "content": content})
+                    append_history_item(history, {"role": "user", "content": content})
                     last_input_ns = timestamp_ns or last_input_ns
                     saw_human_input = True
             continue
@@ -171,7 +181,7 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
                 tool_use = pending_tool_uses.pop(match_idx) if match_idx is not None else {}
 
                 payload = {}
-                if pending_payload_idx < len(pending_payloads):
+                if emit_for_turn and pending_payload_idx < len(pending_payloads):
                     maybe_payload = pending_payloads[pending_payload_idx]
                     pending_payload_idx += 1
                     if isinstance(maybe_payload, dict):
@@ -191,21 +201,22 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
                 if tool_end_ns is None:
                     tool_end_ns = tool_start_ns
 
-                tools.append(
-                    {
-                        "name": f"Tool: {tool_name}",
-                        "start_ns": int(tool_start_ns),
-                        "end_ns": int(tool_end_ns),
-                        "attributes": {
-                            "source": "claude-code",
-                            "hook": "PostToolUse",
-                            "node_type": "CODE_EXECUTION",
-                            "tool_name": tool_name,
-                            "function_input": function_input,
-                            "function_output": function_output,
-                        },
-                    }
-                )
+                if emit_for_turn:
+                    tools.append(
+                        {
+                            "name": f"Tool: {tool_name}",
+                            "start_ns": int(tool_start_ns),
+                            "end_ns": int(tool_end_ns),
+                            "attributes": {
+                                "source": "claude-code",
+                                "hook": "PostToolUse",
+                                "node_type": "CODE_EXECUTION",
+                                "tool_name": tool_name,
+                                "function_input": function_input,
+                                "function_output": function_output,
+                            },
+                        }
+                    )
 
                 history.append(
                     {
@@ -218,7 +229,7 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
                 continue
 
             user_text = content_to_text(content)
-            history.append({"role": "user", "content": user_text})
+            append_history_item(history, {"role": "user", "content": user_text})
             last_input_ns = timestamp_ns or last_input_ns
             saw_human_input = True
             continue
@@ -284,6 +295,7 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
             "source": "claude-code",
             "hook": "Stop",
             "node_type": "PROMPT_TEMPLATE",
+            "promptlayer.prompt_history_mode": "full_session",
             "gen_ai.operation.name": "chat",
             "gen_ai.provider.name": provider,
             "gen_ai.request.model": model,
@@ -296,8 +308,7 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
         if stop_reason:
             attrs["gen_ai.completion.0.finish_reason"] = stop_reason
 
-        immediate_input = history[llm_input_cursor:]
-        flatten_indexed("gen_ai.prompt", immediate_input, attrs)
+        flatten_indexed("gen_ai.prompt", history, attrs)
 
         completion_item = {"role": "assistant", "content": output_text}
         if tool_calls:
@@ -306,20 +317,20 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
 
         span_name = "LLM Call (User)" if saw_human_input else "LLM call"
 
-        llms.append(
-            {
-                "name": span_name,
-                "start_ns": int(llm_start_ns),
-                "end_ns": int(llm_end_ns),
-                "attributes": attrs,
-            }
-        )
+        if emit_for_turn:
+            llms.append(
+                {
+                    "name": span_name,
+                    "start_ns": int(llm_start_ns),
+                    "end_ns": int(llm_end_ns),
+                    "attributes": attrs,
+                }
+            )
 
         assistant_history = {"role": "assistant", "content": output_text}
         if tool_calls:
             assistant_history["tool_calls"] = tool_calls
         history.append(assistant_history)
-        llm_input_cursor = len(history)
         saw_human_input = False
 
     if turn_start_ns is None:

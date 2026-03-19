@@ -500,7 +500,7 @@ build_span_json() {
 		--arg name "$name" \
 		--arg kind "$kind" \
 		--arg start "$start_ns" \
-		--arg end "$end_ns" \
+		--arg end_time "$end_ns" \
 		--argjson attributes "$attrs_json" \
 		'{
       traceId: $trace_id,
@@ -509,7 +509,7 @@ build_span_json() {
       name: $name,
       kind: $kind,
       startTimeUnixNano: $start,
-      endTimeUnixNano: $end,
+      endTimeUnixNano: $end_time,
       attributes: (
         $attributes
         | to_entries

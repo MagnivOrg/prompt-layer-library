@@ -1,10 +1,15 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.1.1"
+version = "1.2.0"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
 readme = "README.md"
+include = [
+    { path = "promptlayer/integrations/claude_agents/vendor/vendor_metadata.json", format = ["sdist", "wheel"] },
+    { path = "promptlayer/integrations/claude_agents/vendor/**/*", format = ["sdist", "wheel"] },
+    { path = "promptlayer/integrations/claude_agents/vendor/trace/.claude-plugin/plugin.json", format = ["sdist", "wheel"] },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
@@ -19,6 +24,7 @@ centrifuge-python = "^0.4.1"
 tenacity = "^9.1.2"
 cachetools = "^5.0.0"
 openai-agents = {version = "^0.3.3", optional = true}
+claude-agent-sdk = {version = ">=0.1.45,<1.0.0", optional = true, python = ">=3.10,<4.0"}
 opentelemetry-exporter-otlp-proto-http = {version = "^1.26.0", optional = true}
 eval-type-backport = {version = "^0.3.1", optional = true}
 
@@ -43,6 +49,7 @@ aioboto3 = "^13.0.0"
 
 [tool.poetry.extras]
 openai-agents = ["openai-agents", "opentelemetry-exporter-otlp-proto-http", "eval-type-backport"]
+claude-agents = ["claude-agent-sdk"]
 
 [build-system]
 requires = ["poetry-core"]
@@ -52,6 +59,7 @@ build-backend = "poetry.core.masonry.api"
 line-length = 120
 indent-width = 4  # mimic Black
 target-version = "py39"
+extend-exclude = ["promptlayer/integrations/claude_agents/vendor"]
 
 [tool.ruff.lint]
 ignore = ["E501", "E711", "E712"]

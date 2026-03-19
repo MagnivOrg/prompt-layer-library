@@ -257,7 +257,7 @@ files = [
     {file = "annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53"},
     {file = "annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89"},
 ]
-markers = {main = "extra == \"openai-agents\""}
+markers = {main = "extra == \"openai-agents\" or (extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\""}
 
 [[package]]
 name = "anthropic"
@@ -523,7 +523,7 @@ files = [
     {file = "cffi-2.0.0-cp39-cp39-win_amd64.whl", hash = "sha256:b882b3df248017dba09d6b16defe9b5c407fe32fc7c65a9c69798e6175601be9"},
     {file = "cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529"},
 ]
-markers = {main = "platform_python_implementation != \"PyPy\" and extra == \"openai-agents\" and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and platform_python_implementation != \"PyPy\""}
+markers = {main = "platform_python_implementation != \"PyPy\" and (extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and platform_python_implementation != \"PyPy\""}
 
 [package.dependencies]
 pycparser = {version = "*", markers = "implementation_name != \"PyPy\""}
@@ -629,6 +629,26 @@ files = [
 ]
 
 [[package]]
+name = "claude-agent-sdk"
+version = "0.1.49"
+description = "Python SDK for Claude Code"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"claude-agents\" and python_version >= \"3.10\""
+files = [
+    {file = "claude_agent_sdk-0.1.49-py3-none-macosx_11_0_arm64.whl", hash = "sha256:a869330d4a15b12c96ae24144b8e29999ff25315267f248634986179e9536a04"},
+]
+
+[package.dependencies]
+anyio = ">=4.0.0"
+mcp = ">=0.1.0"
+typing-extensions = {version = ">=4.0.0", markers = "python_version < \"3.11\""}
+
+[package.extras]
+dev = ["anyio[trio] (>=4.0.0)", "mypy (>=1.0.0)", "pytest (>=7.0.0)", "pytest-asyncio (>=0.20.0)", "pytest-cov (>=4.0.0)", "ruff (>=0.1.0)"]
+
+[[package]]
 name = "click"
 version = "8.3.1"
 description = "Composable command line interface toolkit"
@@ -639,7 +659,7 @@ files = [
     {file = "click-8.3.1-py3-none-any.whl", hash = "sha256:981153a64e25f12d547d3426c367a4857371575ee7ad18df2a6183ab0545b2a6"},
     {file = "click-8.3.1.tar.gz", hash = "sha256:12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a"},
 ]
-markers = {main = "extra == \"openai-agents\" and sys_platform != \"emscripten\" and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and sys_platform != \"emscripten\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and sys_platform != \"emscripten\" and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and sys_platform != \"emscripten\""}
 
 [package.dependencies]
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
@@ -655,7 +675,7 @@ files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
-markers = {main = "extra == \"openai-agents\""}
+markers = {main = "extra == \"openai-agents\" or python_version >= \"3.10\" and (extra == \"openai-agents\" or extra == \"claude-agents\") and sys_platform != \"emscripten\" and platform_system == \"Windows\""}
 
 [[package]]
 name = "cryptography"
@@ -715,7 +735,7 @@ files = [
     {file = "cryptography-46.0.5-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:8456928655f856c6e1533ff59d5be76578a7157224dbd9ce6872f25055ab9ab7"},
     {file = "cryptography-46.0.5.tar.gz", hash = "sha256:abace499247268e3757271b2f1e244b36b06f8515cf27c4d49468fc9eb16e93d"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 cffi = {version = ">=2.0.0", markers = "python_full_version >= \"3.9.0\" and platform_python_implementation != \"PyPy\""}
@@ -1102,7 +1122,7 @@ files = [
     {file = "httpx_sse-0.4.3-py3-none-any.whl", hash = "sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc"},
     {file = "httpx_sse-0.4.3.tar.gz", hash = "sha256:9b1ed0127459a66014aec3c56bebd93da3c1bc8bb6618c8082039a44889a755d"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [[package]]
 name = "hyperframe"
@@ -1270,7 +1290,7 @@ files = [
     {file = "jsonschema-4.26.0-py3-none-any.whl", hash = "sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"},
     {file = "jsonschema-4.26.0.tar.gz", hash = "sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 attrs = ">=22.2.0"
@@ -1293,7 +1313,7 @@ files = [
     {file = "jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe"},
     {file = "jsonschema_specifications-2025.9.1.tar.gz", hash = "sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 referencing = ">=0.31.0"
@@ -1309,7 +1329,7 @@ files = [
     {file = "mcp-1.26.0-py3-none-any.whl", hash = "sha256:904a21c33c25aa98ddbeb47273033c435e595bbacfdb177f4bd87f6dceebe1ca"},
     {file = "mcp-1.26.0.tar.gz", hash = "sha256:db6e2ef491eecc1a0d93711a76f28dec2e05999f93afd48795da1c1137142c66"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 anyio = ">=4.5"
@@ -1905,7 +1925,7 @@ files = [
     {file = "pycparser-3.0-py3-none-any.whl", hash = "sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992"},
     {file = "pycparser-3.0.tar.gz", hash = "sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29"},
 ]
-markers = {main = "platform_python_implementation != \"PyPy\" and extra == \"openai-agents\" and implementation_name != \"PyPy\" and python_version >= \"3.10\"", dev = "platform_python_implementation != \"PyPy\" and implementation_name != \"PyPy\" and python_version >= \"3.10\""}
+markers = {main = "platform_python_implementation != \"PyPy\" and (extra == \"openai-agents\" or extra == \"claude-agents\") and implementation_name != \"PyPy\" and python_version >= \"3.10\"", dev = "platform_python_implementation != \"PyPy\" and implementation_name != \"PyPy\" and python_version >= \"3.10\""}
 
 [[package]]
 name = "pydantic"
@@ -1918,7 +1938,7 @@ files = [
     {file = "pydantic-2.11.7-py3-none-any.whl", hash = "sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b"},
     {file = "pydantic-2.11.7.tar.gz", hash = "sha256:d989c3c6cb79469287b1569f7447a17848c998458d49ebe294e975b9baf0f0db"},
 ]
-markers = {main = "extra == \"openai-agents\""}
+markers = {main = "extra == \"openai-agents\" or (extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\""}
 
 [package.dependencies]
 annotated-types = ">=0.6.0"
@@ -2038,7 +2058,7 @@ files = [
     {file = "pydantic_core-2.33.2-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:2807668ba86cb38c6817ad9bc66215ab8584d1d304030ce4f0887336f28a5e27"},
     {file = "pydantic_core-2.33.2.tar.gz", hash = "sha256:7cb8bc3605c29176e1b105350d2e6474142d7c1bd1d9327c4a9bdb46bf827acc"},
 ]
-markers = {main = "extra == \"openai-agents\""}
+markers = {main = "extra == \"openai-agents\" or (extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\""}
 
 [package.dependencies]
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
@@ -2054,7 +2074,7 @@ files = [
     {file = "pydantic_settings-2.10.1-py3-none-any.whl", hash = "sha256:a60952460b99cf661dc25c29c0ef171721f98bfcb52ef8d9ea4c943d7c8cc796"},
     {file = "pydantic_settings-2.10.1.tar.gz", hash = "sha256:06f0062169818d0f5524420a360d632d5857b83cffd4d42fe29597807a1614ee"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\""}
 
 [package.dependencies]
 pydantic = ">=2.7.0"
@@ -2097,7 +2117,7 @@ files = [
     {file = "pyjwt-2.12.1-py3-none-any.whl", hash = "sha256:28ca37c070cad8ba8cd9790cd940535d40274d22f80ab87f3ac6a713e6e8454c"},
     {file = "pyjwt-2.12.1.tar.gz", hash = "sha256:c74a7a2adf861c04d002db713dd85f84beb242228e671280bf709d765b03672b"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"crypto\""}
@@ -2206,7 +2226,7 @@ files = [
     {file = "python_dotenv-1.1.1-py3-none-any.whl", hash = "sha256:31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc"},
     {file = "python_dotenv-1.1.1.tar.gz", hash = "sha256:a8a6399716257f45be6a007360200409fce5cda2661e3dec71d23dc15f6189ab"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\""}
 
 [package.extras]
 cli = ["click (>=5.0)"]
@@ -2222,7 +2242,7 @@ files = [
     {file = "python_multipart-0.0.22-py3-none-any.whl", hash = "sha256:2b2cd894c83d21bf49d702499531c7bafd057d730c201782048f7945d82de155"},
     {file = "python_multipart-0.0.22.tar.gz", hash = "sha256:7340bef99a7e0032613f56dc36027b959fd3b30a787ed62d310e951f7c3a3a58"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [[package]]
 name = "pywin32"
@@ -2253,7 +2273,7 @@ files = [
     {file = "pywin32-311-cp39-cp39-win_amd64.whl", hash = "sha256:e0c4cfb0621281fe40387df582097fd796e80430597cb9944f0ae70447bacd91"},
     {file = "pywin32-311-cp39-cp39-win_arm64.whl", hash = "sha256:62ea666235135fee79bb154e695f3ff67370afefd71bd7fea7512fc70ef31e3d"},
 ]
-markers = {main = "extra == \"openai-agents\" and sys_platform == \"win32\" and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and sys_platform == \"win32\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and sys_platform == \"win32\" and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and sys_platform == \"win32\""}
 
 [[package]]
 name = "pyyaml"
@@ -2329,7 +2349,7 @@ files = [
     {file = "referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231"},
     {file = "referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 attrs = ">=22.2.0"
@@ -2482,7 +2502,7 @@ files = [
     {file = "rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:ac37f9f516c51e5753f27dfdef11a88330f04de2d564be3991384b2f3535d02e"},
     {file = "rpds_py-0.30.0.tar.gz", hash = "sha256:dd8ff7cf90014af0c0f787eea34794ebf6415242ee1d6fa91eaba725cc441e84"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [[package]]
 name = "rsa"
@@ -2552,7 +2572,7 @@ files = [
     {file = "sse_starlette-3.3.2-py3-none-any.whl", hash = "sha256:5c3ea3dad425c601236726af2f27689b74494643f57017cafcb6f8c9acfbb862"},
     {file = "sse_starlette-3.3.2.tar.gz", hash = "sha256:678fca55a1945c734d8472a6cad186a55ab02840b4f6786f5ee8770970579dcd"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 anyio = ">=4.7.0"
@@ -2575,7 +2595,7 @@ files = [
     {file = "starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74"},
     {file = "starlette-0.52.1.tar.gz", hash = "sha256:834edd1b0a23167694292e94f597773bc3f89f362be6effee198165a35d62933"},
 ]
-markers = {main = "python_version >= \"3.10\" and extra == \"openai-agents\"", dev = "python_version >= \"3.10\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\"", dev = "python_version >= \"3.10\""}
 
 [package.dependencies]
 anyio = ">=3.6.2,<5"
@@ -2703,7 +2723,7 @@ files = [
     {file = "typing_inspection-0.4.1-py3-none-any.whl", hash = "sha256:389055682238f53b04f7badcb49b989835495a96700ced5dab2d8feae4b26f51"},
     {file = "typing_inspection-0.4.1.tar.gz", hash = "sha256:6ae134cc0203c33377d43188d4064e9b357dba58cff3185f22924610e70a9d28"},
 ]
-markers = {main = "extra == \"openai-agents\""}
+markers = {main = "extra == \"openai-agents\" or (extra == \"openai-agents\" or extra == \"claude-agents\") and python_version >= \"3.10\""}
 
 [package.dependencies]
 typing-extensions = ">=4.12.0"
@@ -2756,7 +2776,7 @@ files = [
     {file = "uvicorn-0.42.0-py3-none-any.whl", hash = "sha256:96c30f5c7abe6f74ae8900a70e92b85ad6613b745d4879eb9b16ccad15645359"},
     {file = "uvicorn-0.42.0.tar.gz", hash = "sha256:9b1f190ce15a2dd22e7758651d9b6d12df09a13d51ba5bf4fc33c383a48e1775"},
 ]
-markers = {main = "extra == \"openai-agents\" and sys_platform != \"emscripten\" and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and sys_platform != \"emscripten\""}
+markers = {main = "(extra == \"openai-agents\" or extra == \"claude-agents\") and sys_platform != \"emscripten\" and python_version >= \"3.10\"", dev = "python_version >= \"3.10\" and sys_platform != \"emscripten\""}
 
 [package.dependencies]
 click = ">=7.0"
@@ -3079,9 +3099,10 @@ doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linke
 test = ["big-O", "importlib-resources ; python_version < \"3.9\"", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more-itertools", "pytest (>=6,!=8.1.*)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ignore-flaky", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
 
 [extras]
+claude-agents = ["claude-agent-sdk"]
 openai-agents = ["eval-type-backport", "openai-agents", "opentelemetry-exporter-otlp-proto-http"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "afd01682fd22d3b63c327f133b94a33e85bd52d23730d7285830903ba856e6c7"
+content-hash = "94ab119c76ee8cdd578e1e1e9cecdb8fb6a1dd827bf2bf9a4697aefb66a12a7a"

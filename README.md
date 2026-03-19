@@ -30,6 +30,30 @@ pip install promptlayer
 
 Use `pip install .` to install locally.
 
+### Claude Agents Integration
+
+PromptLayer also ships an optional Claude Agents integration that exposes a vendored PromptLayer Claude plugin configuration.
+
+This integration currently supports Linux and macOS. Windows is not supported.
+
+```bash
+pip install "promptlayer[claude-agents]"
+```
+
+```python
+from claude_agent_sdk import ClaudeAgentOptions
+from promptlayer.integrations.claude_agents import get_claude_config
+
+pl_claude_config = get_claude_config()
+
+options = ClaudeAgentOptions(
+  model="sonnet",
+  cwd=".",
+  plugins=[pl_claude_config.plugin],
+  env={**pl_claude_config.env},
+)
+```
+
 ### Using PromptLayer
 
 To get started, create an account by clicking “*Log in*” on [PromptLayer](https://promptlayer.com/). Once logged in, click the button to create an API key and save this in a secure location ([Guide to Using Env Vars](https://towardsdatascience.com/the-quick-guide-to-using-environment-variables-in-python-d4ec9291619e)).

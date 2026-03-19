@@ -741,11 +741,6 @@ class AsyncPromptLayer(PromptLayerMixin):
         # Capture end time after the LLM request completes
         request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
-        if hasattr(response, "model_dump"):
-            request_response = response.model_dump(mode="json")
-        else:
-            request_response = response
-
         if stream:
             track_request_callable = await self._create_track_request_callable(
                 request_params=llm_data,
@@ -756,11 +751,16 @@ class AsyncPromptLayer(PromptLayerMixin):
                 request_start_time=request_start_time,
             )
             return astream_response(
-                request_response,
+                response,
                 track_request_callable,
                 llm_data["stream_function"],
                 llm_data["prompt_blueprint"]["metadata"],
             )
+
+        if hasattr(response, "model_dump"):
+            request_response = response.model_dump(mode="json")
+        else:
+            request_response = response
 
         request_log = await self._track_request_log(
             llm_data,

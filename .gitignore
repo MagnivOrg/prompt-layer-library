@@ -141,3 +141,4 @@ test.py
 # Internal development
 /samples
 testing_*
+.DS_Store

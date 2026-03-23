@@ -26,7 +26,7 @@ def prompt(
             "Please provide a dictionary of input variables.", response=None, body=None
         )
     return promptlayer_track_prompt(
-        api_key, base_url, throw_on_error, request_id, prompt_name, prompt_input_variables, api_key, version, label
+        api_key, base_url, throw_on_error, request_id, prompt_name, prompt_input_variables, version, label
     )
 
 

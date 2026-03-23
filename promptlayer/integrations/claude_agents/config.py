@@ -28,6 +28,7 @@ class PromptLayerClaudeAgentsConfig:
 _VENDOR_ROOT_FALLBACK = Path(__file__).resolve().parent / "vendor" / "trace"
 _REQUIRED_VENDOR_FILES = (
     ".claude-plugin/plugin.json",
+    "setup.sh",
     "hooks/hooks.json",
     "hooks/lib.sh",
     "hooks/session_start.sh",
@@ -35,8 +36,15 @@ _REQUIRED_VENDOR_FILES = (
     "hooks/post_tool_use.sh",
     "hooks/stop_hook.sh",
     "hooks/session_end.sh",
-    "hooks/hook_utils.py",
-    "hooks/parse_stop_transcript.py",
+    "hooks/py/__init__.py",
+    "hooks/py/cli.py",
+    "hooks/py/context.py",
+    "hooks/py/handlers.py",
+    "hooks/py/otlp.py",
+    "hooks/py/settings.py",
+    "hooks/py/state.py",
+    "hooks/py/stop_parser.py",
+    "hooks/py/traceparent.py",
 )
 
 

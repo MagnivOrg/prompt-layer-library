@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Parse a Claude transcript and return finalized turn/tool/llm spans as JSON."""
+"""Pure transcript parsing and stop-hook span-spec derivation."""
 
 import json
-import os
-import sys
 from datetime import datetime, timezone
+
+from otlp import SpanSpec
 
 
 def parse_iso_to_ns(raw):
@@ -172,9 +172,9 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
                 is_error = bool(block.get("is_error", False))
 
                 match_idx = None
-                for idx, item in enumerate(pending_tool_uses):
+                for candidate_idx, item in enumerate(pending_tool_uses):
                     if tool_use_id and item.get("id") == tool_use_id:
-                        match_idx = idx
+                        match_idx = candidate_idx
                         break
                 if match_idx is None and pending_tool_uses:
                     match_idx = 0
@@ -277,8 +277,6 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
                     }
                 )
 
-        # Claude can emit intermediate assistant records that contain only
-        # empty thinking blocks. Those should not consume the user's prompt.
         if not output_text and not tool_calls:
             continue
 
@@ -345,31 +343,71 @@ def parse_transcript(transcript_path, turn_start_fallback, pending_payloads, exp
     }
 
 
-def main():
-    if len(sys.argv) < 3:
-        print(
-            json.dumps(
-                {"error": "Usage: parse_stop_transcript.py <transcript_path> <turn_start_ns> [session_id]"}
+def build_stop_hook_span_specs(
+    *,
+    parsed,
+    trace_id,
+    session_span_id,
+    session_parent_span_id,
+    session_start_ns,
+    session_init_source,
+    generate_span_id,
+):
+    turn = parsed.get("turn", {})
+    turn_start_ns = str(turn.get("start_ns", session_start_ns))
+    turn_end_ns = str(turn.get("end_ns", turn_start_ns))
+
+    if session_init_source == "lazy_init":
+        session_hook_attr = "StopFallback"
+        session_lifecycle_attr = "stop_fallback"
+    else:
+        session_hook_attr = "Stop"
+        session_lifecycle_attr = "in_progress"
+
+    span_specs = [
+        SpanSpec(
+            trace_id=trace_id,
+            span_id=session_span_id,
+            parent_span_id=session_parent_span_id,
+            name="Claude Code session",
+            kind="1",
+            start_ns=str(session_start_ns),
+            end_ns=turn_end_ns,
+            attrs={
+                "source": "claude-code",
+                "hook": session_hook_attr,
+                "node_type": "WORKFLOW",
+                "session.lifecycle": session_lifecycle_attr,
+            },
+        )
+    ]
+
+    for tool in parsed.get("tools", []):
+        span_specs.append(
+            SpanSpec(
+                trace_id=trace_id,
+                span_id=generate_span_id(),
+                parent_span_id=session_span_id,
+                name=tool.get("name", ""),
+                kind="3",
+                start_ns=str(tool.get("start_ns", turn_start_ns)),
+                end_ns=str(tool.get("end_ns", turn_end_ns)),
+                attrs=tool.get("attributes", {}),
             )
         )
-        return 1
 
-    transcript_path = sys.argv[1]
-    turn_start_fallback = safe_int(sys.argv[2], 0) or None
-    expected_session_id = sys.argv[3] if len(sys.argv) > 3 else None
+    for llm in parsed.get("llms", []):
+        span_specs.append(
+            SpanSpec(
+                trace_id=trace_id,
+                span_id=generate_span_id(),
+                parent_span_id=session_span_id,
+                name=llm.get("name", ""),
+                kind="3",
+                start_ns=str(llm.get("start_ns", turn_start_ns)),
+                end_ns=str(llm.get("end_ns", turn_end_ns)),
+                attrs=llm.get("attributes", {}),
+            )
+        )
 
-    pending_raw = os.environ.get("PL_PENDING_TOOL_CALLS", "[]")
-    try:
-        pending_payloads = json.loads(pending_raw)
-    except Exception:
-        pending_payloads = []
-    if not isinstance(pending_payloads, list):
-        pending_payloads = []
-
-    parsed = parse_transcript(transcript_path, turn_start_fallback, pending_payloads, expected_session_id)
-    print(json.dumps(parsed, ensure_ascii=False, separators=(",", ":")))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    return span_specs

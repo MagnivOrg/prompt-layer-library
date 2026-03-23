@@ -9,17 +9,7 @@ tracing_enabled || exit 0
 check_requirements || exit 0
 
 input="$(cat)"
-session_id="$(echo "$input" | jq -r '.session_id // empty')"
+session_id="$(printf '%s' "$input" | python3 "$SCRIPT_DIR/py/cli.py" user-prompt-submit)"
 [[ -z "$session_id" ]] && exit 0
-
-ensure_session_initialized "$session_id"
-
-trace_id="$(get_session_state "$session_id" trace_id)"
-session_span_id="$(get_session_state "$session_id" session_span_id)"
-[[ -z "$trace_id" || -z "$session_span_id" ]] && exit 0
-start_ns="$(now_ns)"
-
-set_session_state "$session_id" current_turn_start_ns "$start_ns"
-set_session_state "$session_id" pending_tool_calls "[]"
 
 log "INFO" "UserPromptSubmit captured session_id=$session_id"

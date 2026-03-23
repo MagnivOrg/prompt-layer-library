@@ -88,6 +88,7 @@ def test_get_claude_config_points_at_complete_vendored_plugin(monkeypatch):
     assert plugin_root.is_dir()
     for relative in (
         ".claude-plugin/plugin.json",
+        "setup.sh",
         "hooks/hooks.json",
         "hooks/lib.sh",
         "hooks/session_start.sh",
@@ -95,8 +96,15 @@ def test_get_claude_config_points_at_complete_vendored_plugin(monkeypatch):
         "hooks/post_tool_use.sh",
         "hooks/stop_hook.sh",
         "hooks/session_end.sh",
-        "hooks/hook_utils.py",
-        "hooks/parse_stop_transcript.py",
+        "hooks/py/__init__.py",
+        "hooks/py/cli.py",
+        "hooks/py/context.py",
+        "hooks/py/handlers.py",
+        "hooks/py/otlp.py",
+        "hooks/py/settings.py",
+        "hooks/py/state.py",
+        "hooks/py/stop_parser.py",
+        "hooks/py/traceparent.py",
     ):
         assert (plugin_root / relative).exists(), relative
 

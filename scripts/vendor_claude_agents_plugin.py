@@ -14,6 +14,7 @@ DEST_PLUGIN_ROOT = DEST_VENDOR_ROOT / "trace"
 
 SOURCE_PLUGIN_FILES = (
     "plugins/trace/.claude-plugin/plugin.json",
+    "plugins/trace/setup.sh",
     "plugins/trace/hooks/hooks.json",
     "plugins/trace/hooks/lib.sh",
     "plugins/trace/hooks/session_start.sh",
@@ -21,8 +22,15 @@ SOURCE_PLUGIN_FILES = (
     "plugins/trace/hooks/post_tool_use.sh",
     "plugins/trace/hooks/stop_hook.sh",
     "plugins/trace/hooks/session_end.sh",
-    "plugins/trace/hooks/hook_utils.py",
-    "plugins/trace/hooks/parse_stop_transcript.py",
+    "plugins/trace/hooks/py/__init__.py",
+    "plugins/trace/hooks/py/cli.py",
+    "plugins/trace/hooks/py/context.py",
+    "plugins/trace/hooks/py/handlers.py",
+    "plugins/trace/hooks/py/otlp.py",
+    "plugins/trace/hooks/py/settings.py",
+    "plugins/trace/hooks/py/state.py",
+    "plugins/trace/hooks/py/stop_parser.py",
+    "plugins/trace/hooks/py/traceparent.py",
 )
 
 

@@ -12,41 +12,16 @@ from promptlayer.utils import (
 
 
 class TemplateManager:
-    def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
+    def __init__(self, api_key: str, base_url: str, throw_on_error: bool, cache_ttl_seconds: Union[int, None] = None):
         self.api_key = api_key
         self.base_url = base_url
         self.throw_on_error = throw_on_error
+        self._cache_ttl_seconds = cache_ttl_seconds
 
-    def get(
-        self,
-        prompt_name: str,
-        params: Union[GetPromptTemplate, None] = None,
-        cache_ttl_seconds: Union[int, None] = None,
-    ):
-        """
-        Get a prompt template from PromptLayer.
-
-        Args:
-            prompt_name: Name or numeric ID of the prompt template
-            params: Optional parameters for getting the template
-            cache_ttl_seconds: Cache TTL in seconds. If 0 or None, caching is disabled.
-                If > 0, the template will be cached for the specified duration.
-                Expired cache entries are served as fallback when API is unreachable.
-                Cache is automatically bypassed when metadata_filters or provider is specified.
-
-        Returns:
-            Prompt template response dict
-
-        Example:
-            # Enable 15-minute cache
-            template = client.templates.get("my-prompt", cache_ttl_seconds=900)
-
-            # Disable cache (default behavior)
-            template = client.templates.get("my-prompt")
-        """
+    def get(self, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
         result = get_prompt_template(
             self.api_key, self.base_url, self.throw_on_error, prompt_name, params,
-            cache_ttl_seconds=cache_ttl_seconds,
+            cache_ttl_seconds=self._cache_ttl_seconds,
         )
         if result:
             label = params.get("label") if isinstance(params, dict) else getattr(params, "label", None)
@@ -61,41 +36,16 @@ class TemplateManager:
 
 
 class AsyncTemplateManager:
-    def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
+    def __init__(self, api_key: str, base_url: str, throw_on_error: bool, cache_ttl_seconds: Union[int, None] = None):
         self.api_key = api_key
         self.base_url = base_url
         self.throw_on_error = throw_on_error
+        self.cache_ttl_seconds = cache_ttl_seconds
 
-    async def get(
-        self,
-        prompt_name: str,
-        params: Union[GetPromptTemplate, None] = None,
-        cache_ttl_seconds: Union[int, None] = None,
-    ):
-        """
-        Get a prompt template from PromptLayer (async version).
-
-        Args:
-            prompt_name: Name or numeric ID of the prompt template
-            params: Optional parameters for getting the template
-            cache_ttl_seconds: Cache TTL in seconds. If 0 or None, caching is disabled.
-                If > 0, the template will be cached for the specified duration.
-                Expired cache entries are served as fallback when API is unreachable.
-                Cache is automatically bypassed when metadata_filters or provider is specified.
-
-        Returns:
-            Prompt template response dict
-
-        Example:
-            # Enable 15-minute cache
-            template = await client.templates.get("my-prompt", cache_ttl_seconds=900)
-
-            # Disable cache (default behavior)
-            template = await client.templates.get("my-prompt")
-        """
+    async def get(self, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
         result = await aget_prompt_template(
             self.api_key, self.base_url, self.throw_on_error, prompt_name, params,
-            cache_ttl_seconds=cache_ttl_seconds,
+            cache_ttl_seconds=self.cache_ttl_seconds,
         )
         if result:
             label = params.get("label") if isinstance(params, dict) else getattr(params, "label", None)

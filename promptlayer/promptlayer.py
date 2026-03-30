@@ -60,6 +60,7 @@ class PromptLayer(PromptLayerMixin):
         enable_tracing: bool = False,
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
+        cache_ttl_seconds: Union[int, None] = None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -73,7 +74,7 @@ class PromptLayer(PromptLayerMixin):
         self.base_url = get_base_url(base_url)
         self.api_key = api_key
         self.throw_on_error = throw_on_error
-        self.templates = TemplateManager(api_key, self.base_url, self.throw_on_error)
+        self.templates = TemplateManager(api_key, self.base_url, self.throw_on_error, cache_ttl_seconds)
         self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing
@@ -440,6 +441,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         enable_tracing: bool = False,
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
+        cache_ttl_seconds: Union[int, None] = None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -453,7 +455,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         self.base_url = get_base_url(base_url)
         self.api_key = api_key
         self.throw_on_error = throw_on_error
-        self.templates = AsyncTemplateManager(api_key, self.base_url, self.throw_on_error)
+        self.templates = AsyncTemplateManager(api_key, self.base_url, self.throw_on_error, cache_ttl_seconds)
         self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing

@@ -61,7 +61,7 @@ class PromptLayer(PromptLayerMixin):
         enable_tracing: bool = False,
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
-        cache_ttl_seconds: Union[int, None] = None,
+        cache_ttl_seconds: int = 15,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -443,7 +443,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         enable_tracing: bool = False,
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
-        cache_ttl_seconds: Union[int, None] = None,
+        cache_ttl_seconds: int = 15,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")

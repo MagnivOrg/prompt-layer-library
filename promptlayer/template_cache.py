@@ -191,8 +191,7 @@ def _jinja2_render(template: str, variables: dict) -> str:
         from jinja2.sandbox import SandboxedEnvironment
     except ImportError:
         raise ImportError(
-            "jinja2 is required for local rendering of jinja2 prompt templates. "
-            "Install it with:  pip install jinja2"
+            "jinja2 is required for local rendering of jinja2 prompt templates. Install it with:  pip install jinja2"
         )
     env = SandboxedEnvironment(undefined=jinja2.ChainableUndefined)
     return env.from_string(template).render(**variables)

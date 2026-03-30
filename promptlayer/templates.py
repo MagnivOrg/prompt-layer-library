@@ -70,9 +70,6 @@ class TemplateManager:
 
         stale = cached
 
-        if self._cache.is_uncacheable(cache_key):
-            return self._fetch_normal(prompt_name, params)
-
         cache_params = make_cache_params(params)
         try:
             api_result = get_prompt_template(
@@ -95,7 +92,6 @@ class TemplateManager:
             return None
 
         if not is_locally_renderable(api_result):
-            self._cache.mark_uncacheable(cache_key)
             return self._fetch_normal(prompt_name, params)
 
         self._cache.put(cache_key, api_result)
@@ -151,9 +147,6 @@ class AsyncTemplateManager:
 
         stale = cached
 
-        if self._cache.is_uncacheable(cache_key):
-            return await self._afetch_normal(prompt_name, params)
-
         cache_params = make_cache_params(params)
         try:
             api_result = await aget_prompt_template(
@@ -176,7 +169,6 @@ class AsyncTemplateManager:
             return None
 
         if not is_locally_renderable(api_result):
-            self._cache.mark_uncacheable(cache_key)
             return await self._afetch_normal(prompt_name, params)
 
         self._cache.put(cache_key, api_result)

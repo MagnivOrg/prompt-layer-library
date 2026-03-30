@@ -29,7 +29,6 @@ class PromptTemplateCache:
     def __init__(self, ttl_seconds: int):
         self.ttl_seconds = ttl_seconds
         self._entries: Dict[CacheKey, _CacheEntry] = {}
-        self._uncacheable: set = set()
         self._lock = threading.Lock()
 
     @staticmethod
@@ -56,14 +55,6 @@ class PromptTemplateCache:
     def put(self, key: CacheKey, response: dict):
         with self._lock:
             self._entries[key] = _CacheEntry(response, time.monotonic())
-
-    def is_uncacheable(self, key: CacheKey) -> bool:
-        with self._lock:
-            return key in self._uncacheable
-
-    def mark_uncacheable(self, key: CacheKey):
-        with self._lock:
-            self._uncacheable.add(key)
 
 
 # ── public helpers used by TemplateManager ──────────────────────────

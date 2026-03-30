@@ -9,6 +9,7 @@ class GetPromptTemplate(TypedDict, total=False):
     provider: str
     input_variables: Dict[str, Any]
     metadata_filters: Dict[str, str]
+    skip_input_variable_rendering: bool
 
 
 TemplateFormat = Literal["f-string", "jinja2"]

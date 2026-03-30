@@ -1,6 +1,15 @@
+import logging
 from typing import Union
 
 from promptlayer.span_exporter import set_prompt_span_attributes
+from promptlayer.template_cache import (
+    PromptTemplateCache,
+    has_list_input_variables,
+    is_locally_renderable,
+    make_cache_params,
+    render_response,
+    should_skip_cache,
+)
 from promptlayer.types.prompt_template import GetPromptTemplate, PublishPromptTemplate
 from promptlayer.utils import (
     aget_all_prompt_templates,
@@ -10,18 +19,88 @@ from promptlayer.utils import (
     publish_prompt_template,
 )
 
+logger = logging.getLogger(__name__)
+
+
+def _extract_label(params):
+    if isinstance(params, dict):
+        return params.get("label")
+    return getattr(params, "label", None)
+
 
 class TemplateManager:
-    def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        throw_on_error: bool,
+        cache: Union[PromptTemplateCache, None] = None,
+    ):
         self.api_key = api_key
         self.base_url = base_url
         self.throw_on_error = throw_on_error
+        self._cache = cache
 
     def get(self, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
+        if self._cache and not should_skip_cache(params):
+            return self._get_with_cache(prompt_name, params)
+        return self._fetch_normal(prompt_name, params)
+
+    def _fetch_normal(self, prompt_name, params):
         result = get_prompt_template(self.api_key, self.base_url, self.throw_on_error, prompt_name, params)
         if result:
-            label = params.get("label") if isinstance(params, dict) else getattr(params, "label", None)
+            set_prompt_span_attributes(result, prompt_name, label=_extract_label(params))
+        return result
+
+    def _get_with_cache(self, prompt_name, params):
+        cache_key = self._cache.make_key(prompt_name, params)
+        input_variables = params.get("input_variables") if params else None
+        label = _extract_label(params)
+
+        # List-typed values signal placeholder / tool-variable usage — skip cache
+        if has_list_input_variables(params):
+            return self._fetch_normal(prompt_name, params)
+
+        cached, is_fresh = self._cache.get(cache_key)
+
+        if cached is not None and is_fresh:
+            result = render_response(cached, input_variables)
             set_prompt_span_attributes(result, prompt_name, label=label)
+            return result
+
+        stale = cached
+
+        if self._cache.is_uncacheable(cache_key):
+            return self._fetch_normal(prompt_name, params)
+
+        cache_params = make_cache_params(params)
+        try:
+            api_result = get_prompt_template(
+                self.api_key, self.base_url, self.throw_on_error, prompt_name, cache_params
+            )
+        except Exception:
+            if stale is not None:
+                logger.debug("API fetch failed, serving stale cache for '%s'", prompt_name)
+                result = render_response(stale, input_variables)
+                set_prompt_span_attributes(result, prompt_name, label=label)
+                return result
+            raise
+
+        if api_result is None:
+            if stale is not None:
+                logger.debug("API returned None, serving stale cache for '%s'", prompt_name)
+                result = render_response(stale, input_variables)
+                set_prompt_span_attributes(result, prompt_name, label=label)
+                return result
+            return None
+
+        if not is_locally_renderable(api_result):
+            self._cache.mark_uncacheable(cache_key)
+            return self._fetch_normal(prompt_name, params)
+
+        self._cache.put(cache_key, api_result)
+        result = render_response(api_result, input_variables)
+        set_prompt_span_attributes(result, prompt_name, label=label)
         return result
 
     def publish(self, body: PublishPromptTemplate):
@@ -32,16 +111,77 @@ class TemplateManager:
 
 
 class AsyncTemplateManager:
-    def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        throw_on_error: bool,
+        cache: Union[PromptTemplateCache, None] = None,
+    ):
         self.api_key = api_key
         self.base_url = base_url
         self.throw_on_error = throw_on_error
+        self._cache = cache
 
     async def get(self, prompt_name: str, params: Union[GetPromptTemplate, None] = None):
+        if self._cache and not should_skip_cache(params):
+            return await self._aget_with_cache(prompt_name, params)
+        return await self._afetch_normal(prompt_name, params)
+
+    async def _afetch_normal(self, prompt_name, params):
         result = await aget_prompt_template(self.api_key, self.base_url, self.throw_on_error, prompt_name, params)
         if result:
-            label = params.get("label") if isinstance(params, dict) else getattr(params, "label", None)
+            set_prompt_span_attributes(result, prompt_name, label=_extract_label(params))
+        return result
+
+    async def _aget_with_cache(self, prompt_name, params):
+        cache_key = self._cache.make_key(prompt_name, params)
+        input_variables = params.get("input_variables") if params else None
+        label = _extract_label(params)
+
+        if has_list_input_variables(params):
+            return await self._afetch_normal(prompt_name, params)
+
+        cached, is_fresh = self._cache.get(cache_key)
+
+        if cached is not None and is_fresh:
+            result = render_response(cached, input_variables)
             set_prompt_span_attributes(result, prompt_name, label=label)
+            return result
+
+        stale = cached
+
+        if self._cache.is_uncacheable(cache_key):
+            return await self._afetch_normal(prompt_name, params)
+
+        cache_params = make_cache_params(params)
+        try:
+            api_result = await aget_prompt_template(
+                self.api_key, self.base_url, self.throw_on_error, prompt_name, cache_params
+            )
+        except Exception:
+            if stale is not None:
+                logger.debug("API fetch failed, serving stale cache for '%s'", prompt_name)
+                result = render_response(stale, input_variables)
+                set_prompt_span_attributes(result, prompt_name, label=label)
+                return result
+            raise
+
+        if api_result is None:
+            if stale is not None:
+                logger.debug("API returned None, serving stale cache for '%s'", prompt_name)
+                result = render_response(stale, input_variables)
+                set_prompt_span_attributes(result, prompt_name, label=label)
+                return result
+            return None
+
+        if not is_locally_renderable(api_result):
+            self._cache.mark_uncacheable(cache_key)
+            return await self._afetch_normal(prompt_name, params)
+
+        self._cache.put(cache_key, api_result)
+        result = render_response(api_result, input_variables)
+        set_prompt_span_attributes(result, prompt_name, label=label)
         return result
 
     async def all(self, page: int = 1, per_page: int = 30, label: str = None):

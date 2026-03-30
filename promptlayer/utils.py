@@ -1640,7 +1640,7 @@ def _get_prompt_from_cache(cache_key: str, cache_ttl_seconds: Optional[int]) -> 
 
     if elapsed < entry["ttl_seconds"]:
         logger.debug("Prompt template cache hit for key: %s (age: %.1fs)", cache_key, elapsed)
-        return entry["template"]
+        return deepcopy(entry["template"])
 
     logger.debug(
         "Prompt template cache expired for key: %s (age: %.1fs, ttl: %ss)", cache_key, elapsed, entry["ttl_seconds"]
@@ -1662,7 +1662,7 @@ def _save_prompt_to_cache(cache_key: str, template: Dict[str, Any], cache_ttl_se
 
     with _prompt_template_cache_lock:
         _prompt_template_cache[cache_key] = {
-            "template": template,
+            "template": deepcopy(template),
             "cached_at": time.time(),
             "ttl_seconds": cache_ttl_seconds,
         }
@@ -1685,7 +1685,7 @@ def _get_expired_prompt_fallback(cache_key: str) -> Optional[Dict[str, Any]]:
         entry = _prompt_template_cache[cache_key]
         elapsed = time.time() - entry["cached_at"]
         logger.debug("Using expired cache fallback for key: %s (age: %.1fs)", cache_key, elapsed)
-        return entry["template"]
+        return deepcopy(entry["template"])
     return None
 
 
@@ -1707,6 +1707,8 @@ def get_prompt_template(
     throw_on_error: bool,
     prompt_name: str,
     params: Union[GetPromptTemplate, None] = None,
+    *,
+    cache_ttl_seconds: Optional[int] = None,
 ) -> GetPromptTemplateResponse:
     """
     Get a prompt template from PromptLayer.
@@ -1716,29 +1718,20 @@ def get_prompt_template(
         base_url: PromptLayer API base URL
         throw_on_error: Whether to raise exceptions on errors
         prompt_name: Name or numeric ID of the prompt template
-        params: Optional parameters including:
-            - version: Version number of the prompt
-            - label: Release label of the prompt
-            - provider: Provider to render for
-            - input_variables: Input variables for rendering
-            - metadata_filters: Metadata filters for conditional rendering
-            - cache_ttl_seconds: Cache TTL in seconds (0 or None disables cache)
+        params: Optional API parameters (version, label, provider, input_variables, metadata_filters)
+        cache_ttl_seconds: Cache TTL in seconds. None or 0 disables caching.
+            Expired entries are served as fallback when the API is unreachable.
+            Cache is bypassed when metadata_filters or provider is specified in params.
 
     Returns:
         Prompt template response dict
-
-    Notes:
-        - Cache is bypassed when metadata_filters or provider is specified
-        - Expired cache entries are served as fallback when API is unreachable
     """
     params = params or {}
     version = params.get("version")
     label = params.get("label")
     metadata_filters = params.get("metadata_filters")
     provider = params.get("provider")
-    cache_ttl_seconds = params.get("cache_ttl_seconds")
 
-    # Determine if cache should be used
     should_use_cache = (
         metadata_filters is None and provider is None and cache_ttl_seconds is not None and cache_ttl_seconds > 0
     )
@@ -1747,12 +1740,10 @@ def get_prompt_template(
     if should_use_cache:
         cache_key = _create_prompt_cache_key(prompt_name, version, label)
 
-        # Try to get from cache
         cached_template = _get_prompt_from_cache(cache_key, cache_ttl_seconds)
         if cached_template:
             return cached_template
 
-    # Make API request
     try:
         json_body = {"api_key": api_key}
         if params:
@@ -1828,6 +1819,8 @@ async def aget_prompt_template(
     throw_on_error: bool,
     prompt_name: str,
     params: Union[GetPromptTemplate, None] = None,
+    *,
+    cache_ttl_seconds: Optional[int] = None,
 ) -> GetPromptTemplateResponse:
     """
     Get a prompt template from PromptLayer (async version).
@@ -1837,29 +1830,20 @@ async def aget_prompt_template(
         base_url: PromptLayer API base URL
         throw_on_error: Whether to raise exceptions on errors
         prompt_name: Name or numeric ID of the prompt template
-        params: Optional parameters including:
-            - version: Version number of the prompt
-            - label: Release label of the prompt
-            - provider: Provider to render for
-            - input_variables: Input variables for rendering
-            - metadata_filters: Metadata filters for conditional rendering
-            - cache_ttl_seconds: Cache TTL in seconds (0 or None disables cache)
+        params: Optional API parameters (version, label, provider, input_variables, metadata_filters)
+        cache_ttl_seconds: Cache TTL in seconds. None or 0 disables caching.
+            Expired entries are served as fallback when the API is unreachable.
+            Cache is bypassed when metadata_filters or provider is specified in params.
 
     Returns:
         Prompt template response dict
-
-    Notes:
-        - Cache is bypassed when metadata_filters or provider is specified
-        - Expired cache entries are served as fallback when API is unreachable
     """
     params = params or {}
     version = params.get("version")
     label = params.get("label")
     metadata_filters = params.get("metadata_filters")
     provider = params.get("provider")
-    cache_ttl_seconds = params.get("cache_ttl_seconds")
 
-    # Determine if cache should be used
     should_use_cache = (
         metadata_filters is None and provider is None and cache_ttl_seconds is not None and cache_ttl_seconds > 0
     )
@@ -1868,12 +1852,10 @@ async def aget_prompt_template(
     if should_use_cache:
         cache_key = _create_prompt_cache_key(prompt_name, version, label)
 
-        # Try to get from cache
         cached_template = _get_prompt_from_cache(cache_key, cache_ttl_seconds)
         if cached_template:
             return cached_template
 
-    # Make API request
     try:
         json_body = {"api_key": api_key}
         if params:

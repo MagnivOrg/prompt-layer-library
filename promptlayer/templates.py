@@ -44,14 +44,10 @@ class TemplateManager:
             # Disable cache (default behavior)
             template = client.templates.get("my-prompt")
         """
-        if params is None:
-            params = {}
-
-        # Add cache_ttl_seconds to params if provided
-        if cache_ttl_seconds is not None:
-            params["cache_ttl_seconds"] = cache_ttl_seconds
-
-        result = get_prompt_template(self.api_key, self.base_url, self.throw_on_error, prompt_name, params)
+        result = get_prompt_template(
+            self.api_key, self.base_url, self.throw_on_error, prompt_name, params,
+            cache_ttl_seconds=cache_ttl_seconds,
+        )
         if result:
             label = params.get("label") if isinstance(params, dict) else getattr(params, "label", None)
             set_prompt_span_attributes(result, prompt_name, label=label)
@@ -97,14 +93,10 @@ class AsyncTemplateManager:
             # Disable cache (default behavior)
             template = await client.templates.get("my-prompt")
         """
-        if params is None:
-            params = {}
-
-        # Add cache_ttl_seconds to params if provided
-        if cache_ttl_seconds is not None:
-            params["cache_ttl_seconds"] = cache_ttl_seconds
-
-        result = await aget_prompt_template(self.api_key, self.base_url, self.throw_on_error, prompt_name, params)
+        result = await aget_prompt_template(
+            self.api_key, self.base_url, self.throw_on_error, prompt_name, params,
+            cache_ttl_seconds=cache_ttl_seconds,
+        )
         if result:
             label = params.get("label") if isinstance(params, dict) else getattr(params, "label", None)
             set_prompt_span_attributes(result, prompt_name, label=label)

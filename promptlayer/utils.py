@@ -1581,25 +1581,16 @@ async def apromptlayer_track_group(api_key: str, base_url: str, throw_on_error: 
     return True
 
 
-def _create_prompt_cache_key(prompt_name: str, version: Optional[int], label: Optional[str]) -> str:
+def _create_prompt_cache_key(
+    prompt_name: str,
+    version: Optional[int],
+    label: Optional[str],
+    provider: Optional[str] = None,
+) -> str:
     """
     Generate cache key for prompt template.
 
-    Format: {prompt_selector}:{version_selector}
-
-    Where:
-    - prompt_selector = id.{id} if prompt_name is numeric, else name.{name}
-    - version_selector = v.{version} OR label.{label} OR latest
-
-    Matches the API's cache key logic from convert_to_cache_key.
-
-    Args:
-        prompt_name: Name or numeric ID string of the prompt template
-        version: Optional version number
-        label: Optional release label
-
-    Returns:
-        Cache key string
+    Format: {prompt_selector}:{version_selector}[:provider.{provider}]
     """
     if prompt_name.isdigit():
         prompt_selector = f"id.{prompt_name}"
@@ -1613,7 +1604,10 @@ def _create_prompt_cache_key(prompt_name: str, version: Optional[int], label: Op
     else:
         version_selector = "latest"
 
-    return f"{prompt_selector}:{version_selector}"
+    key = f"{prompt_selector}:{version_selector}"
+    if provider is not None:
+        key += f":provider.{provider}"
+    return key
 
 
 def _get_prompt_from_cache(cache_key: str, cache_ttl_seconds: Optional[int]) -> Optional[Dict[str, Any]]:
@@ -1700,6 +1694,115 @@ def clear_prompt_template_cache():
         logger.debug("Cleared prompt template cache")
 
 
+# ---------------------------------------------------------------------------
+# Client-side input variable rendering
+#
+# Replicates the server-side jinja2 / f-string rendering so that cached
+# (unrendered) templates can be rendered locally without an API round-trip.
+# ---------------------------------------------------------------------------
+
+def _fstring_render(template_text: str, input_variables: Dict[str, Any]) -> str:
+    """Render an f-string template, substituting missing variables with ''."""
+    from string import Formatter
+
+    resolved: Dict[str, Any] = {}
+    for _, var_name, _, _ in Formatter().parse(template_text):
+        if var_name is not None:
+            value = input_variables.get(var_name)
+            resolved[var_name] = value if value is not None else ""
+    return template_text.format(**resolved)
+
+
+def _jinja2_render(template_text: str, input_variables: Dict[str, Any]) -> str:
+    """Render a jinja2 template. Undefined variables become ''."""
+    import jinja2
+    from jinja2.sandbox import SandboxedEnvironment
+
+    env = SandboxedEnvironment(undefined=jinja2.ChainableUndefined)
+    return env.from_string(template_text).render(**input_variables)
+
+
+def _render_text(text: str, template_format: str, input_variables: Dict[str, Any]) -> str:
+    if template_format == "jinja2":
+        return _jinja2_render(text, input_variables)
+    return _fstring_render(text, input_variables)
+
+
+def _apply_text_substitutions(obj: Any, substitutions: Dict[str, str]) -> Any:
+    """Recursively walk a nested structure, replacing strings found in *substitutions*."""
+    if isinstance(obj, str):
+        return substitutions.get(obj, obj)
+    if isinstance(obj, dict):
+        return {k: _apply_text_substitutions(v, substitutions) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_apply_text_substitutions(item, substitutions) for item in obj]
+    return obj
+
+
+def _has_placeholder_messages(response: Dict[str, Any]) -> bool:
+    """Check if a cached response contains placeholder messages that require
+    structural expansion we can't replicate client-side."""
+    pt = response.get("prompt_template")
+    if not pt or pt.get("type") != "chat":
+        return False
+    return any(msg.get("role") == "placeholder" for msg in pt.get("messages", []))
+
+
+def _render_prompt_template_variables(
+    response: Dict[str, Any],
+    input_variables: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Render input variables into a prompt template response (in place).
+
+    Walks the prompt_template content, renders each text block using its
+    template_format, then applies the same text substitutions to llm_kwargs
+    so that both fields stay consistent.
+
+    When *input_variables* is None the server would render with {} (replacing
+    every placeholder with ""), so we replicate that here.
+    """
+    input_variables = input_variables or {}
+
+    prompt_template = response.get("prompt_template")
+    if not prompt_template:
+        return response
+
+    subs: Dict[str, str] = {}
+    template_type = prompt_template.get("type")
+
+    if template_type == "chat":
+        for message in prompt_template.get("messages", []):
+            fmt = message.get("template_format", "f-string")
+            for content in message.get("content", []):
+                if content.get("type") != "text":
+                    continue
+                original = content.get("text", "")
+                if not original:
+                    continue
+                rendered = _render_text(original, fmt, input_variables)
+                if rendered != original:
+                    subs[original] = rendered
+                    content["text"] = rendered
+
+    elif template_type == "completion":
+        fmt = prompt_template.get("template_format", "f-string")
+        for content in prompt_template.get("content", []):
+            if content.get("type") != "text":
+                continue
+            original = content.get("text", "")
+            if not original:
+                continue
+            rendered = _render_text(original, fmt, input_variables)
+            if rendered != original:
+                subs[original] = rendered
+                content["text"] = rendered
+
+    if subs and response.get("llm_kwargs"):
+        response["llm_kwargs"] = _apply_text_substitutions(response["llm_kwargs"], subs)
+
+    return response
+
+
 @retry_on_api_error
 def get_prompt_template(
     api_key: str,
@@ -1721,7 +1824,8 @@ def get_prompt_template(
         params: Optional API parameters (version, label, provider, input_variables, metadata_filters)
         cache_ttl_seconds: Cache TTL in seconds. None or 0 disables caching.
             Expired entries are served as fallback when the API is unreachable.
-            Cache is bypassed when metadata_filters or provider is specified in params.
+            Cache is bypassed when metadata_filters is specified in params.
+            When caching with a provider, input variables are rendered client-side.
 
     Returns:
         Prompt template response dict
@@ -1731,23 +1835,32 @@ def get_prompt_template(
     label = params.get("label")
     metadata_filters = params.get("metadata_filters")
     provider = params.get("provider")
+    input_variables = params.get("input_variables")
 
     should_use_cache = (
-        metadata_filters is None and provider is None and cache_ttl_seconds is not None and cache_ttl_seconds > 0
+        metadata_filters is None and cache_ttl_seconds is not None and cache_ttl_seconds > 0
     )
+    # Client-side rendering is only needed when the server would normally
+    # render (i.e. provider is set).  Without a provider the API already
+    # returns raw templates, so no rendering is required on either side.
+    should_render = should_use_cache and provider is not None
 
     cache_key = None
     if should_use_cache:
-        cache_key = _create_prompt_cache_key(prompt_name, version, label)
+        cache_key = _create_prompt_cache_key(prompt_name, version, label, provider)
 
         cached_template = _get_prompt_from_cache(cache_key, cache_ttl_seconds)
-        if cached_template:
+        can_serve_from_cache = cached_template and not (should_render and _has_placeholder_messages(cached_template))
+        if can_serve_from_cache:
+            if should_render:
+                _render_prompt_template_variables(cached_template, input_variables)
             return cached_template
 
     try:
         json_body = {"api_key": api_key}
         if params:
             json_body = {**json_body, **params}
+        json_body["skip_input_variable_rendering"] = should_use_cache
         response = _get_requests_session().post(
             f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
             headers={"X-API-KEY": api_key},
@@ -1768,21 +1881,39 @@ def get_prompt_template(
 
         result = response.json()
 
-        # Save to cache if applicable
         if should_use_cache and cache_key:
-            _save_prompt_to_cache(cache_key, result, cache_ttl_seconds)
+            if should_render and _has_placeholder_messages(result):
+                # Template uses placeholder messages which we can't render
+                # client-side.  Discard the raw result and re-fetch without
+                # the skip flag so the server handles everything.
+                json_body_full = {"api_key": api_key}
+                if params:
+                    json_body_full = {**json_body_full, **params}
+                resp2 = _get_requests_session().post(
+                    f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+                    headers={"X-API-KEY": api_key},
+                    json=json_body_full,
+                )
+                if resp2.status_code == 200:
+                    return resp2.json()
+                # If the second call fails, fall through and return the
+                # (imperfect) raw result rather than erroring out.
+            else:
+                _save_prompt_to_cache(cache_key, result, cache_ttl_seconds)
+                if should_render:
+                    _render_prompt_template_variables(result, input_variables)
 
         return result
 
     except requests.exceptions.ConnectionError as e:
-        # API unreachable - try expired cache as fallback
         if cache_key:
             fallback = _get_expired_prompt_fallback(cache_key)
             if fallback:
                 logger.warning(f"API unreachable, serving expired cached prompt template for '{prompt_name}'")
+                if should_render and not _has_placeholder_messages(fallback):
+                    _render_prompt_template_variables(fallback, input_variables)
                 return fallback
 
-        # No fallback available, proceed with original error handling
         err_msg = f"PromptLayer had the following error while getting your prompt template: {e}"
         if throw_on_error:
             raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
@@ -1790,14 +1921,14 @@ def get_prompt_template(
         return None
 
     except requests.exceptions.Timeout as e:
-        # Timeout - try expired cache as fallback
         if cache_key:
             fallback = _get_expired_prompt_fallback(cache_key)
             if fallback:
                 logger.warning("API timeout, serving expired cached prompt template for '%s'", prompt_name)
+                if should_render and not _has_placeholder_messages(fallback):
+                    _render_prompt_template_variables(fallback, input_variables)
                 return fallback
 
-        # No fallback available, proceed with original error handling
         err_msg = f"PromptLayer had the following error while getting your prompt template: {e}"
         if throw_on_error:
             raise _exceptions.PromptLayerAPITimeoutError(err_msg, response=None, body=None) from e
@@ -1833,7 +1964,8 @@ async def aget_prompt_template(
         params: Optional API parameters (version, label, provider, input_variables, metadata_filters)
         cache_ttl_seconds: Cache TTL in seconds. None or 0 disables caching.
             Expired entries are served as fallback when the API is unreachable.
-            Cache is bypassed when metadata_filters or provider is specified in params.
+            Cache is bypassed when metadata_filters is specified in params.
+            When caching with a provider, input variables are rendered client-side.
 
     Returns:
         Prompt template response dict
@@ -1843,23 +1975,29 @@ async def aget_prompt_template(
     label = params.get("label")
     metadata_filters = params.get("metadata_filters")
     provider = params.get("provider")
+    input_variables = params.get("input_variables")
 
     should_use_cache = (
-        metadata_filters is None and provider is None and cache_ttl_seconds is not None and cache_ttl_seconds > 0
+        metadata_filters is None and cache_ttl_seconds is not None and cache_ttl_seconds > 0
     )
+    should_render = should_use_cache and provider is not None
 
     cache_key = None
     if should_use_cache:
-        cache_key = _create_prompt_cache_key(prompt_name, version, label)
+        cache_key = _create_prompt_cache_key(prompt_name, version, label, provider)
 
         cached_template = _get_prompt_from_cache(cache_key, cache_ttl_seconds)
-        if cached_template:
+        can_serve_from_cache = cached_template and not (should_render and _has_placeholder_messages(cached_template))
+        if can_serve_from_cache:
+            if should_render:
+                _render_prompt_template_variables(cached_template, input_variables)
             return cached_template
 
     try:
         json_body = {"api_key": api_key}
         if params:
             json_body.update(params)
+        json_body["skip_input_variable_rendering"] = should_use_cache
         async with _make_httpx_client() as client:
             response = await client.post(
                 f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
@@ -1881,21 +2019,35 @@ async def aget_prompt_template(
 
         result = response.json()
 
-        # Save to cache if applicable
         if should_use_cache and cache_key:
-            _save_prompt_to_cache(cache_key, result, cache_ttl_seconds)
+            if should_render and _has_placeholder_messages(result):
+                json_body_full = {"api_key": api_key}
+                if params:
+                    json_body_full.update(params)
+                async with _make_httpx_client() as client2:
+                    resp2 = await client2.post(
+                        f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+                        headers={"X-API-KEY": api_key},
+                        json=json_body_full,
+                    )
+                    if resp2.status_code == 200:
+                        return resp2.json()
+            else:
+                _save_prompt_to_cache(cache_key, result, cache_ttl_seconds)
+                if should_render:
+                    _render_prompt_template_variables(result, input_variables)
 
         return result
 
     except (httpx.ConnectError, httpx.NetworkError) as e:
-        # API unreachable - try expired cache as fallback
         if cache_key:
             fallback = _get_expired_prompt_fallback(cache_key)
             if fallback:
                 logger.warning("API unreachable, serving expired cached prompt template for '%s'", prompt_name)
+                if should_render and not _has_placeholder_messages(fallback):
+                    _render_prompt_template_variables(fallback, input_variables)
                 return fallback
 
-        # No fallback available, proceed with original error handling
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
             raise _exceptions.PromptLayerAPIConnectionError(err_msg, response=None, body=None) from e
@@ -1903,14 +2055,14 @@ async def aget_prompt_template(
         return None
 
     except httpx.TimeoutException as e:
-        # Timeout - try expired cache as fallback
         if cache_key:
             fallback = _get_expired_prompt_fallback(cache_key)
             if fallback:
                 logger.warning("API timeout, serving expired cached prompt template for '%s'", prompt_name)
+                if should_render and not _has_placeholder_messages(fallback):
+                    _render_prompt_template_variables(fallback, input_variables)
                 return fallback
 
-        # No fallback available, proceed with original error handling
         err_msg = f"PromptLayer had the following error while getting your prompt template: {str(e)}"
         if throw_on_error:
             raise _exceptions.PromptLayerAPITimeoutError(err_msg, response=None, body=None) from e

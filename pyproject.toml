@@ -23,6 +23,7 @@ nest-asyncio = "^1.6.0"
 centrifuge-python = "^0.4.1"
 tenacity = "^9.1.2"
 cachetools = "^5.0.0"
+jinja2 = "^3.0"
 openai-agents = {version = "^0.3.3", optional = true}
 claude-agent-sdk = {version = ">=0.1.45,<1.0.0", optional = true, python = ">=3.10,<4.0"}
 opentelemetry-exporter-otlp-proto-http = {version = "^1.26.0", optional = true}

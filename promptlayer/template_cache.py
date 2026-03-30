@@ -54,7 +54,7 @@ class PromptTemplateCache:
 
     def put(self, key: CacheKey, response: dict):
         with self._lock:
-            self._entries[key] = _CacheEntry(response, time.monotonic())
+            self._entries[key] = _CacheEntry(copy.deepcopy(response), time.monotonic())
 
 
 # ── public helpers used by TemplateManager ──────────────────────────
@@ -159,6 +159,7 @@ def _render_text(text: str, template_format: str, variables: dict) -> str:
     except ImportError:
         raise
     except Exception:
+        logger.debug("Failed to render template text, returning original", exc_info=True)
         return text
 
 

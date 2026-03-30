@@ -7,6 +7,7 @@ class GetPromptTemplate(TypedDict, total=False):
     version: int
     label: str
     provider: str
+    model: str
     input_variables: Dict[str, Any]
     metadata_filters: Dict[str, str]
     skip_input_variable_rendering: bool

@@ -258,46 +258,76 @@ def _render_content_field(value, template_format: str, variables: dict):
     return value
 
 
+def _render_parts(parts, fmt: str, variables: dict):
+    """Render text in a list of Google-style ``parts`` dicts (in-place)."""
+    for part in parts:
+        if isinstance(part, dict) and "text" in part and isinstance(part["text"], str):
+            part["text"] = _render_text(part["text"], fmt, variables)
+
+
+def _find_system_instruction(llm_kwargs: dict):
+    """Return the Google ``system_instruction`` value regardless of nesting.
+
+    Google mappers may place it at the top level or inside
+    ``generation_config``.
+    """
+    si = llm_kwargs.get("system_instruction")
+    if si is not None:
+        return si
+    gc = llm_kwargs.get("generation_config")
+    if isinstance(gc, dict):
+        return gc.get("system_instruction")
+    return None
+
+
 def _render_llm_kwargs(llm_kwargs: dict, message_formats: List[str], variables: dict):
     """Render input variables in ``llm_kwargs`` text content (in-place).
 
     Handles the message/content structures of all major providers
     (OpenAI, Anthropic, Google, Bedrock, Mistral).
+
+    A single ``fmt`` derived from the first prompt-template message is
+    used for every field.  Per-message format alignment is intentionally
+    avoided because providers like Anthropic and Bedrock extract system
+    messages into a separate top-level key, which shifts positional
+    indices and makes per-index lookup incorrect.  In practice all
+    messages in a template share the same format.
     """
-    default_fmt = message_formats[0] if message_formats else "f-string"
+    fmt = message_formats[0] if message_formats else "f-string"
 
     # Messages — OpenAI Chat Completions / Anthropic / Mistral / Bedrock
-    for i, msg in enumerate(llm_kwargs.get("messages", [])):
-        fmt = message_formats[i] if i < len(message_formats) else default_fmt
+    for msg in llm_kwargs.get("messages", []):
         if "content" in msg:
             msg["content"] = _render_content_field(msg["content"], fmt, variables)
 
     # Input — OpenAI Responses API
-    for i, msg in enumerate(llm_kwargs.get("input", [])):
+    for msg in llm_kwargs.get("input", []):
         if not isinstance(msg, dict):
             continue
-        fmt = message_formats[i] if i < len(message_formats) else default_fmt
         if "content" in msg:
             msg["content"] = _render_content_field(msg["content"], fmt, variables)
 
     # Top-level system — Anthropic / Bedrock
     if "system" in llm_kwargs:
-        llm_kwargs["system"] = _render_content_field(llm_kwargs["system"], default_fmt, variables)
+        llm_kwargs["system"] = _render_content_field(llm_kwargs["system"], fmt, variables)
 
-    # Contents — Google
+    # Contents — Google (completion)
     for item in llm_kwargs.get("contents", []):
         if isinstance(item, dict):
-            for part in item.get("parts", []):
-                if isinstance(part, dict) and "text" in part and isinstance(part["text"], str):
-                    part["text"] = _render_text(part["text"], default_fmt, variables)
+            _render_parts(item.get("parts", []), fmt, variables)
 
-    # System instruction — Google
-    si = llm_kwargs.get("system_instruction")
+    # History — Google (chat)
+    for item in llm_kwargs.get("history", []):
+        if isinstance(item, dict):
+            _render_parts(item.get("parts", []), fmt, variables)
+
+    # System instruction — Google (top-level or inside generation_config)
+    si = _find_system_instruction(llm_kwargs)
     if isinstance(si, dict):
-        for part in si.get("parts", []):
-            if isinstance(part, dict) and "text" in part and isinstance(part["text"], str):
-                part["text"] = _render_text(part["text"], default_fmt, variables)
+        _render_parts(si.get("parts", []), fmt, variables)
+    elif isinstance(si, list):
+        _render_parts(si, fmt, variables)
 
     # Prompt field — completion-type models
     if isinstance(llm_kwargs.get("prompt"), str):
-        llm_kwargs["prompt"] = _render_text(llm_kwargs["prompt"], default_fmt, variables)
+        llm_kwargs["prompt"] = _render_text(llm_kwargs["prompt"], fmt, variables)

@@ -1,6 +1,7 @@
 import logging
 from typing import Union
 
+from promptlayer import exceptions as _exceptions
 from promptlayer.span_exporter import set_prompt_span_attributes
 from promptlayer.template_cache import (
     PromptTemplateCache,
@@ -20,6 +21,12 @@ from promptlayer.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+_TRANSIENT_ERRORS = (
+    _exceptions.PromptLayerInternalServerError,
+    _exceptions.PromptLayerAPIConnectionError,
+    _exceptions.PromptLayerAPITimeoutError,
+)
 
 
 def _extract_label(params):
@@ -57,8 +64,10 @@ class TemplateManager:
         input_variables = params.get("input_variables") if params else None
         label = _extract_label(params)
 
-        # List-typed values signal placeholder / tool-variable usage — skip cache
         if has_list_input_variables(params):
+            return self._fetch_normal(prompt_name, params)
+
+        if self._cache.is_non_renderable(cache_key):
             return self._fetch_normal(prompt_name, params)
 
         cached, is_fresh = self._cache.get(cache_key)
@@ -72,26 +81,26 @@ class TemplateManager:
 
         cache_params = make_cache_params(params)
         try:
-            api_result = get_prompt_template(
-                self.api_key, self.base_url, self.throw_on_error, prompt_name, cache_params
-            )
-        except Exception:
+            api_result = get_prompt_template(self.api_key, self.base_url, True, prompt_name, cache_params)
+        except _TRANSIENT_ERRORS:
             if stale is not None:
-                logger.debug("API fetch failed, serving stale cache for '%s'", prompt_name)
+                logger.debug("Transient API error, serving stale cache for '%s'", prompt_name)
                 result = render_response(stale, input_variables)
                 set_prompt_span_attributes(result, prompt_name, label=label)
                 return result
+            if not self.throw_on_error:
+                return None
+            raise
+        except _exceptions.PromptLayerError:
+            if not self.throw_on_error:
+                return None
             raise
 
         if api_result is None:
-            if stale is not None:
-                logger.debug("API returned None, serving stale cache for '%s'", prompt_name)
-                result = render_response(stale, input_variables)
-                set_prompt_span_attributes(result, prompt_name, label=label)
-                return result
             return None
 
         if not is_locally_renderable(api_result):
+            self._cache.mark_non_renderable(cache_key)
             return self._fetch_normal(prompt_name, params)
 
         self._cache.put(cache_key, api_result)
@@ -138,6 +147,9 @@ class AsyncTemplateManager:
         if has_list_input_variables(params):
             return await self._afetch_normal(prompt_name, params)
 
+        if self._cache.is_non_renderable(cache_key):
+            return await self._afetch_normal(prompt_name, params)
+
         cached, is_fresh = self._cache.get(cache_key)
 
         if cached is not None and is_fresh:
@@ -149,26 +161,26 @@ class AsyncTemplateManager:
 
         cache_params = make_cache_params(params)
         try:
-            api_result = await aget_prompt_template(
-                self.api_key, self.base_url, self.throw_on_error, prompt_name, cache_params
-            )
-        except Exception:
+            api_result = await aget_prompt_template(self.api_key, self.base_url, True, prompt_name, cache_params)
+        except _TRANSIENT_ERRORS:
             if stale is not None:
-                logger.debug("API fetch failed, serving stale cache for '%s'", prompt_name)
+                logger.debug("Transient API error, serving stale cache for '%s'", prompt_name)
                 result = render_response(stale, input_variables)
                 set_prompt_span_attributes(result, prompt_name, label=label)
                 return result
+            if not self.throw_on_error:
+                return None
+            raise
+        except _exceptions.PromptLayerError:
+            if not self.throw_on_error:
+                return None
             raise
 
         if api_result is None:
-            if stale is not None:
-                logger.debug("API returned None, serving stale cache for '%s'", prompt_name)
-                result = render_response(stale, input_variables)
-                set_prompt_span_attributes(result, prompt_name, label=label)
-                return result
             return None
 
         if not is_locally_renderable(api_result):
+            self._cache.mark_non_renderable(cache_key)
             return await self._afetch_normal(prompt_name, params)
 
         self._cache.put(cache_key, api_result)

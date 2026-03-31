@@ -3,11 +3,17 @@ import logging
 import threading
 import time
 from string import Formatter
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+import jinja2
+from jinja2.sandbox import SandboxedEnvironment
 
 logger = logging.getLogger(__name__)
 
 CacheKey = Tuple[str, Optional[int], Optional[str], Optional[str], Optional[str]]
+
+_NON_RENDERABLE_TTL = 60
+_MAX_ENTRIES = 1000
 
 
 class _CacheEntry:
@@ -26,9 +32,11 @@ class PromptTemplateCache:
     the stale entry is still usable as a stability fallback.
     """
 
-    def __init__(self, ttl_seconds: int):
+    def __init__(self, ttl_seconds: int, max_size: int = _MAX_ENTRIES):
         self.ttl_seconds = ttl_seconds
+        self.max_size = max_size
         self._entries: Dict[CacheKey, _CacheEntry] = {}
+        self._non_renderable: Dict[CacheKey, float] = {}
         self._lock = threading.Lock()
 
     @staticmethod
@@ -44,17 +52,50 @@ class PromptTemplateCache:
         )
 
     def get(self, key: CacheKey) -> Tuple[Optional[dict], bool]:
-        """Return (cached_response | None, is_fresh)."""
+        """Return (cached_response | None, is_fresh).
+
+        The returned response is a deep copy safe to mutate.
+        """
         with self._lock:
             entry = self._entries.get(key)
             if entry is None:
                 return None, False
             is_fresh = (time.monotonic() - entry.timestamp) < self.ttl_seconds
-            return entry.response, is_fresh
+            return copy.deepcopy(entry.response), is_fresh
 
     def put(self, key: CacheKey, response: dict):
         with self._lock:
+            if len(self._entries) >= self.max_size and key not in self._entries:
+                self._evict_oldest_entry()
             self._entries[key] = _CacheEntry(copy.deepcopy(response), time.monotonic())
+
+    def is_non_renderable(self, key: CacheKey) -> bool:
+        with self._lock:
+            ts = self._non_renderable.get(key)
+            if ts is None:
+                return False
+            if (time.monotonic() - ts) >= _NON_RENDERABLE_TTL:
+                del self._non_renderable[key]
+                return False
+            return True
+
+    def mark_non_renderable(self, key: CacheKey):
+        with self._lock:
+            if len(self._non_renderable) >= _MAX_ENTRIES and key not in self._non_renderable:
+                self._evict_oldest_non_renderable()
+            self._non_renderable[key] = time.monotonic()
+
+    def _evict_oldest_entry(self):
+        if not self._entries:
+            return
+        oldest_key = min(self._entries, key=lambda k: self._entries[k].timestamp)
+        del self._entries[oldest_key]
+
+    def _evict_oldest_non_renderable(self):
+        if not self._non_renderable:
+            return
+        oldest_key = min(self._non_renderable, key=self._non_renderable.get)
+        del self._non_renderable[oldest_key]
 
 
 # ── public helpers used by TemplateManager ──────────────────────────
@@ -115,40 +156,40 @@ def make_cache_params(params: Optional[dict]) -> dict:
 
 
 def render_response(response: dict, input_variables: Optional[Dict[str, Any]] = None) -> dict:
-    """Deep-copy a cached (unrendered) response and substitute input variables."""
-    result = copy.deepcopy(response)
+    """Render input variables in a response dict.
 
-    # When llm_kwargs is present the server would always render (even with empty
-    # variables), so we must do the same to match the output contract.
-    has_llm_kwargs = result.get("llm_kwargs") is not None
+    Mutates *response* in-place and returns it.  Callers that need to
+    preserve the original must pass a copy (e.g. the one returned by
+    ``PromptTemplateCache.get``).
+    """
+    has_llm_kwargs = response.get("llm_kwargs") is not None
     if has_llm_kwargs:
         variables = input_variables if input_variables else {}
     else:
         if not input_variables:
-            return result
+            return response
         variables = input_variables
 
-    pt = result.get("prompt_template")
+    pt = response.get("prompt_template")
     if pt:
         _render_prompt_template(pt, variables)
-        template_format = _get_template_format(pt)
-        if result.get("llm_kwargs"):
-            _render_llm_kwargs(result["llm_kwargs"], template_format, variables)
+        message_formats = _get_message_formats(pt)
+        if response.get("llm_kwargs"):
+            _render_llm_kwargs(response["llm_kwargs"], message_formats, variables)
 
-    return result
+    return response
 
 
 # ── internal rendering helpers ──────────────────────────────────────
 
 
-def _get_template_format(prompt_template: dict) -> str:
+def _get_message_formats(prompt_template: dict) -> List[str]:
+    """Extract template_format from each message in the prompt template."""
     if prompt_template.get("type") == "chat":
-        msgs = prompt_template.get("messages", [])
-        if msgs:
-            return msgs[0].get("template_format", "f-string")
+        return [msg.get("template_format", "f-string") for msg in prompt_template.get("messages", [])]
     elif prompt_template.get("type") == "completion":
-        return prompt_template.get("template_format", "f-string")
-    return "f-string"
+        return [prompt_template.get("template_format", "f-string")]
+    return ["f-string"]
 
 
 def _render_text(text: str, template_format: str, variables: dict) -> str:
@@ -156,8 +197,6 @@ def _render_text(text: str, template_format: str, variables: dict) -> str:
         if template_format == "jinja2":
             return _jinja2_render(text, variables)
         return _fstring_render(text, variables)
-    except ImportError:
-        raise
     except Exception:
         logger.debug("Failed to render template text, returning original", exc_info=True)
         return text
@@ -178,13 +217,6 @@ def _fstring_render(template: str, variables: dict) -> str:
 
 def _jinja2_render(template: str, variables: dict) -> str:
     """Match server-side ``jinja2_formatter`` behaviour (no-warnings path)."""
-    try:
-        import jinja2
-        from jinja2.sandbox import SandboxedEnvironment
-    except ImportError:
-        raise ImportError(
-            "jinja2 is required for local rendering of jinja2 prompt templates. Install it with:  pip install jinja2"
-        )
     env = SandboxedEnvironment(undefined=jinja2.ChainableUndefined)
     return env.from_string(template).render(**variables)
 
@@ -223,35 +255,38 @@ def _render_content_field(value, template_format: str, variables: dict):
     return value
 
 
-def _render_llm_kwargs(llm_kwargs: dict, template_format: str, variables: dict):
+def _render_llm_kwargs(llm_kwargs: dict, message_formats: List[str], variables: dict):
     """Render input variables in ``llm_kwargs`` text content (in-place).
 
     Handles the message/content structures of all major providers
     (OpenAI, Anthropic, Google, Bedrock, Mistral).
     """
+    default_fmt = message_formats[0] if message_formats else "f-string"
+
     # Messages — OpenAI / Anthropic / Mistral / Bedrock
-    for msg in llm_kwargs.get("messages", []):
+    for i, msg in enumerate(llm_kwargs.get("messages", [])):
+        fmt = message_formats[i] if i < len(message_formats) else default_fmt
         if "content" in msg:
-            msg["content"] = _render_content_field(msg["content"], template_format, variables)
+            msg["content"] = _render_content_field(msg["content"], fmt, variables)
 
     # Top-level system — Anthropic / Bedrock
     if "system" in llm_kwargs:
-        llm_kwargs["system"] = _render_content_field(llm_kwargs["system"], template_format, variables)
+        llm_kwargs["system"] = _render_content_field(llm_kwargs["system"], default_fmt, variables)
 
     # Contents — Google
     for item in llm_kwargs.get("contents", []):
         if isinstance(item, dict):
             for part in item.get("parts", []):
                 if isinstance(part, dict) and "text" in part and isinstance(part["text"], str):
-                    part["text"] = _render_text(part["text"], template_format, variables)
+                    part["text"] = _render_text(part["text"], default_fmt, variables)
 
     # System instruction — Google
     si = llm_kwargs.get("system_instruction")
     if isinstance(si, dict):
         for part in si.get("parts", []):
             if isinstance(part, dict) and "text" in part and isinstance(part["text"], str):
-                part["text"] = _render_text(part["text"], template_format, variables)
+                part["text"] = _render_text(part["text"], default_fmt, variables)
 
     # Prompt field — completion-type models
     if isinstance(llm_kwargs.get("prompt"), str):
-        llm_kwargs["prompt"] = _render_text(llm_kwargs["prompt"], template_format, variables)
+        llm_kwargs["prompt"] = _render_text(llm_kwargs["prompt"], default_fmt, variables)

@@ -109,7 +109,12 @@ class TemplateManager:
         return result
 
     def publish(self, body: PublishPromptTemplate):
-        return publish_prompt_template(self.api_key, self.base_url, self.throw_on_error, body)
+        result = publish_prompt_template(self.api_key, self.base_url, self.throw_on_error, body)
+        if self._cache and result:
+            prompt_name = body.get("prompt_name") if isinstance(body, dict) else getattr(body, "prompt_name", None)
+            if prompt_name:
+                self._cache.invalidate(prompt_name)
+        return result
 
     def all(self, page: int = 1, per_page: int = 30, label: str = None):
         return get_all_prompt_templates(self.api_key, self.base_url, self.throw_on_error, page, per_page, label)

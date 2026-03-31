@@ -85,6 +85,22 @@ class PromptTemplateCache:
                 self._evict_oldest_non_renderable()
             self._non_renderable[key] = time.monotonic()
 
+    def clear(self):
+        """Remove all cached entries and non-renderable markers."""
+        with self._lock:
+            self._entries.clear()
+            self._non_renderable.clear()
+
+    def invalidate(self, prompt_name: str):
+        """Remove all entries whose cache key starts with *prompt_name*."""
+        with self._lock:
+            keys_to_remove = [k for k in self._entries if k[0] == prompt_name]
+            for k in keys_to_remove:
+                del self._entries[k]
+            nr_to_remove = [k for k in self._non_renderable if k[0] == prompt_name]
+            for k in nr_to_remove:
+                del self._non_renderable[k]
+
     def _evict_oldest_entry(self):
         if not self._entries:
             return
@@ -215,10 +231,12 @@ def _fstring_render(template: str, variables: dict) -> str:
     return template.format(**resolved)
 
 
+_JINJA2_ENV = SandboxedEnvironment(undefined=jinja2.ChainableUndefined)
+
+
 def _jinja2_render(template: str, variables: dict) -> str:
     """Match server-side ``jinja2_formatter`` behaviour (no-warnings path)."""
-    env = SandboxedEnvironment(undefined=jinja2.ChainableUndefined)
-    return env.from_string(template).render(**variables)
+    return _JINJA2_ENV.from_string(template).render(**variables)
 
 
 # ── prompt_template rendering ───────────────────────────────────────

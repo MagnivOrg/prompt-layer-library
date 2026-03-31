@@ -408,9 +408,6 @@ class BasePromptTemplateResponse(TypedDict, total=False):
     provider_base_url: ProviderBaseURL
 
 
-a: BasePromptTemplateResponse = {"provider_base_url": {"url": ""}}
-
-
 class PublishPromptTemplateResponse(BasePromptTemplateResponse):
     pass
 

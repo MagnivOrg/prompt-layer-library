@@ -242,6 +242,9 @@ def _render_prompt_template(prompt_template: dict, variables: dict):
 # ── llm_kwargs rendering (provider-agnostic) ────────────────────────
 
 
+_TEXT_CONTENT_TYPES = {"text", "input_text"}
+
+
 def _render_content_field(value, template_format: str, variables: dict):
     """Render template variables in a content value (string *or* list of blocks)."""
     if isinstance(value, str):
@@ -249,7 +252,7 @@ def _render_content_field(value, template_format: str, variables: dict):
     if isinstance(value, list):
         for item in value:
             if isinstance(item, dict) and "text" in item and isinstance(item["text"], str):
-                if item.get("type", "text") == "text":
+                if item.get("type", "text") in _TEXT_CONTENT_TYPES:
                     item["text"] = _render_text(item["text"], template_format, variables)
         return value
     return value
@@ -263,8 +266,16 @@ def _render_llm_kwargs(llm_kwargs: dict, message_formats: List[str], variables: 
     """
     default_fmt = message_formats[0] if message_formats else "f-string"
 
-    # Messages — OpenAI / Anthropic / Mistral / Bedrock
+    # Messages — OpenAI Chat Completions / Anthropic / Mistral / Bedrock
     for i, msg in enumerate(llm_kwargs.get("messages", [])):
+        fmt = message_formats[i] if i < len(message_formats) else default_fmt
+        if "content" in msg:
+            msg["content"] = _render_content_field(msg["content"], fmt, variables)
+
+    # Input — OpenAI Responses API
+    for i, msg in enumerate(llm_kwargs.get("input", [])):
+        if not isinstance(msg, dict):
+            continue
         fmt = message_formats[i] if i < len(message_formats) else default_fmt
         if "content" in msg:
             msg["content"] = _render_content_field(msg["content"], fmt, variables)

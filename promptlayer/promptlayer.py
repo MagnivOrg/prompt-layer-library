@@ -11,6 +11,7 @@ from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
 from promptlayer.streaming import astream_response, stream_response
+from promptlayer.template_cache import PromptTemplateCache
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
 from promptlayer.track import AsyncTrackManager, TrackManager
 from promptlayer.track.error_tracking import categorize_error
@@ -60,6 +61,7 @@ class PromptLayer(PromptLayerMixin):
         enable_tracing: bool = False,
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
+        cache_ttl_seconds: int = 0,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -73,7 +75,8 @@ class PromptLayer(PromptLayerMixin):
         self.base_url = get_base_url(base_url)
         self.api_key = api_key
         self.throw_on_error = throw_on_error
-        self.templates = TemplateManager(api_key, self.base_url, self.throw_on_error)
+        cache = PromptTemplateCache(cache_ttl_seconds) if cache_ttl_seconds else None
+        self.templates = TemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
         self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing
@@ -440,6 +443,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         enable_tracing: bool = False,
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
+        cache_ttl_seconds: int = 0,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -453,7 +457,8 @@ class AsyncPromptLayer(PromptLayerMixin):
         self.base_url = get_base_url(base_url)
         self.api_key = api_key
         self.throw_on_error = throw_on_error
-        self.templates = AsyncTemplateManager(api_key, self.base_url, self.throw_on_error)
+        cache = PromptTemplateCache(cache_ttl_seconds) if cache_ttl_seconds else None
+        self.templates = AsyncTemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
         self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing

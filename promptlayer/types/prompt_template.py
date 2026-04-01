@@ -7,8 +7,10 @@ class GetPromptTemplate(TypedDict, total=False):
     version: int
     label: str
     provider: str
+    model: str
     input_variables: Dict[str, Any]
     metadata_filters: Dict[str, str]
+    skip_input_variable_rendering: bool
 
 
 TemplateFormat = Literal["f-string", "jinja2"]
@@ -404,9 +406,6 @@ class BasePromptTemplateResponse(TypedDict, total=False):
     commit_message: str
     metadata: Metadata
     provider_base_url: ProviderBaseURL
-
-
-a: BasePromptTemplateResponse = {"provider_base_url": {"url": ""}}
 
 
 class PublishPromptTemplateResponse(BasePromptTemplateResponse):

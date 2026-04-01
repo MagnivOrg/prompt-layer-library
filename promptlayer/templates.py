@@ -5,7 +5,6 @@ from promptlayer import exceptions as _exceptions
 from promptlayer.span_exporter import set_prompt_span_attributes
 from promptlayer.template_cache import (
     PromptTemplateCache,
-    has_list_input_variables,
     is_locally_renderable,
     make_cache_params,
     render_response,
@@ -63,9 +62,6 @@ class TemplateManager:
         cache_key = self._cache.make_key(prompt_name, params)
         input_variables = params.get("input_variables") if params else None
         label = _extract_label(params)
-
-        if has_list_input_variables(params):
-            return self._fetch_normal(prompt_name, params)
 
         if self._cache.is_non_renderable(cache_key):
             return self._fetch_normal(prompt_name, params)
@@ -148,9 +144,6 @@ class AsyncTemplateManager:
         cache_key = self._cache.make_key(prompt_name, params)
         input_variables = params.get("input_variables") if params else None
         label = _extract_label(params)
-
-        if has_list_input_variables(params):
-            return await self._afetch_normal(prompt_name, params)
 
         if self._cache.is_non_renderable(cache_key):
             return await self._afetch_normal(prompt_name, params)

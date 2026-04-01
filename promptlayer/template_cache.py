@@ -2,6 +2,7 @@ import copy
 import logging
 import threading
 import time
+from functools import lru_cache
 from string import Formatter
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -234,9 +235,14 @@ def _fstring_render(template: str, variables: dict) -> str:
 _JINJA2_ENV = SandboxedEnvironment(undefined=jinja2.ChainableUndefined)
 
 
+@lru_cache(maxsize=512)
+def _compile_jinja2(template: str):
+    return _JINJA2_ENV.from_string(template)
+
+
 def _jinja2_render(template: str, variables: dict) -> str:
     """Match server-side ``jinja2_formatter`` behaviour (no-warnings path)."""
-    return _JINJA2_ENV.from_string(template).render(**variables)
+    return _compile_jinja2(template).render(**variables)
 
 
 # ── prompt_template rendering ───────────────────────────────────────

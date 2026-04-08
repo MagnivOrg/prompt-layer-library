@@ -86,9 +86,7 @@ class SkillManager:
             format=format,
         )
 
-    def create(
-        self, body: CreateSkillCollection, zip: Any = None
-    ) -> Union[CreateSkillCollectionResponse, None]:
+    def create(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
         if zip is None:
             return create_skill_collection(self.api_key, self.base_url, self.throw_on_error, body)
         return create_skill_collection(self.api_key, self.base_url, self.throw_on_error, body, zip=zip)
@@ -182,6 +180,7 @@ class SkillManager:
             response["version"] = version_response["version"]
         return response
 
+
 class AsyncSkillManager:
     def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
         self.api_key = api_key
@@ -206,9 +205,7 @@ class AsyncSkillManager:
             format=format,
         )
 
-    async def create(
-        self, body: CreateSkillCollection, zip: Any = None
-    ) -> Union[CreateSkillCollectionResponse, None]:
+    async def create(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
         if zip is None:
             return await acreate_skill_collection(self.api_key, self.base_url, self.throw_on_error, body)
         return await acreate_skill_collection(self.api_key, self.base_url, self.throw_on_error, body, zip=zip)
@@ -301,4 +298,3 @@ class AsyncSkillManager:
         if version_response:
             response["version"] = version_response["version"]
         return response
-

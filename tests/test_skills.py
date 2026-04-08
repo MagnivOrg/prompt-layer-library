@@ -15,9 +15,7 @@ from promptlayer.skills import (
 )
 
 
-def test_sync_pull_skill_collection_encodes_identifier_and_forwards_params(
-    promptlayer_api_key, base_url
-):
+def test_sync_pull_skill_collection_encodes_identifier_and_forwards_params(promptlayer_api_key, base_url):
     identifier = "folder/skill set"
     expected_encoded = "folder%2Fskill%20set"
     payload = {

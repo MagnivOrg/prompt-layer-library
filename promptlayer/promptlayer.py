@@ -10,6 +10,7 @@ from promptlayer import exceptions as _exceptions
 from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
+from promptlayer.skills import AsyncSkillManager, SkillManager
 from promptlayer.streaming import astream_response, stream_response
 from promptlayer.template_cache import PromptTemplateCache
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
@@ -77,6 +78,7 @@ class PromptLayer(PromptLayerMixin):
         self.throw_on_error = throw_on_error
         cache = PromptTemplateCache(cache_ttl_seconds) if cache_ttl_seconds else None
         self.templates = TemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
+        self.skills = SkillManager(api_key, self.base_url, self.throw_on_error)
         self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing
@@ -459,6 +461,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         self.throw_on_error = throw_on_error
         cache = PromptTemplateCache(cache_ttl_seconds) if cache_ttl_seconds else None
         self.templates = AsyncTemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
+        self.skills = AsyncSkillManager(api_key, self.base_url, self.throw_on_error)
         self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing

@@ -2,7 +2,6 @@ from typing import Dict, List, Literal, Optional, TypedDict, Union
 
 from typing_extensions import Required
 
-
 SkillProvider = Literal["claude_code", "openai", "openclaw"]
 
 

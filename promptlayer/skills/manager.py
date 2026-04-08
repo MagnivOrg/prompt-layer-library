@@ -16,10 +16,13 @@ from promptlayer.types.skill import (
     CreateSkillCollectionResponse,
     PullSkillCollectionResponse,
     SaveSkillCollectionVersion,
+    SkillProvider,
     SkillFileMove,
     SkillFileUpdate,
     UpdateSkillCollectionResponse,
 )
+
+VALID_SKILL_PROVIDERS = ("claude_code", "openai", "openclaw")
 
 
 def _has_version_updates(
@@ -62,6 +65,21 @@ def _build_version_payload(
     return payload
 
 
+def _require_provider_for_publish(body: CreateSkillCollection) -> None:
+    provider = body.get("provider") if isinstance(body, dict) else getattr(body, "provider", None)
+    if not provider:
+        raise _exceptions.PromptLayerValidationError(
+            "Please provide a provider when publishing a skill collection.", response=None, body=None
+        )
+    if provider not in VALID_SKILL_PROVIDERS:
+        raise _exceptions.PromptLayerValidationError(
+            "Please provide a valid provider when publishing a skill collection. "
+            "Supported values are: claude_code, openai, openclaw.",
+            response=None,
+            body=None,
+        )
+
+
 class SkillManager:
     def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
         self.api_key = api_key
@@ -91,6 +109,10 @@ class SkillManager:
             return create_skill_collection(self.api_key, self.base_url, self.throw_on_error, body)
         return create_skill_collection(self.api_key, self.base_url, self.throw_on_error, body, zip=zip)
 
+    def publish(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
+        _require_provider_for_publish(body)
+        return self.create(body, zip=zip)
+
     def update(
         self,
         identifier: str,
@@ -101,7 +123,7 @@ class SkillManager:
         deletes: Optional[List[str]] = None,
         commit_message: Union[str, None] = None,
         release_label: Union[str, None] = None,
-        provider: Union[str, None] = None,
+        provider: Union[SkillProvider, None] = None,
         zip: Any = None,
     ) -> Union[UpdateSkillCollectionResponse, None]:
         rename_requested = name is not None
@@ -210,6 +232,10 @@ class AsyncSkillManager:
             return await acreate_skill_collection(self.api_key, self.base_url, self.throw_on_error, body)
         return await acreate_skill_collection(self.api_key, self.base_url, self.throw_on_error, body, zip=zip)
 
+    async def publish(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
+        _require_provider_for_publish(body)
+        return await self.create(body, zip=zip)
+
     async def update(
         self,
         identifier: str,
@@ -220,7 +246,7 @@ class AsyncSkillManager:
         deletes: Optional[List[str]] = None,
         commit_message: Union[str, None] = None,
         release_label: Union[str, None] = None,
-        provider: Union[str, None] = None,
+        provider: Union[SkillProvider, None] = None,
         zip: Any = None,
     ) -> Union[UpdateSkillCollectionResponse, None]:
         rename_requested = name is not None

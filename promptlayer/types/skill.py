@@ -1,6 +1,9 @@
-from typing import Dict, List, Optional, TypedDict, Union
+from typing import Dict, List, Literal, Optional, TypedDict, Union
 
 from typing_extensions import Required
+
+
+SkillProvider = Literal["claude_code", "openai", "openclaw"]
 
 
 class InitialSkillFileUpdate(TypedDict, total=False):
@@ -21,7 +24,7 @@ class SkillFileMove(TypedDict):
 class CreateSkillCollection(TypedDict, total=False):
     name: Required[str]
     folder_id: int
-    provider: Optional[str]
+    provider: Optional[SkillProvider]
     files: List[InitialSkillFileUpdate]
     commit_message: Optional[str]
 
@@ -32,7 +35,7 @@ class SaveSkillCollectionVersion(TypedDict, total=False):
     deletes: List[str]
     commit_message: Optional[str]
     release_label: Optional[str]
-    provider: Optional[str]
+    provider: Optional[SkillProvider]
 
 
 class UpdateSkillCollection(SaveSkillCollectionVersion, total=False):
@@ -45,7 +48,7 @@ class SkillCollection(TypedDict, total=False):
     folder_id: Optional[int]
     root_path: Required[str]
     name: Required[str]
-    provider: Optional[str]
+    provider: Optional[SkillProvider]
     is_deleted: Required[bool]
     created_by: Optional[int]
     created_at: Required[str]

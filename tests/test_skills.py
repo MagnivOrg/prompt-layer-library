@@ -110,6 +110,35 @@ def test_sync_create_skill_collection_posts_expected_body(promptlayer_api_key, b
         assert response == payload
 
 
+def test_skill_manager_publish_requires_provider(promptlayer_client):
+    with pytest.raises(PromptLayerValidationError, match="provider"):
+        promptlayer_client.skills.publish({"name": "SDK Skills"})
+
+
+def test_skill_manager_publish_rejects_invalid_provider(promptlayer_client):
+    with pytest.raises(PromptLayerValidationError, match="claude_code, openai, openclaw"):
+        promptlayer_client.skills.publish({"name": "SDK Skills", "provider": "anthropic"})
+
+
+def test_skill_manager_publish_delegates_to_create(promptlayer_client):
+    payload = {
+        "success": True,
+        "skill_collection": {"id": "collection-id", "name": "SDK Skills"},
+    }
+    body = {"name": "SDK Skills", "provider": "openai"}
+
+    with patch("promptlayer.skills.manager.create_skill_collection", return_value=payload) as mock_create:
+        response = promptlayer_client.skills.publish(body)
+
+        mock_create.assert_called_once_with(
+            promptlayer_client.api_key,
+            promptlayer_client.base_url,
+            promptlayer_client.throw_on_error,
+            body,
+        )
+        assert response == payload
+
+
 def test_sync_create_skill_collection_supports_zip_upload(promptlayer_api_key, base_url):
     body = {"name": "SDK Skills", "commit_message": "seed from zip"}
     zip_bytes = b"PK\x03\x04demo"
@@ -378,6 +407,38 @@ async def test_async_create_skill_collection_posts_expected_body(promptlayer_api
         call_args = mock_client.post.call_args
         assert call_args[0][0] == f"{base_url}/api/public/v2/skill-collections"
         assert call_args[1]["json"] == body
+        assert response == payload
+
+
+@pytest.mark.asyncio
+async def test_async_skill_manager_publish_requires_provider(promptlayer_async_client):
+    with pytest.raises(PromptLayerValidationError, match="provider"):
+        await promptlayer_async_client.skills.publish({"name": "Async SDK Skills"})
+
+
+@pytest.mark.asyncio
+async def test_async_skill_manager_publish_rejects_invalid_provider(promptlayer_async_client):
+    with pytest.raises(PromptLayerValidationError, match="claude_code, openai, openclaw"):
+        await promptlayer_async_client.skills.publish({"name": "Async SDK Skills", "provider": "anthropic"})
+
+
+@pytest.mark.asyncio
+async def test_async_skill_manager_publish_delegates_to_create(promptlayer_async_client):
+    payload = {
+        "success": True,
+        "skill_collection": {"id": "collection-id", "name": "Async SDK Skills"},
+    }
+    body = {"name": "Async SDK Skills", "provider": "openai"}
+
+    with patch("promptlayer.skills.manager.acreate_skill_collection", return_value=payload) as mock_create:
+        response = await promptlayer_async_client.skills.publish(body)
+
+        mock_create.assert_called_once_with(
+            promptlayer_async_client.api_key,
+            promptlayer_async_client.base_url,
+            promptlayer_async_client.throw_on_error,
+            body,
+        )
         assert response == payload
 
 

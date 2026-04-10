@@ -85,7 +85,7 @@ class PromptLayer(PromptLayerMixin):
         )
         self.track = TrackManager(api_key, self.base_url, self.throw_on_error)
 
-    def invalidate(self, prompt_name: Union[str, None] = None):
+    def invalidate(self, prompt_name: Optional[str] = None) -> None:
         """Invalidate SDK template cache for a prompt or entirely."""
         self.templates.invalidate(prompt_name)
 
@@ -472,7 +472,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         )
         self.track = AsyncTrackManager(api_key, self.base_url, self.throw_on_error)
 
-    def invalidate(self, prompt_name: Union[str, None] = None):
+    def invalidate(self, prompt_name: Optional[str] = None) -> None:
         """Invalidate SDK template cache for a prompt or entirely."""
         self.templates.invalidate(prompt_name)
 

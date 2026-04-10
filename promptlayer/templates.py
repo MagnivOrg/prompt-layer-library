@@ -1,5 +1,5 @@
 import logging
-from typing import Union
+from typing import Optional, Union
 
 from promptlayer import exceptions as _exceptions
 from promptlayer.span_exporter import set_prompt_span_attributes
@@ -112,6 +112,14 @@ class TemplateManager:
                 self._cache.invalidate(prompt_name)
         return result
 
+    def invalidate(self, prompt_name: Optional[str] = None):
+        if not self._cache:
+            return
+        if prompt_name:
+            self._cache.invalidate(prompt_name)
+        else:
+            self._cache.clear()
+
     def all(self, page: int = 1, per_page: int = 30, label: str = None):
         return get_all_prompt_templates(self.api_key, self.base_url, self.throw_on_error, page, per_page, label)
 
@@ -188,3 +196,11 @@ class AsyncTemplateManager:
 
     async def all(self, page: int = 1, per_page: int = 30, label: str = None):
         return await aget_all_prompt_templates(self.api_key, self.base_url, self.throw_on_error, page, per_page, label)
+
+    def invalidate(self, prompt_name: Optional[str] = None):
+        if not self._cache:
+            return
+        if prompt_name:
+            self._cache.invalidate(prompt_name)
+        else:
+            self._cache.clear()

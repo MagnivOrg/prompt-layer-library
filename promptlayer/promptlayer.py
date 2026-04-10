@@ -85,6 +85,10 @@ class PromptLayer(PromptLayerMixin):
         )
         self.track = TrackManager(api_key, self.base_url, self.throw_on_error)
 
+    def invalidate(self, prompt_name: Union[str, None] = None):
+        """Invalidate SDK template cache for a prompt or entirely."""
+        self.templates.invalidate(prompt_name)
+
     def __getattr__(
         self,
         name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]],
@@ -467,6 +471,10 @@ class AsyncPromptLayer(PromptLayerMixin):
             api_key, self.base_url, self.throw_on_error, enable_tracing
         )
         self.track = AsyncTrackManager(api_key, self.base_url, self.throw_on_error)
+
+    def invalidate(self, prompt_name: Union[str, None] = None):
+        """Invalidate SDK template cache for a prompt or entirely."""
+        self.templates.invalidate(prompt_name)
 
     def __getattr__(self, name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]]):
         if name == "openai":

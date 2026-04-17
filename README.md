@@ -20,15 +20,12 @@ This library provides convenient access to the PromptLayer API from applications
 pip install promptlayer
 ```
 
-Optional extras:
+Optional extras [(learn more)](#integration-modules):
 
 ```bash
 pip install "promptlayer[openai-agents]"
 pip install "promptlayer[claude-agents]"
 ```
-
-- `promptlayer[openai-agents]` installs the dependencies required to instrument `openai-agents` runs and export their traces to PromptLayer.
-- `promptlayer[claude-agents]` installs the Claude Agents SDK dependency used by PromptLayer's Claude Agents integration and vendored plugin config helper.
 
 ## Quick Start
 

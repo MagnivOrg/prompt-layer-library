@@ -12,7 +12,9 @@
 
 <div align="left">
 
-The Python SDK lets you fetch and run PromptLayer-managed prompts, execute workflows, log and annotate LLM requests, and instrument supported providers and agent runtimes with PromptLayer tracing.
+This library provides convenient access to the PromptLayer API from applications written in python. 
+
+Fetch and run prompts, execute workflows, log and annotate LLM requests, and instrument supported providers and agent runtimes with PromptLayer tracing.
 
 ## Installation
 

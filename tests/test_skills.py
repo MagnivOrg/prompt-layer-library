@@ -139,6 +139,11 @@ def test_skill_manager_publish_delegates_to_create(promptlayer_client):
         assert response == payload
 
 
+def test_skill_manager_does_not_expose_create_methods(promptlayer_client):
+    assert not hasattr(promptlayer_client.skills, "create")
+    assert not hasattr(promptlayer_client.skills, "_create")
+
+
 def test_sync_create_skill_collection_supports_zip_upload(promptlayer_api_key, base_url):
     body = {"name": "SDK Skills", "commit_message": "seed from zip"}
     zip_bytes = b"PK\x03\x04demo"
@@ -440,6 +445,12 @@ async def test_async_skill_manager_publish_delegates_to_create(promptlayer_async
             body,
         )
         assert response == payload
+
+
+@pytest.mark.asyncio
+async def test_async_skill_manager_does_not_expose_create_methods(promptlayer_async_client):
+    assert not hasattr(promptlayer_async_client.skills, "create")
+    assert not hasattr(promptlayer_async_client.skills, "_create")
 
 
 @pytest.mark.asyncio

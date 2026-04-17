@@ -80,6 +80,22 @@ def _require_provider_for_publish(body: CreateSkillCollection) -> None:
         )
 
 
+def _create_skill_collection_for_publish(
+    api_key: str, base_url: str, throw_on_error: bool, body: CreateSkillCollection, zip: Any = None
+) -> Union[CreateSkillCollectionResponse, None]:
+    if zip is None:
+        return create_skill_collection(api_key, base_url, throw_on_error, body)
+    return create_skill_collection(api_key, base_url, throw_on_error, body, zip=zip)
+
+
+async def _acreate_skill_collection_for_publish(
+    api_key: str, base_url: str, throw_on_error: bool, body: CreateSkillCollection, zip: Any = None
+) -> Union[CreateSkillCollectionResponse, None]:
+    if zip is None:
+        return await acreate_skill_collection(api_key, base_url, throw_on_error, body)
+    return await acreate_skill_collection(api_key, base_url, throw_on_error, body, zip=zip)
+
+
 class SkillManager:
     def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
         self.api_key = api_key
@@ -104,14 +120,9 @@ class SkillManager:
             format=format,
         )
 
-    def create(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
-        if zip is None:
-            return create_skill_collection(self.api_key, self.base_url, self.throw_on_error, body)
-        return create_skill_collection(self.api_key, self.base_url, self.throw_on_error, body, zip=zip)
-
     def publish(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
         _require_provider_for_publish(body)
-        return self.create(body, zip=zip)
+        return _create_skill_collection_for_publish(self.api_key, self.base_url, self.throw_on_error, body, zip=zip)
 
     def update(
         self,
@@ -227,14 +238,11 @@ class AsyncSkillManager:
             format=format,
         )
 
-    async def create(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
-        if zip is None:
-            return await acreate_skill_collection(self.api_key, self.base_url, self.throw_on_error, body)
-        return await acreate_skill_collection(self.api_key, self.base_url, self.throw_on_error, body, zip=zip)
-
     async def publish(self, body: CreateSkillCollection, zip: Any = None) -> Union[CreateSkillCollectionResponse, None]:
         _require_provider_for_publish(body)
-        return await self.create(body, zip=zip)
+        return await _acreate_skill_collection_for_publish(
+            self.api_key, self.base_url, self.throw_on_error, body, zip=zip
+        )
 
     async def update(
         self,

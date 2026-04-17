@@ -83,15 +83,6 @@ asyncio.run(main())
 
 Every method has an async version.
 
-
-`PromptLayer(...)` and `AsyncPromptLayer(...)` accept these parameters:
-
-- `api_key: str | None = None`: Your PromptLayer API key. If omitted, the SDK looks for `PROMPTLAYER_API_KEY`.
-- `enable_tracing: bool = False`: Enables OpenTelemetry tracing export to PromptLayer.
-- `base_url: str | None = None`: Overrides the PromptLayer API base URL. If omitted, the SDK uses `PROMPTLAYER_BASE_URL` or the default API URL.
-- `throw_on_error: bool = True`: Controls whether SDK methods raise PromptLayer exceptions or return `None` for many API errors.
-- `cache_ttl_seconds: int = 0`: Enables in-memory prompt-template caching when greater than `0`.
-
 You can also use the client as a proxy around supported provider SDKs:
 
 ```python
@@ -107,7 +98,19 @@ response = openai.chat.completions.create(
 )
 ```
 
-## Environment Variables
+## Configuration
+
+### Client Options
+
+`PromptLayer(...)` and `AsyncPromptLayer(...)` accept these parameters:
+
+- `api_key: str | None = None`: Your PromptLayer API key. If omitted, the SDK looks for `PROMPTLAYER_API_KEY`.
+- `enable_tracing: bool = False`: Enables OpenTelemetry tracing export to PromptLayer.
+- `base_url: str | None = None`: Overrides the PromptLayer API base URL. If omitted, the SDK uses `PROMPTLAYER_BASE_URL` or the default API URL.
+- `throw_on_error: bool = True`: Controls whether SDK methods raise PromptLayer exceptions or return `None` for many API errors.
+- `cache_ttl_seconds: int = 0`: Enables in-memory prompt-template caching when greater than `0`.
+
+### Environment Variables
 
 The SDK relies on the following environment variables:
 

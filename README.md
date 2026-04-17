@@ -16,8 +16,6 @@ This library provides convenient access to the PromptLayer API from applications
 
 ## Installation
 
-Install the base SDK:
-
 ```bash
 pip install promptlayer
 ```
@@ -111,29 +109,36 @@ The SDK relies on the following environment variables:
 | `PROMPTLAYER_OTLP_TRACES_ENDPOINT` | No | Overrides the OTLP trace endpoint used by the OpenAI Agents tracing integration. |
 | `PROMPTLAYER_TRACEPARENT` | No | Optional trace context passed through the Claude Agents integration. |
 
-## Resources
+## Client Resources
 
-The main resources surfaced by `PromptLayer` and related modules are:
+The main resources surfaced by `PromptLayer` and `AsyncPromptLayer` are:
 
-| Resource | What it does |
+| Resource | Description |
 | --- | --- |
 | `PromptLayer` and `AsyncPromptLayer` | Main sync and async SDK clients. |
-| `pl.templates` | Prompt template retrieval, listing, publishing, and cache invalidation. |
-| `pl.run()` and `pl.run_workflow()` | Helpers for running PromptLayer-managed prompts and workflows. |
-| `pl.log_request()` | Manual request logging. |
-| `pl.track` | Request annotation utilities for metadata, prompt linkage, scores, and groups. |
-| `pl.group` | Group creation for organizing related requests. |
-| `pl.traceable()` | Decorator for creating PromptLayer-exported tracing spans around your own functions. |
-| `promptlayer.integrations.openai_agents` | OpenAI Agents tracing helpers such as `instrument_openai_agents()`. |
-| `promptlayer.integrations.claude_agents` | Claude Agents integration helpers such as `get_claude_config()`. |
-| `pl.skills` | Skill collection pull, create, publish, and update operations. |
-| `pl.openai` and `pl.anthropic` | Provider proxies that wrap those SDKs and log requests to PromptLayer. |
+| `client.templates` | Prompt template retrieval, listing, publishing, and cache invalidation. |
+| `client.run()` and `client.run_workflow()` | Helpers for running PromptLayer-managed prompts and workflows. |
+| `client.log_request()` | Manual request logging. |
+| `client.track` | Request annotation utilities for metadata, prompt linkage, scores, and groups. |
+| `client.group` | Group creation for organizing related requests. |
+| `client.traceable()` | Decorator for creating PromptLayer-exported tracing spans around your own functions. |
+| `client.skills` | Skill collection pull, create, publish, and update operations. |
+| `client.openai` and `client.anthropic` | Provider proxies that wrap those SDKs and log requests to PromptLayer. |
+
+## Integration Modules
+
+The SDK also exposes integration-specific modules that are imported directly rather than accessed through the client:
+
+| Module | Description |
+| --- | --- |
+| `promptlayer.integrations.openai_agents` | OpenAI Agents tracing utilities for instrumenting `openai-agents` runs and exporting their traces to PromptLayer. |
+| `promptlayer.integrations.claude_agents` | Claude Agents configuration utilities for loading the PromptLayer plugin and required environment settings. |
 
 ## Error Handling
 
 The SDK raises `PromptLayerError` as the base exception for SDK failures, with more specific subclasses for common API and validation cases.
 
-| Error type | What it means |
+| Error type | Description |
 | --- | --- |
 | `PromptLayerValidationError` | Invalid input passed to the SDK before or during a request. |
 | `PromptLayerAPIConnectionError` | The SDK could not connect to PromptLayer. |

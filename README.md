@@ -1,119 +1,125 @@
-<div align="center">
+# PromptLayer Python SDK
 
-# 🍰 PromptLayer
+The PromptLayer Python SDK lets you fetch and run PromptLayer-managed prompts, execute workflows, log and annotate LLM requests, and instrument supported providers and agent runtimes with PromptLayer tracing.
 
-**The first platform built for <span style="background-color: rgb(219, 234, 254);">prompt engineers</span>**
+## Installation
 
-<a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.9+-blue?style=for-the-badge&logo=python&logoColor=white"></a>
-<a href="https://docs.promptlayer.com"><img alt="Docs" src="https://custom-icon-badges.herokuapp.com/badge/docs-PL-green.svg?logo=cake&style=for-the-badge"></a>
-<a href="https://www.loom.com/share/196c42e43acd4a369d75e9a7374a0850"><img alt="Demo with Loom" src="https://img.shields.io/badge/Demo-loom-552586.svg?logo=loom&style=for-the-badge&labelColor=gray"></a>
-
----
-
-<div align="left">
-
-[PromptLayer](https://promptlayer.com/) is the first platform that allows you to track, manage, and share your GPT prompt engineering. PromptLayer acts a middleware between your code and OpenAI’s python library.
-
-PromptLayer records all your OpenAI API requests, allowing you to search and explore request history in the PromptLayer dashboard.
-
-This repo contains the Python wrapper library for PromptLayer.
-
-## Quickstart ⚡
-
-### Install PromptLayer
+Install the base SDK:
 
 ```bash
 pip install promptlayer
 ```
 
-### Installing PromptLayer Locally
-
-Use `pip install .` to install locally.
-
-### Claude Agents Integration
-
-PromptLayer also ships an optional Claude Agents integration that exposes a vendored PromptLayer Claude plugin configuration.
-
-This integration currently supports Linux and macOS. Windows is not supported.
+Optional extras:
 
 ```bash
+pip install "promptlayer[openai-agents]"
 pip install "promptlayer[claude-agents]"
 ```
 
-```python
-from claude_agent_sdk import ClaudeAgentOptions
-from promptlayer.integrations.claude_agents import get_claude_config
+- `promptlayer[openai-agents]` installs the dependencies required to instrument `openai-agents` runs and export their traces to PromptLayer.
+- `promptlayer[claude-agents]` installs the Claude Agents SDK dependency used by PromptLayer's Claude Agents integration and vendored plugin config helper.
 
-pl_claude_config = get_claude_config()
+## Quick Start
 
-options = ClaudeAgentOptions(
-  model="sonnet",
-  cwd=".",
-  plugins=[pl_claude_config.plugin],
-  env={**pl_claude_config.env},
-)
-```
-
-### Using PromptLayer
-
-To get started, create an account by clicking “*Log in*” on [PromptLayer](https://promptlayer.com/). Once logged in, click the button to create an API key and save this in a secure location ([Guide to Using Env Vars](https://towardsdatascience.com/the-quick-guide-to-using-environment-variables-in-python-d4ec9291619e)).
-
-Once you have that all set up, [install PromptLayer using](https://pypi.org/project/promptlayer/) `pip`.
-
-In the Python file where you use OpenAI APIs, add the following. This allows us to keep track of your requests without needing any other code changes.
+Create a client and fetch a prompt template from PromptLayer:
 
 ```python
 from promptlayer import PromptLayer
 
-promptlayer = PromptLayer(api_key="<YOUR PromptLayer API KEY pl_xxxxxx>")
-openai = promptlayer.openai
+pl = PromptLayer(api_key="pl_xxxxx")
+
+prompt = pl.templates.get(
+    "support-reply",
+    {
+        "input_variables": {
+            "customer_name": "Ada",
+            "question": "How do I reset my password?",
+        }
+    },
+)
+
+print(prompt["prompt_template"])
 ```
 
-**You can then use `openai` as you would if you had imported it directly.**
-
-<aside>
-💡 Your OpenAI API Key is **never** sent to our servers. All OpenAI requests are made locally from your machine, PromptLayer just logs the request.
-</aside>
-
-### Adding PromptLayer tags: `pl_tags`
-
-PromptLayer allows you to add tags through the `pl_tags` argument. This allows you to track and group requests in the dashboard.
-
-*Tags are not required but we recommend them!*
+Async version:
 
 ```python
-openai.Completion.create(
-  engine="text-ada-001",
-  prompt="My name is",
-  pl_tags=["name-guessing", "pipeline-2"]
+import asyncio
+
+from promptlayer import AsyncPromptLayer
+
+
+async def main():
+    pl = AsyncPromptLayer(api_key="pl_xxxxx")
+
+    prompt = await pl.templates.get(
+        "support-reply",
+        {
+            "input_variables": {
+                "customer_name": "Ada",
+                "question": "How do I reset my password?",
+            }
+        },
+    )
+
+    print(prompt["prompt_template"])
+
+
+asyncio.run(main())
+```
+
+Every method has an async version.
+
+You can also use the client as a proxy around supported provider SDKs:
+
+```python
+from promptlayer import PromptLayer
+
+pl = PromptLayer(api_key="pl_xxxxx")
+openai = pl.openai
+
+response = openai.chat.completions.create(
+    model="gpt-4.1-mini",
+    messages=[{"role": "user", "content": "Say hello in one short sentence."}],
+    pl_tags=["proxy-example"],
 )
 ```
 
-After making your first few requests, you should be able to see them in the PromptLayer dashboard!
+## Environment Variables
 
-## Using the REST API
+The SDK relies on the following environment variables:
 
-This Python library is a wrapper over PromptLayer's REST API. If you use another language, like Javascript, just interact directly with the API.
+| Variable | Required | Description |
+| --- | --- | --- |
+| `PROMPTLAYER_API_KEY` | Yes, unless passed as `api_key=` | API key used to authenticate requests to PromptLayer. |
+| `PROMPTLAYER_BASE_URL` | No | Overrides the PromptLayer API base URL. Defaults to `https://api.promptlayer.com`. |
+| `PROMPTLAYER_OTLP_TRACES_ENDPOINT` | No | Overrides the OTLP trace endpoint used by the OpenAI Agents tracing integration. |
+| `PROMPTLAYER_TRACEPARENT` | No | Optional trace context passed through the Claude Agents integration. |
 
-Here is an example request below:
+## SDK Resources
 
-```python
-import requests
-request_response = requests.post(
-  "https://api.promptlayer.com/track-request",
-  json={
-    "function_name": "openai.Completion.create",
-    "args": [],
-    "kwargs": {"engine": "text-ada-001", "prompt": "My name is"},
-    "tags": ["hello", "world"],
-    "request_response": {"id": "cmpl-6TEeJCRVlqQSQqhD8CYKd1HdCcFxM", "object": "text_completion", "created": 1672425843, "model": "text-ada-001", "choices": [{"text": " advocacy\"\n\nMy name is advocacy.", "index": 0, "logprobs": None, "finish_reason": "stop"}]},
-    "request_start_time": 1673987077.463504,
-    "request_end_time": 1673987077.463504,
-    "api_key": "pl_<YOUR API KEY>",
-  },
-)
-```
+The main resources surfaced by `PromptLayer` and related modules are:
 
-## Contributing
+| Resource | Where | What it does |
+| --- | --- | --- |
+| `pl.openai` | `PromptLayer.openai` | Proxy around the OpenAI Python SDK that logs requests to PromptLayer. |
+| `pl.anthropic` | `PromptLayer.anthropic` | Proxy around the Anthropic Python SDK that logs requests to PromptLayer. |
+| `pl.templates` | `TemplateManager` | Fetches prompt templates, lists templates, publishes templates, and manages local cache invalidation. |
+| `pl.run()` | `PromptLayer.run` | Fetches a PromptLayer-managed prompt, executes it with the configured provider/model, and logs the resulting request. |
+| `pl.run_workflow()` | `PromptLayer.run_workflow` | Runs a PromptLayer workflow by ID or name and returns its outputs. |
+| `pl.log_request()` | `PromptLayer.log_request` | Manually logs a request/response pair to PromptLayer. |
+| `pl.track` | `TrackManager` | Attaches metadata, prompt linkage, score, and group information to an existing PromptLayer request. |
+| `pl.group` | `GroupManager` | Creates PromptLayer groups for organizing related requests. |
+| `pl.skills` | `SkillManager` | Pulls, creates, publishes, and updates PromptLayer skill collections. |
+| `pl.invalidate()` | `PromptLayer.invalidate` | Clears the SDK prompt-template cache for one prompt or all prompts. |
+| `pl.traceable()` | `PromptLayerMixin.traceable` | Decorator for wrapping your own functions in PromptLayer-exported tracing spans. |
+| `instrument_openai_agents()` | `promptlayer.integrations.openai_agents` | Instruments `openai-agents` runs and exports traces to PromptLayer. |
+| `create_openai_agents_tracer_provider()` | `promptlayer.integrations.openai_agents` | Creates an OTLP-backed tracer provider configured for PromptLayer ingestion. |
+| `get_claude_config()` | `promptlayer.integrations.claude_agents` | Returns the vendored PromptLayer Claude Agents plugin config and required environment settings. |
 
-We welcome contributions to our open source project, including new features, infrastructure improvements, and better documentation. For more information or any questions, contact us at [hello@promptlayer.com](mailto:hello@promptlayer.com).
+## Notes
+
+- `PromptLayer` and `AsyncPromptLayer` accept `api_key`, `base_url`, `enable_tracing`, `throw_on_error`, and `cache_ttl_seconds`.
+- When tracing is enabled, spans are exported to PromptLayer using OpenTelemetry.
+- Prompt execution supports PromptLayer-managed configurations for multiple providers, including OpenAI, Anthropic, Azure OpenAI, Google, Mistral, and Bedrock-backed runtimes.

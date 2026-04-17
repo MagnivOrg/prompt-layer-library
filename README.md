@@ -54,7 +54,7 @@ prompt = pl.templates.get(
 print(prompt["prompt_template"])
 ```
 
-Async version:
+Async client:
 
 ```python
 import asyncio
@@ -82,6 +82,15 @@ asyncio.run(main())
 ```
 
 Every method has an async version.
+
+
+`PromptLayer(...)` and `AsyncPromptLayer(...)` accept these parameters:
+
+- `api_key: str | None = None`: Your PromptLayer API key. If omitted, the SDK looks for `PROMPTLAYER_API_KEY`.
+- `enable_tracing: bool = False`: Enables OpenTelemetry tracing export to PromptLayer.
+- `base_url: str | None = None`: Overrides the PromptLayer API base URL. If omitted, the SDK uses `PROMPTLAYER_BASE_URL` or the default API URL.
+- `throw_on_error: bool = True`: Controls whether SDK methods raise PromptLayer exceptions or return `None` for many API errors.
+- `cache_ttl_seconds: int = 0`: Enables in-memory prompt-template caching when greater than `0`.
 
 You can also use the client as a proxy around supported provider SDKs:
 
@@ -115,15 +124,16 @@ The main resources surfaced by `PromptLayer` and `AsyncPromptLayer` are:
 
 | Resource | Description |
 | --- | --- |
-| `PromptLayer` and `AsyncPromptLayer` | Main sync and async SDK clients. |
 | `client.templates` | Prompt template retrieval, listing, publishing, and cache invalidation. |
-| `client.run()` and `client.run_workflow()` | Helpers for running PromptLayer-managed prompts and workflows. |
+| `client.run()` and `client.run_workflow()` | Helpers for running prompts and workflows. |
 | `client.log_request()` | Manual request logging. |
 | `client.track` | Request annotation utilities for metadata, prompt linkage, scores, and groups. |
 | `client.group` | Group creation for organizing related requests. |
-| `client.traceable()` | Decorator for creating PromptLayer-exported tracing spans around your own functions. |
+| `client.traceable()` | Decorator for tracing your own functions and sending those spans to PromptLayer when tracing is enabled. |
 | `client.skills` | Skill collection pull, create, publish, and update operations. |
 | `client.openai` and `client.anthropic` | Provider proxies that wrap those SDKs and log requests to PromptLayer. |
+
+Note: When tracing is enabled, spans are exported to PromptLayer using OpenTelemetry.
 
 ## Integration Modules
 
@@ -155,8 +165,13 @@ The SDK raises `PromptLayerError` as the base exception for SDK failures, with m
 
 By default, the clients raise these exceptions. If you initialize `PromptLayer` or `AsyncPromptLayer` with `throw_on_error=False`, many resource methods return `None` instead of raising on PromptLayer API errors.
 
-## Notes
+## Caching
 
-- `PromptLayer` and `AsyncPromptLayer` accept `api_key`, `base_url`, `enable_tracing`, `throw_on_error`, and `cache_ttl_seconds`.
-- When tracing is enabled, spans are exported to PromptLayer using OpenTelemetry.
-- Prompt execution supports PromptLayer-managed configurations for multiple providers, including OpenAI, Anthropic, Azure OpenAI, Google, Mistral, and Bedrock-backed runtimes.
+When enabled, the SDK caches fetched prompt templates in memory for faster repeat reads, locally re-renders them with new variables, and falls back to stale cache on temporary API failures.
+- Caching is disabled by default and is enabled by setting `cache_ttl_seconds` when creating `PromptLayer` or `AsyncPromptLayer`.
+- The cache applies to prompt templates fetched through `client.templates.get(...)`.
+- Cached entries are stored in memory and keyed by prompt name, version, label, provider, and model.
+- Requests that include `metadata_filters` or `model_parameter_overrides` bypass the cache.
+- Templates that require server-side rendering behavior, such as placeholder messages or tool-variable expansion, are not cached for local rendering.
+- If a cached template is stale and PromptLayer returns a transient error, the SDK can serve the stale cached version as a fallback.
+- You can clear cached entries with `client.invalidate(...)` or `client.templates.invalidate(...)`.

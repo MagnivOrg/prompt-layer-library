@@ -1,4 +1,15 @@
-# PromptLayer Python SDK
+<div align="center">
+
+# 🍰 PromptLayer
+
+**Version, test, and monitor every prompt and agent with robust evals, tracing, and regression sets.**
+
+<a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/-Python 3.9+-blue?style=for-the-badge&logo=python&logoColor=white"></a>
+<a href="https://docs.promptlayer.com"><img alt="Docs" src="https://custom-icon-badges.herokuapp.com/badge/docs-PL-green.svg?logo=cake&style=for-the-badge"></a>
+
+---
+
+<div align="left">
 
 The PromptLayer Python SDK lets you fetch and run PromptLayer-managed prompts, execute workflows, log and annotate LLM requests, and instrument supported providers and agent runtimes with PromptLayer tracing.
 

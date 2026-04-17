@@ -11,7 +11,7 @@
 
 <div align="left">
 
-The PromptLayer Python SDK lets you fetch and run PromptLayer-managed prompts, execute workflows, log and annotate LLM requests, and instrument supported providers and agent runtimes with PromptLayer tracing.
+The Python SDK lets you fetch and run PromptLayer-managed prompts, execute workflows, log and annotate LLM requests, and instrument supported providers and agent runtimes with PromptLayer tracing.
 
 ## Installation
 
@@ -32,6 +32,8 @@ pip install "promptlayer[claude-agents]"
 - `promptlayer[claude-agents]` installs the Claude Agents SDK dependency used by PromptLayer's Claude Agents integration and vendored plugin config helper.
 
 ## Quick Start
+
+To follow along, you need a [PromptLayer](https://www.promptlayer.com/) API key. Once logged in, go to Settings to generate a key.
 
 Create a client and fetch a prompt template from PromptLayer:
 
@@ -108,26 +110,44 @@ The SDK relies on the following environment variables:
 | `PROMPTLAYER_OTLP_TRACES_ENDPOINT` | No | Overrides the OTLP trace endpoint used by the OpenAI Agents tracing integration. |
 | `PROMPTLAYER_TRACEPARENT` | No | Optional trace context passed through the Claude Agents integration. |
 
-## SDK Resources
+## Resources
 
 The main resources surfaced by `PromptLayer` and related modules are:
 
 | Resource | What it does |
 | --- | --- |
-| `pl.openai` | Proxy around the OpenAI Python SDK that logs requests to PromptLayer. |
-| `pl.anthropic` | Proxy around the Anthropic Python SDK that logs requests to PromptLayer. |
-| `pl.templates` | Fetches prompt templates, lists templates, publishes templates, and manages local cache invalidation. |
-| `pl.run()` | Fetches a PromptLayer-managed prompt, executes it with the configured provider/model, and logs the resulting request. |
-| `pl.run_workflow()` | Runs a PromptLayer workflow by ID or name and returns its outputs. |
-| `pl.log_request()` | Manually logs a request/response pair to PromptLayer. |
-| `pl.track` | Attaches metadata, prompt linkage, score, and group information to an existing PromptLayer request. |
-| `pl.group` | Creates PromptLayer groups for organizing related requests. |
-| `pl.skills` | Pulls, creates, publishes, and updates PromptLayer skill collections. |
-| `pl.invalidate()` | Clears the SDK prompt-template cache for one prompt or all prompts. |
-| `pl.traceable()` | Decorator for wrapping your own functions in PromptLayer-exported tracing spans. |
-| `instrument_openai_agents()` | Instruments `openai-agents` runs and exports traces to PromptLayer. |
-| `create_openai_agents_tracer_provider()` | Creates an OTLP-backed tracer provider configured for PromptLayer ingestion. |
-| `get_claude_config()` | Returns the vendored PromptLayer Claude Agents plugin config and required environment settings. |
+| `PromptLayer` and `AsyncPromptLayer` | Main sync and async SDK clients. |
+| `pl.templates` | Prompt template retrieval, listing, publishing, and cache invalidation. |
+| `pl.run()` and `pl.run_workflow()` | Helpers for running PromptLayer-managed prompts and workflows. |
+| `pl.log_request()` | Manual request logging. |
+| `pl.track` | Request annotation utilities for metadata, prompt linkage, scores, and groups. |
+| `pl.group` | Group creation for organizing related requests. |
+| `pl.traceable()` | Decorator for creating PromptLayer-exported tracing spans around your own functions. |
+| `promptlayer.integrations.openai_agents` | OpenAI Agents tracing helpers such as `instrument_openai_agents()`. |
+| `promptlayer.integrations.claude_agents` | Claude Agents integration helpers such as `get_claude_config()`. |
+| `pl.skills` | Skill collection pull, create, publish, and update operations. |
+| `pl.openai` and `pl.anthropic` | Provider proxies that wrap those SDKs and log requests to PromptLayer. |
+
+## Error Handling
+
+The SDK raises `PromptLayerError` as the base exception for SDK failures, with more specific subclasses for common API and validation cases.
+
+| Error type | What it means |
+| --- | --- |
+| `PromptLayerValidationError` | Invalid input passed to the SDK before or during a request. |
+| `PromptLayerAPIConnectionError` | The SDK could not connect to PromptLayer. |
+| `PromptLayerAPITimeoutError` | A PromptLayer request or workflow run timed out. |
+| `PromptLayerAuthenticationError` | Authentication failed, usually because the API key is missing or invalid. |
+| `PromptLayerPermissionDeniedError` | The API key does not have permission for the requested operation. |
+| `PromptLayerNotFoundError` | The requested resource, such as a prompt or workflow, was not found. |
+| `PromptLayerBadRequestError` | The request was malformed or used invalid parameters. |
+| `PromptLayerConflictError` | The request conflicts with the current state of a resource. |
+| `PromptLayerUnprocessableEntityError` | The request was well-formed but semantically invalid. |
+| `PromptLayerRateLimitError` | PromptLayer rejected the request because of rate limiting. |
+| `PromptLayerInternalServerError` | PromptLayer returned a 5xx server error. |
+| `PromptLayerAPIStatusError` | Other non-success API responses that do not map to a more specific error type. |
+
+By default, the clients raise these exceptions. If you initialize `PromptLayer` or `AsyncPromptLayer` with `throw_on_error=False`, many resource methods return `None` instead of raising on PromptLayer API errors.
 
 ## Notes
 

@@ -137,12 +137,12 @@ Note: When tracing is enabled, spans are exported to PromptLayer using OpenTelem
 
 ## Integration Modules
 
-The SDK also exposes integration-specific modules that are imported directly rather than accessed through the client:
+Optional modules that are imported directly rather than accessed through the client:
 
 | Module | Description |
 | --- | --- |
-| `promptlayer.integrations.openai_agents` | OpenAI Agents tracing utilities for instrumenting `openai-agents` runs and exporting their traces to PromptLayer. |
-| `promptlayer.integrations.claude_agents` | Claude Agents configuration utilities for loading the PromptLayer plugin and required environment settings. |
+| `promptlayer.integrations.openai_agents` | Tracing utilities for the [openai-agents SDK](https://github.com/openai/openai-agents-python) that instrument agent runs and export their traces to PromptLayer. |
+| `promptlayer.integrations.claude_agents` | Configuration utilities for the [claude-agent-sdk SDK](https://github.com/anthropics/claude-agent-sdk-python) that load the PromptLayer plugin and required environment settings so Claude agent runs send traces to PromptLayer. |
 
 ## Error Handling
 

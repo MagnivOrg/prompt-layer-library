@@ -101,22 +101,22 @@ The SDK relies on the following environment variables:
 
 The main resources surfaced by `PromptLayer` and related modules are:
 
-| Resource | Where | What it does |
-| --- | --- | --- |
-| `pl.openai` | `PromptLayer.openai` | Proxy around the OpenAI Python SDK that logs requests to PromptLayer. |
-| `pl.anthropic` | `PromptLayer.anthropic` | Proxy around the Anthropic Python SDK that logs requests to PromptLayer. |
-| `pl.templates` | `TemplateManager` | Fetches prompt templates, lists templates, publishes templates, and manages local cache invalidation. |
-| `pl.run()` | `PromptLayer.run` | Fetches a PromptLayer-managed prompt, executes it with the configured provider/model, and logs the resulting request. |
-| `pl.run_workflow()` | `PromptLayer.run_workflow` | Runs a PromptLayer workflow by ID or name and returns its outputs. |
-| `pl.log_request()` | `PromptLayer.log_request` | Manually logs a request/response pair to PromptLayer. |
-| `pl.track` | `TrackManager` | Attaches metadata, prompt linkage, score, and group information to an existing PromptLayer request. |
-| `pl.group` | `GroupManager` | Creates PromptLayer groups for organizing related requests. |
-| `pl.skills` | `SkillManager` | Pulls, creates, publishes, and updates PromptLayer skill collections. |
-| `pl.invalidate()` | `PromptLayer.invalidate` | Clears the SDK prompt-template cache for one prompt or all prompts. |
-| `pl.traceable()` | `PromptLayerMixin.traceable` | Decorator for wrapping your own functions in PromptLayer-exported tracing spans. |
-| `instrument_openai_agents()` | `promptlayer.integrations.openai_agents` | Instruments `openai-agents` runs and exports traces to PromptLayer. |
-| `create_openai_agents_tracer_provider()` | `promptlayer.integrations.openai_agents` | Creates an OTLP-backed tracer provider configured for PromptLayer ingestion. |
-| `get_claude_config()` | `promptlayer.integrations.claude_agents` | Returns the vendored PromptLayer Claude Agents plugin config and required environment settings. |
+| Resource | What it does |
+| --- | --- |
+| `pl.openai` | Proxy around the OpenAI Python SDK that logs requests to PromptLayer. |
+| `pl.anthropic` | Proxy around the Anthropic Python SDK that logs requests to PromptLayer. |
+| `pl.templates` | Fetches prompt templates, lists templates, publishes templates, and manages local cache invalidation. |
+| `pl.run()` | Fetches a PromptLayer-managed prompt, executes it with the configured provider/model, and logs the resulting request. |
+| `pl.run_workflow()` | Runs a PromptLayer workflow by ID or name and returns its outputs. |
+| `pl.log_request()` | Manually logs a request/response pair to PromptLayer. |
+| `pl.track` | Attaches metadata, prompt linkage, score, and group information to an existing PromptLayer request. |
+| `pl.group` | Creates PromptLayer groups for organizing related requests. |
+| `pl.skills` | Pulls, creates, publishes, and updates PromptLayer skill collections. |
+| `pl.invalidate()` | Clears the SDK prompt-template cache for one prompt or all prompts. |
+| `pl.traceable()` | Decorator for wrapping your own functions in PromptLayer-exported tracing spans. |
+| `instrument_openai_agents()` | Instruments `openai-agents` runs and exports traces to PromptLayer. |
+| `create_openai_agents_tracer_provider()` | Creates an OTLP-backed tracer provider configured for PromptLayer ingestion. |
+| `get_claude_config()` | Returns the vendored PromptLayer Claude Agents plugin config and required environment settings. |
 
 ## Notes
 

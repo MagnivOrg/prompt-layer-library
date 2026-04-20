@@ -12,7 +12,7 @@
 
 <div align="left">
 
-This library provides convenient access to the PromptLayer API from applications written in python. 
+This library provides convenient access to the PromptLayer API from applications written in python.
 
 ## Installation
 

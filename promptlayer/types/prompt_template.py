@@ -254,6 +254,13 @@ class BuiltInTool(TypedDict, total=False):
     name: str
 
 
+class RegistryTool(TypedDict, total=False):
+    type: Literal["registry"]
+    tool_registry_id: int
+    label: Optional[str]
+    version_number: Optional[int]
+
+
 class FunctionCall(TypedDict, total=False):
     name: str
     arguments: str
@@ -356,7 +363,7 @@ class ChatPromptTemplate(TypedDict, total=False):
     functions: Sequence[Function]
     function_call: Union[Literal["auto", "none"], ChatFunctionCall]
     input_variables: List[str]
-    tools: Sequence[Union[Tool, BuiltInTool]]
+    tools: Sequence[Union[Tool, BuiltInTool, RegistryTool]]
     tool_choice: ToolChoice
 
 

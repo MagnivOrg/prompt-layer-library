@@ -331,6 +331,7 @@ async def _post_workflow_id_run(
     _url_template: str = WORKFLOW_RUN_URL_TEMPLATE,
 ):
     url = _url_template.format(base_url=base_url, workflow_id=workflow_id)
+    prompt_name = urllib.parse.quote(prompt_name)
     payload = {
         "input_variables": input_variables,
         "metadata": metadata,
@@ -901,6 +902,7 @@ async def apromptlayer_track_prompt(
     throw_on_error: bool = True,
 ) -> bool:
     url = f"{base_url}/library-track-prompt"
+    prompt_name = urllib.parse.quote(prompt_name)
     payload = {
         "request_id": request_id,
         "prompt_name": prompt_name,
@@ -982,6 +984,7 @@ async def apromptlayer_track_metadata(
     metadata: Dict[str, Any],
 ) -> bool:
     url = f"{base_url}/library-track-metadata"
+    prompt_name = urllib.parse.quote(prompt_name)
     payload = {
         "request_id": request_id,
         "metadata": metadata,
@@ -1060,6 +1063,7 @@ async def apromptlayer_track_score(
     score_name: Optional[str],
 ) -> bool:
     url = f"{base_url}/library-track-score"
+    prompt_name = urllib.parse.quote(prompt_name)
     data = {
         "request_id": request_id,
         "score": score,
@@ -1169,6 +1173,7 @@ class GeneratorProxy:
         self.api_request_arugments = api_request_arguments
         self.api_key = api_key
         self.base_url = base_url
+    prompt_name = urllib.parse.quote(prompt_name)
 
     def __iter__(self):
         return self
@@ -1588,7 +1593,7 @@ def get_prompt_template(
         if params:
             json_body = {**json_body, **params}
         response = _get_requests_session().post(
-            f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+            f"{base_url}/prompt-templates/{quote(urllib.parse.quote(prompt_name), safe='')}",
             headers={"X-API-KEY": api_key},
             json=json_body,
         )
@@ -1640,7 +1645,7 @@ async def aget_prompt_template(
             json_body.update(params)
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+                f"{base_url}/prompt-templates/{quote(urllib.parse.quote(prompt_name), safe='')}",
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )
@@ -2389,6 +2394,7 @@ def anthropic_bedrock_request(
     aws_region = function_kwargs.pop("aws_region", None)
     aws_session_token = function_kwargs.pop("aws_session_token", None)
     base_url = function_kwargs.pop("base_url", None)
+    prompt_name = urllib.parse.quote(prompt_name)
 
     cache_key = f"anthropic_bedrock:{aws_access_key or ''}:{aws_region or ''}:{base_url or ''}"
     client = _get_cached_client(
@@ -2423,6 +2429,7 @@ async def aanthropic_bedrock_request(
     aws_region = function_kwargs.pop("aws_region", None)
     aws_session_token = function_kwargs.pop("aws_session_token", None)
     base_url = function_kwargs.pop("base_url", None)
+    prompt_name = urllib.parse.quote(prompt_name)
 
     cache_key = f"async_anthropic_bedrock:{aws_access_key or ''}:{aws_region or ''}:{base_url or ''}"
     client = _get_cached_client(

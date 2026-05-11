@@ -148,14 +148,14 @@ def handle_session_end(ctx, raw_input: str) -> str:
                 trace_id=state.trace_id,
                 span_id=state.session_span_id,
                 parent_span_id=state.session_parent_span_id,
-                name="Claude Code session",
+                name="LLM Session",
                 kind="1",
                 start_ns=state.session_start_ns or str(time.time_ns()),
                 end_ns=str(time.time_ns()),
                 attrs={
                     "source": "claude-code",
                     "hook": "SessionEnd",
-                    "node_type": "WORKFLOW",
+                    "node_type": "LLM_SESSION",
                     "session.lifecycle": "complete",
                 },
             )

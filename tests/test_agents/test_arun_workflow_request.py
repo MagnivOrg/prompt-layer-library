@@ -6,9 +6,30 @@ import pytest
 from ably.realtime.realtime_channel import RealtimeChannel
 from pytest_parametrize_cases import Case, parametrize_cases
 
-from promptlayer.utils import arun_workflow_request
+from promptlayer.utils import _resolve_workflow_id, arun_workflow_request
 from tests.utils.mocks import Any
 from tests.utils.vcr import assert_played, is_cassette_recording
+
+
+@pytest.mark.asyncio
+async def test_resolve_workflow_id_encodes_workflow_name(base_url: str, headers):
+    workflow_name = "feature1/resolve_problem_2:v1#draft"
+    expected_url = f"{base_url}/workflows/feature1%2Fresolve_problem_2%3Av1%23draft"
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"workflow": {"id": 3}}
+
+    with patch("promptlayer.utils._make_httpx_client") as mock_client_factory:
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_factory.return_value = mock_client
+
+        assert await _resolve_workflow_id(base_url, workflow_name, headers) == 3
+
+        mock_client.get.assert_awaited_once_with(expected_url, headers=headers)
 
 
 @patch("promptlayer.utils.WS_TOKEN_REQUEST_LIBRARY_URL", "http://localhost:8000/ws-token-request-library")

@@ -6,23 +6,30 @@ on:
 
 env:
   POETRY_VIRTUALENVS_CREATE: "false"
-  PYTHON_VERSION: "3.9"
-  POETRY_VERSION: "2.2.1"
-  PIPX_DEFAULT_PYTHON: "python3.9"
 
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - python-version: "3.9"
+            poetry-version: "1.8.5"
+          - python-version: "3.11"
+            poetry-version: "2.2.1"
 
     steps:
       - uses: actions/checkout@v5
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Poetry
-        run: pipx install poetry==${{ env.POETRY_VERSION }}
+        env:
+          PIPX_DEFAULT_PYTHON: python${{ matrix.python-version }}
+        run: pipx install poetry==${{ matrix.poetry-version }}
 
       - name: Install dependencies
         run: poetry install

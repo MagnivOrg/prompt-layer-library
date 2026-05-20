@@ -14,6 +14,7 @@ _UNSET = object()
 
 def base_trace_attributes(trace, *, include_raw_payloads: bool) -> dict[str, Any]:
     attrs: dict[str, Any] = {
+        "node_type": "LLM_SESSION",
         "promptlayer.telemetry.source": "openai-agents-python",
         "promptlayer.telemetry.source_version": SDK_VERSION,
         "openai_agents.trace_id_original": trace.trace_id,
@@ -36,10 +37,12 @@ def base_trace_attributes(trace, *, include_raw_payloads: bool) -> dict[str, Any
 
 def span_name_for(span) -> str:
     span_type = span.span_data.type
+    if span_type in {"generation", "response"}:
+        return "LLM call"
+    if span_type == "agent":
+        return "LLM Session"
     if span_type == "function":
         return f"Function: {span.span_data.name}"
-    if span_type == "agent":
-        return f"Agent: {span.span_data.name}"
     if span_type == "guardrail":
         return f"Guardrail: {span.span_data.name}"
     if span_type == "custom":
@@ -86,7 +89,7 @@ def span_data_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, 
 
 
 def _generation_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {"gen_ai.provider.name": "openai.responses"}
+    attrs: dict[str, Any] = {"node_type": "LLM_CALL", "gen_ai.provider.name": "openai.responses"}
     _set_str_attr(attrs, "gen_ai.request.model", span_data.model)
     _apply_usage_attributes(attrs, span_data.usage or {})
 
@@ -101,7 +104,7 @@ def _generation_attributes(span_data, *, include_raw_payloads: bool) -> dict[str
 
 
 def _response_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {"gen_ai.provider.name": "openai.responses"}
+    attrs: dict[str, Any] = {"node_type": "LLM_CALL", "gen_ai.provider.name": "openai.responses"}
     response_obj = _jsonable(getattr(span_data, "response", None))
     if isinstance(response_obj, Mapping):
         model = response_obj.get("model")
@@ -147,7 +150,10 @@ def _function_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, 
 
 
 def _agent_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, Any]:
-    attrs: dict[str, Any] = {"openai_agents.agent.name": span_data.name}
+    attrs: dict[str, Any] = {
+        "node_type": "LLM_SESSION",
+        "openai_agents.agent.name": span_data.name,
+    }
     _set_str_attr(attrs, "openai_agents.agent.output_type", span_data.output_type)
     _set_json_attr(attrs, "openai_agents.agent.handoffs_json", span_data.handoffs, include_raw_payloads)
     _set_json_attr(attrs, "openai_agents.agent.tools_json", span_data.tools, include_raw_payloads)

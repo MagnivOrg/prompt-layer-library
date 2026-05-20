@@ -2,7 +2,7 @@ import json
 
 import pytest
 from agents.tracing import set_trace_processors
-from agents.tracing.create import function_span, generation_span, trace
+from agents.tracing.create import agent_span, function_span, generation_span, trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -112,6 +112,8 @@ def test_generation_span_emits_canonical_attrs_and_deterministic_ids(in_memory_t
     assert f"{child.context.span_id:016x}" == map_span_id(span_id)
 
     root_attrs = dict(root.attributes)
+    assert root.name == "LLM Session"
+    assert root_attrs["node_type"] == "LLM_SESSION"
     assert root_attrs["promptlayer.telemetry.source"] == "openai-agents-python"
     assert root_attrs["openai_agents.trace_id_original"] == trace_id
     assert root_attrs["openai_agents.workflow_name"] == "Weather workflow"
@@ -120,6 +122,8 @@ def test_generation_span_emits_canonical_attrs_and_deterministic_ids(in_memory_t
     assert json.loads(root_attrs["openai_agents.metadata_json"]) == {"tenant": "acme", "nested": {"x": 1}}
 
     attrs = dict(child.attributes)
+    assert child.name == "LLM call"
+    assert attrs["node_type"] == "LLM_CALL"
     assert attrs["promptlayer.telemetry.source"] == "openai-agents-python"
     assert attrs["openai_agents.span_type"] == "generation"
     assert attrs["gen_ai.provider.name"] == "openai.responses"
@@ -137,6 +141,33 @@ def test_generation_span_emits_canonical_attrs_and_deterministic_ids(in_memory_t
     assert json.loads(attrs["openai_agents.generation.raw_input_json"]) == [
         {"role": "user", "content": "What is the weather?"}
     ]
+
+
+def test_agent_span_emits_llm_session_semantics(in_memory_tracer_provider):
+    provider, exporter = in_memory_tracer_provider
+    processor = PromptLayerOpenAIAgentsProcessor(tracer_provider=provider)
+    set_trace_processors([processor])
+
+    with trace("Agent workflow"):
+        with agent_span(
+            name="PromptLayer Demo Agent",
+            handoffs=[],
+            tools=[],
+            output_type="str",
+        ):
+            pass
+
+    spans = _finished_spans(exporter)
+    _, child = _find_root_and_child(spans)
+    attrs = dict(child.attributes)
+
+    assert child.name == "LLM Session"
+    assert attrs["node_type"] == "LLM_SESSION"
+    assert attrs["openai_agents.span_type"] == "agent"
+    assert attrs["openai_agents.agent.name"] == "PromptLayer Demo Agent"
+    assert attrs["openai_agents.agent.output_type"] == "str"
+    assert json.loads(attrs["openai_agents.agent.handoffs_json"]) == []
+    assert json.loads(attrs["openai_agents.agent.tools_json"]) == []
 
 
 def test_function_span_stays_namespaced_without_genai_attrs(in_memory_tracer_provider):
@@ -216,8 +247,8 @@ def test_traceparent_metadata_parents_the_synthetic_root(in_memory_tracer_provid
             pass
 
     spans = _finished_spans(exporter)
-    root = next(span for span in spans if span.name == "Traceparent workflow")
-    child = next(span for span in spans if span.name == "Generation")
+    root = next(span for span in spans if span.parent is not None and span.name == "LLM Session")
+    child = next(span for span in spans if span.name == "LLM call")
 
     assert f"{root.context.trace_id:032x}" == "11111111111111111111111111111111"
     assert f"{child.context.trace_id:032x}" == "11111111111111111111111111111111"
@@ -244,7 +275,7 @@ def test_active_local_context_does_not_override_agents_trace_id_without_tracepar
                 pass
 
     spans = _finished_spans(exporter)
-    root = next(span for span in spans if span.name == "No traceparent workflow")
+    root = next(span for span in spans if span.name == "LLM Session")
 
     assert f"{root.context.trace_id:032x}" == "c" * 32
     assert root.parent is None

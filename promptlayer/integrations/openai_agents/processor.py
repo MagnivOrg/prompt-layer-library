@@ -49,7 +49,7 @@ class PromptLayerOpenAIAgentsProcessor:
         attributes = base_trace_attributes(trace, include_raw_payloads=self._include_raw_payloads)
 
         root_span = self._start_span_with_fixed_ids(
-            name=trace.name,
+            name="LLM Session",
             kind=SpanKind.INTERNAL,
             context=parent_context,
             attributes=attributes,

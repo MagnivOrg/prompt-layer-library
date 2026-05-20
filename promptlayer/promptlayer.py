@@ -310,7 +310,8 @@ class PromptLayer(PromptLayerMixin):
             with self.tracer.start_as_current_span("PromptLayer Run") as span:
                 span.set_attribute("prompt_name", prompt_name)
                 span.set_attribute("function_input", str(_run_internal_kwargs))
-                pl_run_span_id = hex(span.context.span_id)[2:].zfill(16)
+                span_ctx = span.get_span_context()
+                pl_run_span_id = hex(span_ctx.span_id)[2:].zfill(16) if span_ctx and span_ctx.is_valid else None
                 result = self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
                 span.set_attribute("function_output", str(result))
                 return result
@@ -573,7 +574,8 @@ class AsyncPromptLayer(PromptLayerMixin):
             with self.tracer.start_as_current_span("PromptLayer Run") as span:
                 span.set_attribute("prompt_name", prompt_name)
                 span.set_attribute("function_input", str(_run_internal_kwargs))
-                pl_run_span_id = hex(span.context.span_id)[2:].zfill(16)
+                span_ctx = span.get_span_context()
+                pl_run_span_id = hex(span_ctx.span_id)[2:].zfill(16) if span_ctx and span_ctx.is_valid else None
                 result = await self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
                 span.set_attribute("function_output", str(result))
                 return result

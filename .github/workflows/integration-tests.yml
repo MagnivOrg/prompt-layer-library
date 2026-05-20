@@ -6,9 +6,9 @@ on:
 
 env:
   POETRY_VIRTUALENVS_CREATE: "false"
-  PYTHON_VERSION: "3.9"
+  PYTHON_VERSION: "3.11"
   POETRY_VERSION: "2.2.1"
-  PIPX_DEFAULT_PYTHON: "python3.9"
+  PIPX_DEFAULT_PYTHON: "python3.11"
 
 jobs:
   integration-tests:

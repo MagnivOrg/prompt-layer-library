@@ -222,6 +222,12 @@ def normalize_response_items(items: Any) -> list[dict[str, Any]]:
             continue
 
         item_type = item.get("type")
+        if item_type == "reasoning":
+            thinking = _extract_reasoning_summary(item)
+            if thinking:
+                messages.append({"role": "assistant", "thinking": thinking})
+            continue
+
         if item_type == "message":
             message = _normalize_response_message(item)
             if message:
@@ -252,6 +258,22 @@ def normalize_response_items(items: Any) -> list[dict[str, Any]]:
             messages.append(message)
 
     return messages
+
+
+def _extract_reasoning_summary(item: Mapping[str, Any]) -> str | None:
+    summary = item.get("summary")
+    if not isinstance(summary, Sequence) or isinstance(summary, (str, bytes, bytearray)):
+        return None
+
+    text_parts: list[str] = []
+    for part in summary:
+        if not isinstance(part, Mapping):
+            continue
+        text = part.get("text")
+        if text is not None:
+            text_parts.append(str(text))
+
+    return "\n\n".join(text_parts) if text_parts else None
 
 
 def _normalize_response_message(item: Mapping[str, Any]) -> dict[str, Any]:
@@ -434,6 +456,9 @@ def _apply_usage_attributes(attrs: dict[str, Any], usage: Mapping[str, Any]) -> 
         "gen_ai.usage.output_tokens",
         usage.get("output_tokens", usage.get("completion_tokens", _UNSET)),
     )
+    output_details = usage.get("output_tokens_details") or usage.get("completion_tokens_details") or {}
+    if isinstance(output_details, Mapping):
+        _set_int_attr(attrs, "gen_ai.usage.reasoning.output_tokens", output_details.get("reasoning_tokens", _UNSET))
 
 
 def _set_int_attr(attrs: dict[str, Any], key: str, value: Any) -> None:

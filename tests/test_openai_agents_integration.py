@@ -2,7 +2,7 @@ import json
 
 import pytest
 from agents.tracing import set_trace_processors
-from agents.tracing.create import agent_span, function_span, generation_span, trace
+from agents.tracing.create import agent_span, function_span, generation_span, response_span, trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -168,6 +168,65 @@ def test_agent_span_emits_llm_session_semantics(in_memory_tracer_provider):
     assert attrs["openai_agents.agent.output_type"] == "str"
     assert json.loads(attrs["openai_agents.agent.handoffs_json"]) == []
     assert json.loads(attrs["openai_agents.agent.tools_json"]) == []
+
+
+def test_response_span_emits_openai_reasoning_as_genai_thinking(in_memory_tracer_provider):
+    provider, exporter = in_memory_tracer_provider
+    processor = PromptLayerOpenAIAgentsProcessor(tracer_provider=provider)
+    set_trace_processors([processor])
+
+    response = {
+        "id": "resp_123",
+        "object": "response",
+        "model": "gpt-5-2025-08-07",
+        "output": [
+            {
+                "type": "reasoning",
+                "id": "rs_123",
+                "summary": [
+                    {
+                        "type": "summary_text",
+                        "text": "I should compute the multiplication directly.",
+                    }
+                ],
+                "encrypted_content": "enc",
+            },
+            {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": "19 times 23 is 437."}],
+            },
+        ],
+        "usage": {
+            "input_tokens": 12,
+            "output_tokens": 80,
+            "output_tokens_details": {"reasoning_tokens": 64},
+        },
+    }
+
+    with trace("Reasoning workflow"):
+        with response_span(
+            response=response,
+            span_id="span_" + ("d" * 24),
+        ):
+            pass
+
+    spans = _finished_spans(exporter)
+    child = next(span for span in spans if span.name == "LLM call")
+    attrs = dict(child.attributes)
+
+    assert attrs["node_type"] == "LLM_CALL"
+    assert attrs["gen_ai.provider.name"] == "openai.responses"
+    assert attrs["gen_ai.request.model"] == "gpt-5-2025-08-07"
+    assert attrs["gen_ai.response.id"] == "resp_123"
+    assert attrs["gen_ai.usage.input_tokens"] == 12
+    assert attrs["gen_ai.usage.output_tokens"] == 80
+    assert attrs["gen_ai.usage.reasoning.output_tokens"] == 64
+    assert attrs["gen_ai.completion.0.role"] == "assistant"
+    assert attrs["gen_ai.completion.0.thinking"] == "I should compute the multiplication directly."
+    assert attrs["gen_ai.completion.1.role"] == "assistant"
+    assert attrs["gen_ai.completion.1.content"] == "19 times 23 is 437."
+    assert json.loads(attrs["openai_agents.response.raw_json"]) == response
 
 
 def test_function_span_stays_namespaced_without_genai_attrs(in_memory_tracer_provider):
@@ -352,5 +411,41 @@ def test_normalize_response_items_keeps_message_like_inputs_without_type():
             "role": "tool",
             "tool_call_id": "call_1",
             "content": "{'temp_c': 24, 'condition': 'Sunny'}",
+        },
+    ]
+
+
+def test_normalize_response_items_preserves_openai_reasoning_summary():
+    items = [
+        {
+            "type": "reasoning",
+            "id": "rs_123",
+            "summary": [
+                {
+                    "type": "summary_text",
+                    "text": "I should compute the multiplication directly.",
+                },
+                {
+                    "type": "summary_text",
+                    "text": "The answer is 437.",
+                },
+            ],
+            "encrypted_content": "enc",
+        },
+        {
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "output_text", "text": "19 times 23 is 437."}],
+        },
+    ]
+
+    assert normalize_response_items(items) == [
+        {
+            "role": "assistant",
+            "thinking": "I should compute the multiplication directly.\n\nThe answer is 437.",
+        },
+        {
+            "role": "assistant",
+            "content": "19 times 23 is 437.",
         },
     ]

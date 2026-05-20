@@ -73,11 +73,7 @@ class PromptLayerBase(object):
         if tracer:
             with tracer.start_as_current_span(function_name) as llm_request_span:
                 _span_ctx = llm_request_span.get_span_context()
-                llm_request_span_id = (
-                    hex(_span_ctx.span_id)[2:].zfill(16)
-                    if _span_ctx and _span_ctx.is_valid
-                    else None
-                )
+                llm_request_span_id = hex(_span_ctx.span_id)[2:].zfill(16) if _span_ctx and _span_ctx.is_valid else None
                 llm_request_span.set_attribute("provider", object.__getattribute__(self, "_provider_type"))
                 llm_request_span.set_attribute("function_name", function_name)
                 llm_request_span.set_attribute("function_input", str({"args": args, "kwargs": kwargs}))

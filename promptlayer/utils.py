@@ -76,6 +76,14 @@ WS_TOKEN_REQUEST_LIBRARY_URL = (
 
 logger = logging.getLogger(__name__)
 
+
+def _quote_api_path_segment(value: Union[int, str]) -> str:
+    encoded = quote(str(value), safe="")
+    # PromptLayer's edge stack decodes %2F before routing path parameters, so
+    # slashes must survive one decode pass and arrive at the app as %2F.
+    return encoded.replace("%2F", "%252F")
+
+
 # Module-level session for connection pooling (thread-safe initialization)
 _requests_session: Optional[requests.Session] = None
 _requests_session_lock = threading.Lock()
@@ -250,7 +258,9 @@ async def _resolve_workflow_id(base_url: str, workflow_id_or_name: Union[int, st
     # TODO(dmu) LOW: Should we warn user here to avoid using workflow names in favor of workflow id?
     async with _make_httpx_client() as client:
         # TODO(dmu) MEDIUM: Generalize the way we make async calls to PromptLayer API and reuse it everywhere
-        response = await client.get(f"{base_url}/workflows/{workflow_id_or_name}", headers=headers)
+        response = await client.get(
+            f"{base_url}/workflows/{_quote_api_path_segment(workflow_id_or_name)}", headers=headers
+        )
         if response.status_code != 200:
             raise_on_bad_response(response, "PromptLayer had the following error while resolving workflow")
 
@@ -1588,7 +1598,7 @@ def get_prompt_template(
         if params:
             json_body = {**json_body, **params}
         response = _get_requests_session().post(
-            f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+            f"{base_url}/prompt-templates/{_quote_api_path_segment(prompt_name)}",
             headers={"X-API-KEY": api_key},
             json=json_body,
         )
@@ -1640,7 +1650,7 @@ async def aget_prompt_template(
             json_body.update(params)
         async with _make_httpx_client() as client:
             response = await client.post(
-                f"{base_url}/prompt-templates/{quote(prompt_name, safe='')}",
+                f"{base_url}/prompt-templates/{_quote_api_path_segment(prompt_name)}",
                 headers={"X-API-KEY": api_key},
                 json=json_body,
             )

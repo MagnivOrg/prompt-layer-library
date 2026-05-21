@@ -91,7 +91,7 @@ class PromptLayer(PromptLayerMixin):
 
     def __getattr__(
         self,
-        name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]],
+        name: Union[Literal["openai"], Literal["anthropic"], Literal["litellm"], Literal["prompts"]],
     ):
         if name == "openai":
             import openai as openai_module
@@ -108,6 +108,16 @@ class PromptLayer(PromptLayerMixin):
                 anthropic_module,
                 function_name="anthropic",
                 provider_type="anthropic",
+                tracer=self.tracer,
+            )
+        elif name == "litellm":
+            import litellm as litellm_module
+
+            return PromptLayerBase(
+                self.api_key,
+                self.base_url,
+                litellm_module,
+                function_name="litellm",
                 tracer=self.tracer,
             )
         else:
@@ -477,7 +487,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         """Invalidate SDK template cache for a prompt or entirely."""
         self.templates.invalidate(prompt_name)
 
-    def __getattr__(self, name: Union[Literal["openai"], Literal["anthropic"], Literal["prompts"]]):
+    def __getattr__(self, name: Union[Literal["openai"], Literal["anthropic"], Literal["litellm"], Literal["prompts"]]):
         if name == "openai":
             import openai as openai_module
 
@@ -497,6 +507,16 @@ class AsyncPromptLayer(PromptLayerMixin):
                 tracer=self.tracer,
             )
             return anthropic
+        elif name == "litellm":
+            import litellm as litellm_module
+
+            return PromptLayerBase(
+                self.api_key,
+                self.base_url,
+                litellm_module,
+                function_name="litellm",
+                tracer=self.tracer,
+            )
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 

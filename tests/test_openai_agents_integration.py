@@ -112,7 +112,7 @@ def test_generation_span_emits_canonical_attrs_and_deterministic_ids(in_memory_t
     assert f"{child.context.span_id:016x}" == map_span_id(span_id)
 
     root_attrs = dict(root.attributes)
-    assert root.name == "LLM Session"
+    assert root.name == "OpenAI session"
     assert root_attrs["node_type"] == "LLM_SESSION"
     assert root_attrs["promptlayer.telemetry.source"] == "openai-agents-python"
     assert root_attrs["openai_agents.trace_id_original"] == trace_id
@@ -161,7 +161,7 @@ def test_agent_span_emits_llm_session_semantics(in_memory_tracer_provider):
     _, child = _find_root_and_child(spans)
     attrs = dict(child.attributes)
 
-    assert child.name == "LLM Session"
+    assert child.name == "LLM session"
     assert attrs["node_type"] == "LLM_SESSION"
     assert attrs["openai_agents.span_type"] == "agent"
     assert attrs["openai_agents.agent.name"] == "PromptLayer Demo Agent"
@@ -246,6 +246,7 @@ def test_function_span_stays_namespaced_without_genai_attrs(in_memory_tracer_pro
     _, child = _find_root_and_child(spans)
     attrs = dict(child.attributes)
 
+    assert child.name == "Tool: weather_lookup"
     assert attrs["openai_agents.span_type"] == "function"
     assert attrs["node_type"] == "CODE_EXECUTION"
     assert attrs["tool_name"] == "weather_lookup"
@@ -306,7 +307,7 @@ def test_traceparent_metadata_parents_the_synthetic_root(in_memory_tracer_provid
             pass
 
     spans = _finished_spans(exporter)
-    root = next(span for span in spans if span.parent is not None and span.name == "LLM Session")
+    root = next(span for span in spans if span.parent is not None and span.name == "OpenAI session")
     child = next(span for span in spans if span.name == "LLM call")
 
     assert f"{root.context.trace_id:032x}" == "11111111111111111111111111111111"
@@ -334,7 +335,7 @@ def test_active_local_context_does_not_override_agents_trace_id_without_tracepar
                 pass
 
     spans = _finished_spans(exporter)
-    root = next(span for span in spans if span.name == "LLM Session")
+    root = next(span for span in spans if span.name == "OpenAI session")
 
     assert f"{root.context.trace_id:032x}" == "c" * 32
     assert root.parent is None

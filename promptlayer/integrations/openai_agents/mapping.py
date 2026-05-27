@@ -40,9 +40,9 @@ def span_name_for(span) -> str:
     if span_type in {"generation", "response"}:
         return "LLM call"
     if span_type == "agent":
-        return "LLM Session"
+        return "LLM session"
     if span_type == "function":
-        return f"Function: {span.span_data.name}"
+        return f"Tool: {span.span_data.name}"
     if span_type == "guardrail":
         return f"Guardrail: {span.span_data.name}"
     if span_type == "custom":

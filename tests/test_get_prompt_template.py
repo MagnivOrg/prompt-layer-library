@@ -10,9 +10,9 @@ class TestUrlEncodingInGetPromptTemplate:
     """Tests for URL encoding of prompt names in get_prompt_template and aget_prompt_template."""
 
     def test_sync_get_prompt_template_encodes_slashes(self, promptlayer_api_key, base_url):
-        """Prompt names with slashes should be URL-encoded."""
+        """Prompt names with slashes should stay encoded after one edge decode."""
         prompt_name = "feature1/resolve_problem_2"
-        expected_encoded = "feature1%2Fresolve_problem_2"
+        expected_encoded = "feature1%252Fresolve_problem_2"
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -32,7 +32,7 @@ class TestUrlEncodingInGetPromptTemplate:
             call_args = mock_session.return_value.post.call_args
             actual_url = call_args[0][0]
             assert expected_encoded in actual_url, f"Expected {expected_encoded} in URL, got {actual_url}"
-            assert "/" + prompt_name not in actual_url, "Unencoded slash found in URL"
+            assert actual_url == f"{base_url}/prompt-templates/{expected_encoded}"
 
     def test_sync_get_prompt_template_encodes_colons(self, promptlayer_api_key, base_url):
         """Prompt names with colons should be URL-encoded."""
@@ -83,7 +83,7 @@ class TestUrlEncodingInGetPromptTemplate:
     def test_sync_get_prompt_template_encodes_special_chars(self, promptlayer_api_key, base_url):
         """Prompt names with various special characters should be URL-encoded."""
         prompt_name = "test/prompt:name@v1#latest"
-        # URL encoding: / -> %2F, : -> %3A, @ -> %40, # -> %23
+        expected_encoded = "test%252Fprompt%3Aname%40v1%23latest"
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -101,17 +101,13 @@ class TestUrlEncodingInGetPromptTemplate:
 
             call_args = mock_session.return_value.post.call_args
             actual_url = call_args[0][0]
-            # Verify special characters are encoded
-            assert "%2F" in actual_url, "Slash not encoded"
-            assert "%3A" in actual_url, "Colon not encoded"
-            assert "%40" in actual_url, "At sign not encoded"
-            assert "%23" in actual_url, "Hash not encoded"
+            assert actual_url == f"{base_url}/prompt-templates/{expected_encoded}"
 
     @pytest.mark.asyncio
     async def test_async_get_prompt_template_encodes_slashes(self, promptlayer_api_key, base_url):
-        """Async: Prompt names with slashes should be URL-encoded."""
+        """Async: Prompt names with slashes should stay encoded after one edge decode."""
         prompt_name = "feature1/resolve_problem_2"
-        expected_encoded = "feature1%2Fresolve_problem_2"
+        expected_encoded = "feature1%252Fresolve_problem_2"
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -134,7 +130,7 @@ class TestUrlEncodingInGetPromptTemplate:
             call_args = mock_client.post.call_args
             actual_url = call_args[0][0]
             assert expected_encoded in actual_url, f"Expected {expected_encoded} in URL, got {actual_url}"
-            assert "/" + prompt_name not in actual_url, "Unencoded slash found in URL"
+            assert actual_url == f"{base_url}/prompt-templates/{expected_encoded}"
 
     @pytest.mark.asyncio
     async def test_async_get_prompt_template_encodes_colons(self, promptlayer_api_key, base_url):
@@ -168,6 +164,7 @@ class TestUrlEncodingInGetPromptTemplate:
     async def test_async_get_prompt_template_encodes_special_chars(self, promptlayer_api_key, base_url):
         """Async: Prompt names with various special characters should be URL-encoded."""
         prompt_name = "test/prompt:name@v1#latest"
+        expected_encoded = "test%252Fprompt%3Aname%40v1%23latest"
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -189,11 +186,7 @@ class TestUrlEncodingInGetPromptTemplate:
 
             call_args = mock_client.post.call_args
             actual_url = call_args[0][0]
-            # Verify special characters are encoded
-            assert "%2F" in actual_url, "Slash not encoded"
-            assert "%3A" in actual_url, "Colon not encoded"
-            assert "%40" in actual_url, "At sign not encoded"
-            assert "%23" in actual_url, "Hash not encoded"
+            assert actual_url == f"{base_url}/prompt-templates/{expected_encoded}"
 
 
 def test_get_prompt_template_provider_base_url_name(capsys, promptlayer_client):

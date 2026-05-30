@@ -10,9 +10,9 @@ class TestUrlEncodingInGetPromptTemplate:
     """Tests for URL encoding of prompt names in get_prompt_template and aget_prompt_template."""
 
     def test_sync_get_prompt_template_encodes_slashes(self, promptlayer_api_key, base_url):
-        """Prompt names with slashes should be URL-encoded."""
+        """Prompt names with slashes should survive one router decode pass."""
         prompt_name = "feature1/resolve_problem_2"
-        expected_encoded = "feature1%2Fresolve_problem_2"
+        expected_encoded = "feature1%252Fresolve_problem_2"
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -83,7 +83,7 @@ class TestUrlEncodingInGetPromptTemplate:
     def test_sync_get_prompt_template_encodes_special_chars(self, promptlayer_api_key, base_url):
         """Prompt names with various special characters should be URL-encoded."""
         prompt_name = "test/prompt:name@v1#latest"
-        # URL encoding: / -> %2F, : -> %3A, @ -> %40, # -> %23
+        # URL encoding: / -> %252F to survive one router decode, : -> %3A, @ -> %40, # -> %23
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -102,16 +102,16 @@ class TestUrlEncodingInGetPromptTemplate:
             call_args = mock_session.return_value.post.call_args
             actual_url = call_args[0][0]
             # Verify special characters are encoded
-            assert "%2F" in actual_url, "Slash not encoded"
+            assert "%252F" in actual_url, "Slash not double-encoded"
             assert "%3A" in actual_url, "Colon not encoded"
             assert "%40" in actual_url, "At sign not encoded"
             assert "%23" in actual_url, "Hash not encoded"
 
     @pytest.mark.asyncio
     async def test_async_get_prompt_template_encodes_slashes(self, promptlayer_api_key, base_url):
-        """Async: Prompt names with slashes should be URL-encoded."""
+        """Async: Prompt names with slashes should survive one router decode pass."""
         prompt_name = "feature1/resolve_problem_2"
-        expected_encoded = "feature1%2Fresolve_problem_2"
+        expected_encoded = "feature1%252Fresolve_problem_2"
 
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -190,7 +190,7 @@ class TestUrlEncodingInGetPromptTemplate:
             call_args = mock_client.post.call_args
             actual_url = call_args[0][0]
             # Verify special characters are encoded
-            assert "%2F" in actual_url, "Slash not encoded"
+            assert "%252F" in actual_url, "Slash not double-encoded"
             assert "%3A" in actual_url, "Colon not encoded"
             assert "%40" in actual_url, "At sign not encoded"
             assert "%23" in actual_url, "Hash not encoded"

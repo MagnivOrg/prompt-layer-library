@@ -12,6 +12,7 @@ from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
 from promptlayer.skills import AsyncSkillManager, SkillManager
 from promptlayer.streaming import astream_response, stream_response
+from promptlayer.tables import AsyncTableManager, TableManager
 from promptlayer.template_cache import PromptTemplateCache
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
 from promptlayer.track import AsyncTrackManager, TrackManager
@@ -79,6 +80,7 @@ class PromptLayer(PromptLayerMixin):
         cache = PromptTemplateCache(cache_ttl_seconds) if cache_ttl_seconds else None
         self.templates = TemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
         self.skills = SkillManager(api_key, self.base_url, self.throw_on_error)
+        self.tables = TableManager(api_key, self.base_url, self.throw_on_error)
         self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing
@@ -467,6 +469,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         cache = PromptTemplateCache(cache_ttl_seconds) if cache_ttl_seconds else None
         self.templates = AsyncTemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
         self.skills = AsyncSkillManager(api_key, self.base_url, self.throw_on_error)
+        self.tables = AsyncTableManager(api_key, self.base_url, self.throw_on_error)
         self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing

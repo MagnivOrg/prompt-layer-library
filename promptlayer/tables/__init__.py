@@ -1,8 +1,8 @@
 from promptlayer.tables.scorecards import (
     AsyncScorecardManager,
     ScorecardManager,
-    aconfigure_scorecard,
     acancel_scorecard_calculation,
+    aconfigure_scorecard,
     adelete_scorecard,
     aget_scorecard,
     aget_scorecard_calculation,

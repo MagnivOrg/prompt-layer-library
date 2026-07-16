@@ -18,12 +18,12 @@ from promptlayer.tables.scorecards import cancel_scorecard_calculation
 from promptlayer.types.scorecard import (
     CancelScorecardRequest,
     ConfigureScorecardRequest,
-    GetScoreScorecardCompatibilityResponse,
     GetScorecardRowOptions,
+    GetScoreScorecardCompatibilityResponse,
     ListScorecardRowsOptions,
     MigrateLegacyScorecardRequest,
-    RecalculateScoreResponse,
     RecalculateScorecardRequest,
+    RecalculateScoreResponse,
 )
 
 TABLE_ID = "table/1"

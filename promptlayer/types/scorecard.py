@@ -3,7 +3,21 @@ from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 from typing_extensions import NotRequired, Required
 
 ScoreVerdict = Literal["pass", "warn", "fail", "error", "skipped", "unknown"]
-ScorecardStatus = Literal["needs_setup", "ready", "queued", "running", "completed", "stale", "failed"]
+# Public scorecards use lifecycle statuses like `needs_setup` and `ready`; the older draft values
+# are retained for compatibility with the initial unreleased SDK draft shipped in this PR branch.
+ScorecardStatus = Literal[
+    "needs_setup",
+    "ready",
+    "queued",
+    "running",
+    "completed",
+    "stale",
+    "failed",
+    "active",
+    "draft",
+    "disabled",
+    "deleted",
+]
 ScorecardCalculationStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 # Public scorecard payloads use uppercase primitive types; lowercase values are retained for
 # compatibility with the initial unreleased SDK draft shipped in this PR branch.
@@ -186,7 +200,7 @@ class ScorecardActionResponse(TypedDict, total=False):
 class ScorecardRecalculateResponse(TypedDict, total=False):
     success: Required[bool]
     calculation_id: Required[str]
-    status: Required[Literal["queued"]]
+    status: Required[ScorecardCalculationStatus]
     version: Required[int]
 
 
@@ -209,6 +223,9 @@ class ScorecardRowsResponse(TypedDict, total=False):
 
 class ScorecardRowResponse(ScorecardRowBreakdown, total=False):
     success: Required[bool]
+    # Public API flattens row fields at the top level; retain `row` for compatibility with the
+    # initial unreleased SDK draft structure.
+    row: NotRequired[ScorecardRowBreakdown]
 
 
 class LegacyScorecardAggregateResult(TypedDict, total=False):

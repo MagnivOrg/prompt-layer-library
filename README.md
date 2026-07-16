@@ -131,9 +131,78 @@ The main resources surfaced by `PromptLayer` and `AsyncPromptLayer` are:
 | `client.group` | Group creation for organizing related requests. |
 | `client.traceable()` | Decorator for tracing your own functions and sending those spans to PromptLayer when tracing is enabled. |
 | `client.skills` | Skill collection pull, create, publish, and update operations. |
+| `client.tables.sheets.scorecards` | Table scorecard configuration, migration, recalculation, and row-level result retrieval. |
 | `client.openai` and `client.anthropic` | Provider proxies that wrap those SDKs and log requests to PromptLayer. |
 
 Note: When tracing is enabled, spans are exported to PromptLayer using OpenTelemetry.
+
+## Table Scorecards
+
+New scorecard APIs are preferred for new table scoring workflows. Legacy `/score` endpoints remain supported for existing integrations. If both a legacy score configuration and a scorecard exist on the same sheet, `/score` continues to return legacy score behavior; use the `/scorecard` endpoints through `client.tables.sheets.scorecards` to access scorecard state and results.
+
+Configure a scorecard:
+
+```python
+await client.tables.sheets.scorecards.configure(
+    table_id,
+    sheet_id,
+    {
+        "name": "Quality Scorecard",
+        "evaluated_column_ids": [],
+        "aggregation": {
+            "method": "weighted_mean",
+            "required_step_failure_behavior": "fail",
+            "pass_threshold": 0.8,
+            "warn_threshold": 0.6,
+        },
+        "steps": [],
+    },
+)
+```
+
+Migrate a legacy score safely. `delete_legacy_score` defaults to `False`, so migration does not remove legacy score configuration unless you explicitly request it:
+
+```python
+await client.tables.sheets.scorecards.migrate_legacy_score(
+    table_id,
+    sheet_id,
+    {"delete_legacy_score": False},
+)
+```
+
+Recalculate and fetch the calculation:
+
+```python
+run = await client.tables.sheets.scorecards.recalculate(table_id, sheet_id)
+
+result = await client.tables.sheets.scorecards.get_calculation(
+    table_id,
+    sheet_id,
+    run["calculation_id"],
+)
+```
+
+Fetch row breakdowns:
+
+```python
+rows = await client.tables.sheets.scorecards.list_rows(
+    table_id,
+    sheet_id,
+    {
+        "calculation_id": run["calculation_id"],
+        "verdict": "fail",
+    },
+)
+
+row = await client.tables.sheets.scorecards.get_row(
+    table_id,
+    sheet_id,
+    0,
+    {"calculation_id": run["calculation_id"]},
+)
+```
+
+Migration caveat: custom legacy scoring cannot be automatically converted into scorecard criteria. Review migrated criteria before relying on scorecard results in production.
 
 ## Integration Modules
 

@@ -1,11 +1,22 @@
 from typing import Any, Dict, List, Literal, Optional, TypedDict, Union
 
-from typing_extensions import Required
+from typing_extensions import NotRequired, Required
 
 ScoreVerdict = Literal["pass", "warn", "fail", "error", "skipped", "unknown"]
-ScorecardStatus = Literal["active", "draft", "disabled", "deleted"]
+ScorecardStatus = Literal["needs_setup", "ready", "queued", "running", "completed", "stale", "failed"]
 ScorecardCalculationStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
-ScorecardPrimitiveType = Literal["boolean", "number", "categorical", "text", "json"]
+ScorecardPrimitiveType = Literal[
+    "BOOLEAN",
+    "NUMBER",
+    "CATEGORICAL",
+    "TEXT",
+    "JSON",
+    "boolean",
+    "number",
+    "categorical",
+    "text",
+    "json",
+]
 ScorecardStaleState = Literal["fresh", "stale", "missing", "unknown"]
 
 
@@ -43,15 +54,18 @@ class CriterionSummary(TypedDict, total=False):
 
 
 class ScorecardStep(TypedDict, total=False):
-    id: Optional[str]
-    name: Required[str]
-    description: Optional[str]
-    evaluator_id: Optional[str]
-    primitive_type: Optional[ScorecardPrimitiveType]
-    required: Optional[bool]
-    weight: Optional[float]
-    thresholds: Optional[ScorecardThresholds]
-    config: Dict[str, Any]
+    id: NotRequired[str]
+    title: Required[str]
+    name: NotRequired[str]
+    description: NotRequired[str]
+    evaluator_id: NotRequired[str]
+    primitive_type: NotRequired[ScorecardPrimitiveType]
+    required: NotRequired[bool]
+    weight: NotRequired[float]
+    thresholds: NotRequired[ScorecardThresholds]
+    primitive_config: NotRequired[Dict[str, Any]]
+    score_adapter: NotRequired[Dict[str, Any]]
+    config: NotRequired[Dict[str, Any]]
 
 
 class ScorecardDriftSummary(TypedDict, total=False):
@@ -84,34 +98,35 @@ class ScorecardCalculation(TypedDict, total=False):
     table_id: Required[Union[str, int]]
     sheet_id: Required[Union[str, int]]
     status: Required[ScorecardCalculationStatus]
-    version: Optional[int]
-    score: Optional[float]
-    verdict: Optional[ScoreVerdict]
-    row_count: Optional[int]
-    completed_row_count: Optional[int]
-    failed_row_count: Optional[int]
-    error_message: Optional[str]
-    started_at: Optional[str]
-    completed_at: Optional[str]
-    created_at: Optional[str]
-    updated_at: Optional[str]
+    version: NotRequired[int]
+    aggregate_score: NotRequired[float]
+    aggregate_verdict: NotRequired[ScoreVerdict]
+    criterion_summaries: NotRequired[List[CriterionSummary]]
+    drift_summary: NotRequired[ScorecardDriftSummary]
+    row_count: NotRequired[int]
+    completed_row_count: NotRequired[int]
+    failed_row_count: NotRequired[int]
+    error_summary: NotRequired[Dict[str, Any]]
+    started_at: NotRequired[str]
+    completed_at: NotRequired[str]
+    created_at: NotRequired[str]
+    updated_at: NotRequired[str]
 
 
 class ScorecardRowSummary(TypedDict, total=False):
     row_index: Required[int]
-    calculation_id: Optional[str]
-    score: Optional[float]
-    verdict: Optional[ScoreVerdict]
-    stale_state: Optional[ScorecardStaleState]
-    criterion_summaries: List[CriterionSummary]
-    error_message: Optional[str]
+    calculation_id: NotRequired[str]
+    aggregate_score: NotRequired[float]
+    aggregate_verdict: NotRequired[ScoreVerdict]
+    step_results: NotRequired[Dict[str, Any]]
+    drift_summary: NotRequired[ScorecardDriftSummary]
+    stale_state: NotRequired[ScorecardStaleState]
+    error_summary: NotRequired[Dict[str, Any]]
 
 
 class ScorecardRowBreakdown(ScorecardRowSummary, total=False):
-    criteria: List[CriterionSummary]
-    evaluator_results: List[EvaluatorResult]
-    aggregate_result: Dict[str, Any]
-    row_data: Dict[str, Any]
+    criterion_summaries: NotRequired[List[CriterionSummary]]
+    row_data: NotRequired[Dict[str, Any]]
 
 
 class ConfigureScorecardRequest(TypedDict, total=False):
@@ -128,19 +143,19 @@ class MigrateLegacyScorecardRequest(TypedDict, total=False):
 
 class RecalculateScorecardRequest(TypedDict, total=False):
     row_indices: List[int]
-    force: bool
+    step_ids: List[str]
 
 
 class CancelScorecardRequest(TypedDict, total=False):
-    calculation_id: str
+    row_indices: List[int]
+    step_ids: List[str]
 
 
 class ListScorecardRowsOptions(TypedDict, total=False):
     calculation_id: str
     verdict: ScoreVerdict
-    stale_state: ScorecardStaleState
     limit: int
-    offset: int
+    cursor: str
 
 
 class GetScorecardRowOptions(TypedDict, total=False):
@@ -159,38 +174,61 @@ class ScorecardCalculationResponse(TypedDict, total=False):
 
 class ScorecardActionResponse(TypedDict, total=False):
     success: Required[bool]
-    calculation_id: Optional[str]
-    status: Optional[ScorecardCalculationStatus]
-    version: Optional[int]
-    scorecard: Optional[Scorecard]
-    calculation: Optional[ScorecardCalculation]
+    message: NotRequired[str]
+    scorecard: NotRequired[Scorecard]
+
+
+class ScorecardRecalculateResponse(TypedDict, total=False):
+    success: Required[bool]
+    calculation_id: Required[str]
+    status: Required[Literal["queued"]]
+    version: Required[int]
+
+
+class ScorecardCancelResponse(TypedDict, total=False):
+    success: Required[bool]
+    message: NotRequired[str]
+    scorecard: NotRequired[Scorecard]
+    cancelled_count: NotRequired[int]
+    execution_ids: NotRequired[List[str]]
+    calculation_id: NotRequired[str]
 
 
 class ScorecardRowsResponse(TypedDict, total=False):
     success: Required[bool]
+    calculation_id: NotRequired[str]
     rows: Required[List[ScorecardRowSummary]]
-    next_offset: Optional[int]
+    next_cursor: NotRequired[Optional[str]]
+    verdict_counts: NotRequired[Dict[str, int]]
 
 
-class ScorecardRowResponse(TypedDict, total=False):
+class ScorecardRowResponse(ScorecardRowBreakdown, total=False):
     success: Required[bool]
-    row: Required[ScorecardRowBreakdown]
 
 
-class LegacyScorecardAggregateResult(TypedDict):
+class LegacyScorecardAggregateResult(TypedDict, total=False):
     scorecard_id: Required[str]
     scorecard_calculation_id: Required[str]
+    aggregate_score: NotRequired[float]
+    aggregate_verdict: NotRequired[ScoreVerdict]
 
 
-class LegacyScorecardDetails(TypedDict):
+class LegacyScorecardDetails(TypedDict, total=False):
     aggregate_result: Required[LegacyScorecardAggregateResult]
+    aggregate: NotRequired[Dict[str, Any]]
+    per_column: NotRequired[Dict[str, Any]]
 
 
-class GetScoreScorecardCompatibilityResponse(TypedDict):
+class GetScoreScorecardCompatibilityResponse(TypedDict, total=False):
     score_type: Required[Literal["scorecard"]]
     scoring_type: Required[Literal["scorecard"]]
     score_configuration: Required[None]
     details: Required[LegacyScorecardDetails]
+    overall_score: NotRequired[float]
+    aggregate_score: NotRequired[float]
+    aggregate: NotRequired[Dict[str, Any]]
+    per_column: NotRequired[Dict[str, Any]]
+    status: NotRequired[str]
 
 
 class RecalculateScoreLegacyResponse(TypedDict, total=False):

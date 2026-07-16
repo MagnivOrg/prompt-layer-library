@@ -4,7 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from promptlayer.tables import (
+    aconfigure_scorecard,
     aget_scorecard,
+    arecalculate_scorecard,
     configure_scorecard,
     delete_scorecard,
     get_scorecard,
@@ -57,7 +59,7 @@ def test_get_scorecard_sends_expected_request(promptlayer_api_key, base_url):
         assert response == payload
 
 
-def test_configure_scorecard_puts_body(promptlayer_api_key, base_url):
+def test_configure_scorecard_patches_body(promptlayer_api_key, base_url):
     body: ConfigureScorecardRequest = {
         "name": "Quality Scorecard",
         "evaluated_column_ids": [],
@@ -72,11 +74,11 @@ def test_configure_scorecard_puts_body(promptlayer_api_key, base_url):
     payload = {"success": True, "scorecard": {"id": "sc_1", **body}}
 
     with patch("promptlayer.tables.scorecards._get_requests_session") as mock_session:
-        mock_session.return_value.put.return_value = _mock_response(payload)
+        mock_session.return_value.patch.return_value = _mock_response(payload)
 
         response = configure_scorecard(promptlayer_api_key, base_url, True, TABLE_ID, SHEET_ID, body)
 
-        _assert_request(mock_session.return_value.put.call_args, base_url, promptlayer_api_key, json=body)
+        _assert_request(mock_session.return_value.patch.call_args, base_url, promptlayer_api_key, json=body)
         assert response == payload
 
 
@@ -100,11 +102,11 @@ def test_migrate_legacy_score_posts_options(promptlayer_api_key, base_url):
 
 
 def test_recalculate_scorecard_posts_options(promptlayer_api_key, base_url):
-    body: RecalculateScorecardRequest = {"row_indices": [0, 1], "force": True}
+    body: RecalculateScorecardRequest = {"row_indices": [0, 1], "step_ids": ["step_1"]}
     payload = {"success": True, "calculation_id": "calc_1", "status": "queued", "version": 3}
 
     with patch("promptlayer.tables.scorecards._get_requests_session") as mock_session:
-        mock_session.return_value.post.return_value = _mock_response(payload)
+        mock_session.return_value.post.return_value = _mock_response(payload, status_code=202)
 
         response = recalculate_scorecard(promptlayer_api_key, base_url, True, TABLE_ID, SHEET_ID, body)
 
@@ -119,8 +121,15 @@ def test_recalculate_scorecard_posts_options(promptlayer_api_key, base_url):
 
 
 def test_cancel_scorecard_posts_options(promptlayer_api_key, base_url):
-    body: CancelScorecardRequest = {"calculation_id": "calc_1"}
-    payload = {"success": True, "calculation_id": "calc_1", "status": "cancelled"}
+    body: CancelScorecardRequest = {"row_indices": [0, 1], "step_ids": ["step_1"]}
+    payload = {
+        "success": True,
+        "message": "Cancelled scorecard runs",
+        "scorecard": {"id": "sc_1"},
+        "cancelled_count": 1,
+        "execution_ids": ["exec_1"],
+        "calculation_id": "calc_1",
+    }
 
     with patch("promptlayer.tables.scorecards._get_requests_session") as mock_session:
         mock_session.return_value.post.return_value = _mock_response(payload)
@@ -144,8 +153,19 @@ def test_get_scorecard_calculation_sends_expected_request(promptlayer_api_key, b
 
 
 def test_list_scorecard_rows_forwards_query_params(promptlayer_api_key, base_url):
-    options: ListScorecardRowsOptions = {"calculation_id": "calc_1", "verdict": "fail", "limit": 25, "offset": 50}
-    payload = {"success": True, "rows": [{"row_index": 0, "verdict": "fail"}], "next_offset": None}
+    options: ListScorecardRowsOptions = {
+        "calculation_id": "calc_1",
+        "verdict": "fail",
+        "limit": 25,
+        "cursor": "cursor_1",
+    }
+    payload = {
+        "success": True,
+        "calculation_id": "calc_1",
+        "rows": [{"row_index": 0, "aggregate_verdict": "fail"}],
+        "next_cursor": None,
+        "verdict_counts": {"fail": 1},
+    }
 
     with patch("promptlayer.tables.scorecards._get_requests_session") as mock_session:
         mock_session.return_value.get.return_value = _mock_response(payload)
@@ -158,7 +178,17 @@ def test_list_scorecard_rows_forwards_query_params(promptlayer_api_key, base_url
 
 def test_get_scorecard_row_forwards_query_params(promptlayer_api_key, base_url):
     options: GetScorecardRowOptions = {"calculation_id": "calc_1"}
-    payload = {"success": True, "row": {"row_index": 0, "verdict": "fail", "criteria": []}}
+    payload = {
+        "success": True,
+        "row_index": 0,
+        "calculation_id": "calc_1",
+        "aggregate_score": 0.91,
+        "aggregate_verdict": "fail",
+        "step_results": {},
+        "drift_summary": None,
+        "stale_state": None,
+        "error_summary": None,
+    }
 
     with patch("promptlayer.tables.scorecards._get_requests_session") as mock_session:
         mock_session.return_value.get.return_value = _mock_response(payload)
@@ -210,6 +240,47 @@ async def test_async_get_scorecard_sends_expected_request(promptlayer_api_key, b
         assert response == payload
 
 
+@pytest.mark.asyncio
+async def test_async_configure_scorecard_patches_body(promptlayer_api_key, base_url):
+    body: ConfigureScorecardRequest = {
+        "name": "Quality Scorecard",
+        "evaluated_column_ids": [],
+        "aggregation": {"method": "weighted_mean"},
+        "steps": [],
+    }
+    payload = {"success": True, "scorecard": {"id": "sc_1", **body}}
+
+    with patch("promptlayer.tables.scorecards._make_httpx_client") as mock_client_factory:
+        mock_client = AsyncMock()
+        mock_client.patch.return_value = _mock_response(payload)
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_factory.return_value = mock_client
+
+        response = await aconfigure_scorecard(promptlayer_api_key, base_url, True, TABLE_ID, SHEET_ID, body)
+
+        _assert_request(mock_client.patch.call_args, base_url, promptlayer_api_key, json=body)
+        assert response == payload
+
+
+@pytest.mark.asyncio
+async def test_async_recalculate_scorecard_accepts_202_response(promptlayer_api_key, base_url):
+    body: RecalculateScorecardRequest = {"row_indices": [0], "step_ids": ["step_1"]}
+    payload = {"success": True, "calculation_id": "calc_1", "status": "queued", "version": 3}
+
+    with patch("promptlayer.tables.scorecards._make_httpx_client") as mock_client_factory:
+        mock_client = AsyncMock()
+        mock_client.post.return_value = _mock_response(payload, status_code=202)
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client_factory.return_value = mock_client
+
+        response = await arecalculate_scorecard(promptlayer_api_key, base_url, True, TABLE_ID, SHEET_ID, body)
+
+        _assert_request(mock_client.post.call_args, base_url, promptlayer_api_key, "/recalculate", json=body)
+        assert response == payload
+
+
 def test_get_score_scorecard_compatibility_shape_is_supported_by_types():
     payload = cast(
         GetScoreScorecardCompatibilityResponse,
@@ -219,10 +290,15 @@ def test_get_score_scorecard_compatibility_shape_is_supported_by_types():
                 "score_type": "scorecard",
                 "scoring_type": "scorecard",
                 "score_configuration": None,
+                "overall_score": 0.91,
+                "aggregate_score": 0.91,
+                "status": "completed",
                 "details": {
                     "aggregate_result": {
                         "scorecard_id": "sc_1",
                         "scorecard_calculation_id": "calc_1",
+                        "aggregate_score": 0.91,
+                        "aggregate_verdict": "pass",
                     }
                 },
             },
@@ -231,6 +307,7 @@ def test_get_score_scorecard_compatibility_shape_is_supported_by_types():
 
     assert payload["score_configuration"] is None
     assert payload["details"]["aggregate_result"]["scorecard_calculation_id"] == "calc_1"
+    assert payload["aggregate_score"] == 0.91
 
 
 def test_recalculate_score_scorecard_piggyback_shape_is_supported_by_types():

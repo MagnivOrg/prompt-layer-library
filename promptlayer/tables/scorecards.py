@@ -14,6 +14,8 @@ from promptlayer.types.scorecard import (
     RecalculateScorecardRequest,
     ScorecardActionResponse,
     ScorecardCalculationResponse,
+    ScorecardCancelResponse,
+    ScorecardRecalculateResponse,
     ScorecardResponse,
     ScorecardRowResponse,
     ScorecardRowsResponse,
@@ -30,6 +32,8 @@ from promptlayer.utils import (
 JsonResponse = Union[
     ScorecardResponse,
     ScorecardActionResponse,
+    ScorecardRecalculateResponse,
+    ScorecardCancelResponse,
     ScorecardCalculationResponse,
     ScorecardRowsResponse,
     ScorecardRowResponse,
@@ -172,7 +176,7 @@ def configure_scorecard(
     body: ConfigureScorecardRequest,
 ) -> Union[ScorecardResponse, None]:
     return _sync_request(
-        "put",
+        "patch",
         api_key,
         base_url,
         throw_on_error,
@@ -192,7 +196,7 @@ async def aconfigure_scorecard(
     body: ConfigureScorecardRequest,
 ) -> Union[ScorecardResponse, None]:
     return await _async_request(
-        "put",
+        "patch",
         api_key,
         base_url,
         throw_on_error,
@@ -288,7 +292,7 @@ def recalculate_scorecard(
     table_id: Union[str, int],
     sheet_id: Union[str, int],
     body: Union[RecalculateScorecardRequest, None] = None,
-) -> Union[ScorecardActionResponse, None]:
+) -> Union[ScorecardRecalculateResponse, None]:
     return _sync_request(
         "post",
         api_key,
@@ -298,6 +302,7 @@ def recalculate_scorecard(
         sheet_id,
         parts=("recalculate",),
         json=body or {},
+        success_status=202,
         error_context="PromptLayer had the following error while recalculating your scorecard",
     )
 
@@ -309,7 +314,7 @@ async def arecalculate_scorecard(
     table_id: Union[str, int],
     sheet_id: Union[str, int],
     body: Union[RecalculateScorecardRequest, None] = None,
-) -> Union[ScorecardActionResponse, None]:
+) -> Union[ScorecardRecalculateResponse, None]:
     return await _async_request(
         "post",
         api_key,
@@ -319,6 +324,7 @@ async def arecalculate_scorecard(
         sheet_id,
         parts=("recalculate",),
         json=body or {},
+        success_status=202,
         error_context="PromptLayer had the following error while recalculating your scorecard",
     )
 
@@ -330,7 +336,7 @@ def cancel_scorecard_calculation(
     table_id: Union[str, int],
     sheet_id: Union[str, int],
     body: Union[CancelScorecardRequest, None] = None,
-) -> Union[ScorecardActionResponse, None]:
+) -> Union[ScorecardCancelResponse, None]:
     return _sync_request(
         "post",
         api_key,
@@ -351,7 +357,7 @@ async def acancel_scorecard_calculation(
     table_id: Union[str, int],
     sheet_id: Union[str, int],
     body: Union[CancelScorecardRequest, None] = None,
-) -> Union[ScorecardActionResponse, None]:
+) -> Union[ScorecardCancelResponse, None]:
     return await _async_request(
         "post",
         api_key,
@@ -521,7 +527,7 @@ class ScorecardManager:
         table_id: Union[str, int],
         sheet_id: Union[str, int],
         options: Union[RecalculateScorecardRequest, None] = None,
-    ) -> Union[ScorecardActionResponse, None]:
+    ) -> Union[ScorecardRecalculateResponse, None]:
         return recalculate_scorecard(self.api_key, self.base_url, self.throw_on_error, table_id, sheet_id, options)
 
     def cancel(
@@ -529,7 +535,7 @@ class ScorecardManager:
         table_id: Union[str, int],
         sheet_id: Union[str, int],
         options: Union[CancelScorecardRequest, None] = None,
-    ) -> Union[ScorecardActionResponse, None]:
+    ) -> Union[ScorecardCancelResponse, None]:
         return cancel_scorecard_calculation(
             self.api_key, self.base_url, self.throw_on_error, table_id, sheet_id, options
         )
@@ -593,7 +599,7 @@ class AsyncScorecardManager:
         table_id: Union[str, int],
         sheet_id: Union[str, int],
         options: Union[RecalculateScorecardRequest, None] = None,
-    ) -> Union[ScorecardActionResponse, None]:
+    ) -> Union[ScorecardRecalculateResponse, None]:
         return await arecalculate_scorecard(
             self.api_key, self.base_url, self.throw_on_error, table_id, sheet_id, options
         )
@@ -603,7 +609,7 @@ class AsyncScorecardManager:
         table_id: Union[str, int],
         sheet_id: Union[str, int],
         options: Union[CancelScorecardRequest, None] = None,
-    ) -> Union[ScorecardActionResponse, None]:
+    ) -> Union[ScorecardCancelResponse, None]:
         return await acancel_scorecard_calculation(
             self.api_key, self.base_url, self.throw_on_error, table_id, sheet_id, options
         )

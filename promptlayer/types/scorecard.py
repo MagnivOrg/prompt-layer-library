@@ -72,7 +72,8 @@ class CriterionSummary(TypedDict, total=False):
 class ScorecardStep(TypedDict, total=False):
     id: NotRequired[str]
     title: Required[str]
-    # Public API uses `title`; retain `name` for compatibility with the initial unreleased SDK draft.
+    # Public API uses `title`; use that going forward. `name` is retained only for compatibility
+    # with the initial unreleased SDK draft and may be removed in a future version.
     name: NotRequired[str]
     description: NotRequired[str]
     evaluator_id: NotRequired[str]
@@ -223,8 +224,8 @@ class ScorecardRowsResponse(TypedDict, total=False):
 
 class ScorecardRowResponse(ScorecardRowBreakdown, total=False):
     success: Required[bool]
-    # Public API flattens row fields at the top level; retain `row` for compatibility with the
-    # initial unreleased SDK draft structure.
+    # Public API returns row fields at the top level; clients should prefer those fields. The
+    # nested `row` shape is retained only for compatibility with the initial unreleased SDK draft.
     row: NotRequired[ScorecardRowBreakdown]
 
 

@@ -5,12 +5,19 @@ from typing_extensions import NotRequired, Required
 ScoreVerdict = Literal["pass", "warn", "fail", "error", "skipped", "unknown"]
 ScorecardStatus = Literal["needs_setup", "ready", "queued", "running", "completed", "stale", "failed"]
 ScorecardCalculationStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+# Public scorecard payloads use uppercase primitive types; lowercase values are retained for
+# compatibility with the initial unreleased SDK draft shipped in this PR branch.
 ScorecardPrimitiveType = Literal[
     "BOOLEAN",
     "NUMBER",
     "CATEGORICAL",
     "TEXT",
     "JSON",
+    "boolean",
+    "number",
+    "categorical",
+    "text",
+    "json",
 ]
 ScorecardStaleState = Literal["fresh", "stale", "missing", "unknown"]
 
@@ -51,13 +58,17 @@ class CriterionSummary(TypedDict, total=False):
 class ScorecardStep(TypedDict, total=False):
     id: NotRequired[str]
     title: Required[str]
+    # Public API uses `title`; retain `name` for compatibility with the initial unreleased SDK draft.
+    name: NotRequired[str]
     description: NotRequired[str]
     evaluator_id: NotRequired[str]
     primitive_type: NotRequired[ScorecardPrimitiveType]
     required: NotRequired[bool]
     weight: NotRequired[float]
     thresholds: NotRequired[ScorecardThresholds]
+    # Backend scorecard steps serialize provider-specific primitive settings under `primitive_config`.
     primitive_config: NotRequired[Dict[str, Any]]
+    # Backend scorecard steps serialize aggregation/adaptation settings under `score_adapter`.
     score_adapter: NotRequired[Dict[str, Any]]
     config: NotRequired[Dict[str, Any]]
 

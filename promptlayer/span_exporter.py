@@ -5,6 +5,7 @@ from opentelemetry import baggage, context, trace
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
+from promptlayer.tracing_context import format_otel_span_id, format_otel_trace_id
 from promptlayer.utils import _get_requests_session, raise_on_bad_response, retry_on_api_error
 
 _BAGGAGE_KEYS = (
@@ -72,7 +73,7 @@ class PromptLayerSpanExporter(SpanExporter):
     def _post_spans(self, request_data):
         response = _get_requests_session().post(
             self.url,
-            headers={"X-Api-Key": self.api_key, "Content-Type": "application/json"},
+            headers={"X-API-KEY": self.api_key, "Content-Type": "application/json"},
             json={"spans": request_data},
         )
         if response.status_code not in (200, 201):
@@ -86,12 +87,12 @@ class PromptLayerSpanExporter(SpanExporter):
             span_info = {
                 "name": span.name,
                 "context": {
-                    "trace_id": hex(span.context.trace_id)[2:].zfill(32),  # Ensure 32 characters
-                    "span_id": hex(span.context.span_id)[2:].zfill(16),  # Ensure 16 characters
+                    "trace_id": format_otel_trace_id(span.context.trace_id),
+                    "span_id": format_otel_span_id(span.context.span_id),
                     "trace_state": str(span.context.trace_state),
                 },
                 "kind": str(span.kind),
-                "parent_id": hex(span.parent.span_id)[2:] if span.parent else None,
+                "parent_id": format_otel_span_id(span.parent.span_id) if span.parent else None,
                 "start_time": span.start_time,
                 "end_time": span.end_time,
                 "status": {

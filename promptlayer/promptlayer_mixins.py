@@ -10,6 +10,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
 from promptlayer.span_exporter import PromptLayerSpanExporter
+from promptlayer.tracing_context import resolve_tracer
 from promptlayer.streaming import (
     aanthropic_stream_completion,
     aanthropic_stream_message,
@@ -287,6 +288,15 @@ AMAP_PROVIDER_TO_FUNCTION = {
 
 
 class PromptLayerMixin:
+    @property
+    def tracer(self):
+        """Resolve tracer at use-time so Eval can nest client spans."""
+        return resolve_tracer(getattr(self, "_tracer", None))
+
+    @tracer.setter
+    def tracer(self, value) -> None:
+        self._tracer = value
+
     @staticmethod
     def _initialize_tracer(api_key: str, base_url: str, throw_on_error: bool, enable_tracing: bool = False):
         if enable_tracing:
@@ -449,9 +459,10 @@ class PromptLayerMixin:
         def decorator(func):
             @wraps(func)
             def sync_wrapper(*args, **kwargs):
-                if self.tracer:
+                tracer = self.tracer
+                if tracer:
                     span_name = name or func.__name__
-                    with self.tracer.start_as_current_span(span_name) as span:
+                    with tracer.start_as_current_span(span_name) as span:
                         if attributes:
                             for key, value in attributes.items():
                                 span.set_attribute(key, value)
@@ -466,9 +477,10 @@ class PromptLayerMixin:
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
-                if self.tracer:
+                tracer = self.tracer
+                if tracer:
                     span_name = name or func.__name__
-                    with self.tracer.start_as_current_span(span_name) as span:
+                    with tracer.start_as_current_span(span_name) as span:
                         if attributes:
                             for key, value in attributes.items():
                                 span.set_attribute(key, value)

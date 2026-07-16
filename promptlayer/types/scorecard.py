@@ -11,11 +11,6 @@ ScorecardPrimitiveType = Literal[
     "CATEGORICAL",
     "TEXT",
     "JSON",
-    "boolean",
-    "number",
-    "categorical",
-    "text",
-    "json",
 ]
 ScorecardStaleState = Literal["fresh", "stale", "missing", "unknown"]
 
@@ -56,7 +51,6 @@ class CriterionSummary(TypedDict, total=False):
 class ScorecardStep(TypedDict, total=False):
     id: NotRequired[str]
     title: Required[str]
-    name: NotRequired[str]
     description: NotRequired[str]
     evaluator_id: NotRequired[str]
     primitive_type: NotRequired[ScorecardPrimitiveType]

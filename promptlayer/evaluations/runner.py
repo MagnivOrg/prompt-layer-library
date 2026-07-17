@@ -230,13 +230,22 @@ def _execute_cases_sync(
             _emit_runner_progress(completed, total)
         return [item for item in results if item is not None]
 
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(_run_one, index, case) for index, case in enumerate(cases)]
+    executor = ThreadPoolExecutor(max_workers=workers)
+    futures = [executor.submit(_run_one, index, case) for index, case in enumerate(cases)]
+    interrupted = False
+    try:
         for future in as_completed(futures):
             index, executed = future.result()
             results[index] = executed
             completed += 1
             _emit_runner_progress(completed, total)
+    except KeyboardInterrupt:
+        interrupted = True
+        for future in futures:
+            future.cancel()
+        raise
+    finally:
+        executor.shutdown(wait=not interrupted, cancel_futures=True)
 
     return [item for item in results if item is not None]
 

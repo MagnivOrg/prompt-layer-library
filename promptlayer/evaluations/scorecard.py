@@ -12,6 +12,7 @@ from promptlayer.evaluations.utils import (
 )
 from promptlayer.evaluations.validation import (
     api_error,
+    resolve_config_sources_to_column_ids,
     scorer_dependencies_from_config,
 )
 
@@ -58,14 +59,16 @@ def build_scorecard_steps_from_scorers(
     steps: List[Dict[str, Any]] = []
     for index, scorer in enumerate(scorers):
         primitive_type = str(scorer["type"]).upper()
-        primitive_config = _strip_sdk_only_config(scorer.get("config"))
+        author_config = _strip_sdk_only_config(scorer.get("config"))
         dependencies = scorer_dependencies_from_config(scorer.get("config"), by_title)
         source_column_ids = [str(dependency["column_id"]) for dependency in dependencies]
         if primitive_type == "CODE_EXECUTION" and not source_column_ids:
             source_column_ids = _infer_code_execution_source_ids(
-                primitive_config.get("code"),
+                author_config.get("code"),
                 by_title,
             )
+        # Persist column IDs (not titles) so the Scorecard UI can resolve sources.
+        primitive_config = resolve_config_sources_to_column_ids(author_config, by_title)
         step: Dict[str, Any] = {
             "title": scorer["title"],
             "primitive_type": primitive_type,

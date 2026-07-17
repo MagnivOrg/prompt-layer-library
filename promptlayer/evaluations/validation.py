@@ -349,6 +349,52 @@ def scorer_dependencies_from_config(
     return dependencies
 
 
+def resolve_config_sources_to_column_ids(
+    config: Optional[Dict[str, Any]],
+    columns_by_title: Dict[str, Column],
+) -> Dict[str, Any]:
+    """Return a copy of config with source column titles rewritten to column IDs.
+
+    Authoring APIs keep human-readable titles (e.g. ``source="output"``). The
+    scorecard UI and backing-column dependency wiring expect UUIDs in
+    ``primitive_config``, so rewrite titles once columns exist.
+    """
+    if not isinstance(config, dict):
+        return {}
+
+    by_id = {str(column["id"]): column for column in columns_by_title.values()}
+
+    def _resolve_ref(reference: Any) -> Any:
+        if not isinstance(reference, str) or not reference.strip():
+            return reference
+        column = columns_by_title.get(reference) or by_id.get(reference)
+        if column is None:
+            return reference
+        return str(column["id"])
+
+    resolved = dict(config)
+    for key in _NAMED_SOURCE_KEYS:
+        if key in resolved:
+            resolved[key] = _resolve_ref(resolved[key])
+
+    # Used by COLUMN_AGGREGATE; not in dependency iteration but still UI-bound.
+    if "label_source" in resolved:
+        resolved["label_source"] = _resolve_ref(resolved["label_source"])
+
+    sources = resolved.get("sources")
+    if isinstance(sources, list):
+        resolved["sources"] = [_resolve_ref(item) for item in sources]
+
+    for key in _MAPPING_SOURCE_KEYS:
+        mapping = resolved.get(key)
+        if isinstance(mapping, dict):
+            resolved[key] = {
+                variable_name: _resolve_ref(source_ref)
+                for variable_name, source_ref in mapping.items()
+            }
+    return resolved
+
+
 def _config_references_trace(config: Optional[Dict[str, Any]]) -> bool:
     from promptlayer.evaluations.code_refs import config_references_titles
 

@@ -6,6 +6,7 @@ import argparse
 import ast
 import os
 import runpy
+import signal
 import sys
 import traceback
 from contextlib import contextmanager
@@ -14,6 +15,23 @@ from typing import Iterable, Iterator, List, Optional, Sequence
 
 from promptlayer.exceptions import EvaluationFailedError
 from promptlayer.evaluations.terminal import EvalTerminal, set_terminal
+
+_SIGINT_COUNT = 0
+
+
+def _install_double_sigint_handler() -> None:
+    """First Ctrl+C asks for confirmation; second force-kills the process."""
+
+    def _handler(signum, frame):  # noqa: ARG001
+        global _SIGINT_COUNT
+        _SIGINT_COUNT += 1
+        if _SIGINT_COUNT == 1:
+            sys.stderr.write("\nAre you sure? Press Ctrl+C again to force quit.\n")
+            sys.stderr.flush()
+            raise KeyboardInterrupt
+        os._exit(130)
+
+    signal.signal(signal.SIGINT, _handler)
 
 _SKIP_DIR_NAMES = frozenset(
     {
@@ -57,6 +75,7 @@ def add_eval_parser(subparsers: argparse._SubParsersAction) -> None:
 def run_eval_command(args: argparse.Namespace) -> int:
     terminal = EvalTerminal()
     set_terminal(terminal)
+    _install_double_sigint_handler()
 
     try:
         files = discover_eval_files(args.paths)
@@ -73,27 +92,36 @@ def run_eval_command(args: argparse.Namespace) -> int:
 
     passed = 0
     failed = 0
-    for index, path in enumerate(files, start=1):
-        display = _display_path(path)
-        terminal.file_start(display, index=index, total=len(files))
-        failure_message: Optional[str] = None
-        try:
-            _run_eval_file(path)
-        except SystemExit as exc:
-            code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
-            if code:
-                failure_message = f"exited with code {code}"
-        except EvaluationFailedError as exc:
-            failure_message = str(exc)
-        except Exception:  # noqa: BLE001 - surface file failures to the CLI
-            failure_message = traceback.format_exc()
+    try:
+        for index, path in enumerate(files, start=1):
+            display = _display_path(path)
+            terminal.file_start(display, index=index, total=len(files))
+            failure_message: Optional[str] = None
+            try:
+                _run_eval_file(path)
+            except KeyboardInterrupt:
+                terminal.write("Eval interrupted.", err=True)
+                terminal.session_end(passed=passed, failed=failed + 1)
+                return 130
+            except SystemExit as exc:
+                code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+                if code:
+                    failure_message = f"exited with code {code}"
+            except EvaluationFailedError as exc:
+                failure_message = str(exc)
+            except Exception:  # noqa: BLE001 - surface file failures to the CLI
+                failure_message = traceback.format_exc()
 
-        if failure_message is None:
-            passed += 1
-            terminal.file_passed()
-        else:
-            failed += 1
-            terminal.file_failed(display, failure_message)
+            if failure_message is None:
+                passed += 1
+                terminal.file_passed()
+            else:
+                failed += 1
+                terminal.file_failed(display, failure_message)
+    except KeyboardInterrupt:
+        terminal.write("Eval interrupted.", err=True)
+        terminal.session_end(passed=passed, failed=failed + 1)
+        return 130
 
     terminal.session_end(passed=passed, failed=failed)
     return 1 if failed else 0

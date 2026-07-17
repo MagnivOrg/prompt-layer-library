@@ -136,6 +136,7 @@ def test_generic_column_helpers_build_backend_configs():
 
 def test_scorer_dependencies_from_config_resolve_titles():
     from promptlayer.evaluations.validation import (
+        resolve_config_sources_to_column_ids as _resolve_config_sources_to_column_ids,
         scorer_dependencies_from_config as _scorer_dependencies_from_config,
         scorers_reference_trace as _scorers_reference_trace,
     )
@@ -144,6 +145,7 @@ def test_scorer_dependencies_from_config_resolve_titles():
         "output": {"id": "out-1", "title": "output"},
         "Trace": {"id": "tr-1", "title": "Trace"},
         "expected": {"id": "exp-1", "title": "expected"},
+        "input": {"id": "in-1", "title": "input"},
     }
     deps = _scorer_dependencies_from_config(
         {
@@ -165,10 +167,61 @@ def test_scorer_dependencies_from_config_resolve_titles():
             "config_meta": {"variable_name": "ground_truth"},
         },
     ]
+    assert _resolve_config_sources_to_column_ids(
+        {
+            "source": "output",
+            "prompt": "check {user_request}",
+            "variable_mappings": {
+                "user_request": "input",
+                "execution_trace": "Trace",
+            },
+        },
+        columns_by_title,
+    ) == {
+        "source": "out-1",
+        "prompt": "check {user_request}",
+        "variable_mappings": {
+            "user_request": "in-1",
+            "execution_trace": "tr-1",
+        },
+    }
     assert _scorers_reference_trace([llm_assertion_scorer(title="x", source="Trace", prompt="ok")])
     assert not _scorers_reference_trace([llm_assertion_scorer(title="x", source="output", prompt="ok")])
     with pytest.raises(PromptLayerValidationError, match="not found: missing"):
         _scorer_dependencies_from_config({"source": "missing"}, columns_by_title)
+
+
+def test_build_scorecard_steps_persist_column_ids():
+    from promptlayer.evaluations.scorecard import build_scorecard_steps_from_scorers
+
+    columns = [
+        {"id": "out-1", "title": "output"},
+        {"id": "in-1", "title": "input"},
+        {"id": "tr-1", "title": "Trace"},
+    ]
+    steps = build_scorecard_steps_from_scorers(
+        [
+            llm_assertion_scorer(
+                title="Response grounded",
+                source="output",
+                prompt="User: {user_request}\nTrace: {execution_trace}",
+                variable_mappings={
+                    "user_request": "input",
+                    "execution_trace": "Trace",
+                },
+            )
+        ],
+        columns,
+    )
+    assert len(steps) == 1
+    step = steps[0]
+    assert step["source_column_ids"] == ["out-1", "in-1", "tr-1"]
+    assert step["primitive_config"]["source"] == "out-1"
+    assert step["primitive_config"]["variable_mappings"] == {
+        "user_request": "in-1",
+        "execution_trace": "tr-1",
+    }
+    assert step["primitive_config"]["prompt"] == "User: {user_request}\nTrace: {execution_trace}"
 
 
 def test_generic_column_helpers_validate_required_fields():

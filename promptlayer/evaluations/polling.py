@@ -255,11 +255,37 @@ def _non_negative_int(value: Any) -> Optional[int]:
     return parsed if parsed >= 0 else None
 
 
+def _normalize_operation_status_payload(payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Unwrap GET /operations/:id which returns ``{"success": true, "operation": {...}}``.
+
+    CREATE responses keep a string ``operation`` field (``"recalculate"``), so leave those
+    payloads unchanged.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    nested = payload.get("operation")
+    if isinstance(nested, dict):
+        return nested
+    return payload
+
+
 def _operation_is_terminal(payload: Optional[Dict[str, Any]]) -> bool:
+    payload = _normalize_operation_status_payload(payload)
     if not isinstance(payload, dict):
         return False
     status = payload.get("status")
-    return isinstance(status, str) and status.lower() in _TERMINAL_OPERATION_STATUSES
+    if isinstance(status, str) and status.lower() in _TERMINAL_OPERATION_STATUSES:
+        return True
+    # Fallback when Redis status lags behind finished cells.
+    pending = _non_negative_int(payload.get("pending_count"))
+    completed = _non_negative_int(payload.get("completed_count"))
+    failed = _non_negative_int(payload.get("failed_count"))
+    cell_count = _non_negative_int(payload.get("cell_count"))
+    if pending is None or completed is None or failed is None or cell_count is None:
+        return False
+    if pending > 0:
+        return False
+    return completed + failed >= cell_count
 
 
 def _operation_ids_from_create_response(payload: Optional[Dict[str, Any]]) -> List[str]:
@@ -282,7 +308,10 @@ def _report_operation_cell_progress(
     payload: Optional[Dict[str, Any]],
     on_progress: Optional[Callable[[int, int, int, Optional[str]], None]] = None,
 ) -> None:
-    if on_progress is None or not isinstance(payload, dict):
+    if on_progress is None:
+        return
+    payload = _normalize_operation_status_payload(payload)
+    if not isinstance(payload, dict):
         return
     counts = payload.get("status_counts")
     if counts is None:
@@ -358,8 +387,10 @@ def wait_for_sheet_operations(
     last: Optional[Dict[str, Any]] = None
     for operation_id in operation_ids:
         last = _poll_until(
-            fetch=lambda operation_id=operation_id: tables_api.get_sheet_operation(
-                api_key, base_url, throw_on_error, table_id, sheet_id, operation_id
+            fetch=lambda operation_id=operation_id: _normalize_operation_status_payload(
+                tables_api.get_sheet_operation(
+                    api_key, base_url, throw_on_error, table_id, sheet_id, operation_id
+                )
             ),
             is_done=_operation_is_terminal,
             timeout_seconds=timeout_seconds,
@@ -418,10 +449,16 @@ async def await_for_sheet_operations(
 
     last: Optional[Dict[str, Any]] = None
     for operation_id in operation_ids:
+
+        async def _fetch(operation_id: str = operation_id):
+            return _normalize_operation_status_payload(
+                await tables_api.aget_sheet_operation(
+                    api_key, base_url, throw_on_error, table_id, sheet_id, operation_id
+                )
+            )
+
         last = await _apoll_until(
-            fetch=lambda operation_id=operation_id: tables_api.aget_sheet_operation(
-                api_key, base_url, throw_on_error, table_id, sheet_id, operation_id
-            ),
+            fetch=_fetch,
             is_done=_operation_is_terminal,
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,

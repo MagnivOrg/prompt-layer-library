@@ -82,15 +82,23 @@ def test_status_count_polling_times_out():
 
 
 def test_preprocessing_operation_polls_operation_status():
-    terminal = {"operation_id": "operation-1", "status": "completed", "completed_count": 4, "failed_count": 0}
+    terminal = {
+        "operation_id": "operation-1",
+        "status": "completed",
+        "completed_count": 4,
+        "failed_count": 0,
+        "pending_count": 0,
+        "cell_count": 4,
+    }
     with (
         patch(
             "promptlayer.tables.api.create_sheet_operation",
-            return_value={"cell_count": 4, "operation_id": "operation-1"},
+            return_value={"cell_count": 4, "operation_id": "operation-1", "operation": "recalculate"},
         ),
         patch(
             "promptlayer.tables.api.get_sheet_operation",
-            return_value=terminal,
+            # Public API nests status under "operation".
+            return_value={"success": True, "operation": terminal},
         ) as get_operation,
         patch("promptlayer.tables.api.get_sheet_status_counts") as get_counts,
     ):
@@ -110,15 +118,22 @@ def test_preprocessing_operation_polls_operation_status():
 
 @pytest.mark.asyncio
 async def test_async_preprocessing_operation_polls_operation_status():
-    terminal = {"operation_id": "operation-1", "status": "completed", "completed_count": 4, "failed_count": 0}
+    terminal = {
+        "operation_id": "operation-1",
+        "status": "completed",
+        "completed_count": 4,
+        "failed_count": 0,
+        "pending_count": 0,
+        "cell_count": 4,
+    }
     with (
         patch(
             "promptlayer.tables.api.acreate_sheet_operation",
-            return_value={"cell_count": 4, "operation_id": "operation-1"},
+            return_value={"cell_count": 4, "operation_id": "operation-1", "operation": "recalculate"},
         ),
         patch(
             "promptlayer.tables.api.aget_sheet_operation",
-            return_value=terminal,
+            return_value={"success": True, "operation": terminal},
         ) as get_operation,
         patch("promptlayer.tables.api.aget_sheet_status_counts") as get_counts,
     ):
@@ -134,6 +149,34 @@ async def test_async_preprocessing_operation_polls_operation_status():
     assert result == terminal
     get_operation.assert_awaited_once()
     get_counts.assert_not_called()
+
+
+def test_operation_is_terminal_when_cell_counts_finish_without_status():
+    from promptlayer.evaluations.polling import _operation_is_terminal
+
+    assert _operation_is_terminal(
+        {
+            "success": True,
+            "operation": {
+                "pending_count": 0,
+                "completed_count": 8,
+                "failed_count": 0,
+                "cell_count": 8,
+            },
+        }
+    )
+    assert not _operation_is_terminal(
+        {
+            "success": True,
+            "operation": {
+                "status": "running",
+                "pending_count": 2,
+                "completed_count": 6,
+                "failed_count": 0,
+                "cell_count": 8,
+            },
+        }
+    )
 
 
 def test_scorecard_polling_waits_for_terminal_calculation():

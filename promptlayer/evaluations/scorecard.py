@@ -74,9 +74,11 @@ def build_scorecard_steps_from_scorers(
             "primitive_type": primitive_type,
             "primitive_config": primitive_config,
             "order_index": index,
-            "weight": 1,
-            "required": False,
+            "weight": float(scorer["weight"]) if scorer.get("weight") is not None else 1,
+            "required": bool(scorer.get("required", False)),
         }
+        if scorer.get("thresholds"):
+            step["thresholds"] = dict(scorer["thresholds"])
         if source_column_ids:
             step["source_column_ids"] = source_column_ids
         steps.append(step)

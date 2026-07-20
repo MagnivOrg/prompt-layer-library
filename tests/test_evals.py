@@ -61,7 +61,7 @@ def test_expected_trace_round_trips_through_eval_rows():
         {"id": "c3", "title": "expected_trace", "type": "TEXT"},
         {"id": "c4", "title": "output", "type": "TEXT"},
     ]
-    expected_trace = {"required_tools": ["create_folder"]}
+    expected_trace = {"required_tools": [{"tool": "create_folder"}]}
     values = build_row_values(
         {column["title"]: column for column in columns},
         input_value={"question": "Create a folder"},
@@ -71,7 +71,7 @@ def test_expected_trace_round_trips_through_eval_rows():
     )
 
     assert values["c2"] == "The folder is created."
-    assert values["c3"] == '{"required_tools": ["create_folder"]}'
+    assert values["c3"] == '{"required_tools": [{"tool": "create_folder"}]}'
     cases = cases_from_rows(
         {
             "data": [
@@ -618,7 +618,7 @@ def test_eval_runs_inline_dataset_and_writes_rows(
             {
                 "input": {"userMessage": "refund status"},
                 "expected": "The refund status is returned.",
-                "expected_trace": {"requiredTools": ["lookup_invoice"]},
+                "expected_trace": {"required_tools": [{"tool": "lookup_invoice"}]},
             }
         ],
         runner=lambda input_data: {
@@ -663,7 +663,7 @@ def test_eval_runs_inline_dataset_and_writes_rows(
     values = add_rows_body["values"][0]
     assert "c1" in values and "c2" in values and "c3" in values and "c5" in values
     assert values["c2"] == "The refund status is returned."
-    assert values["c5"] == '{"requiredTools": ["lookup_invoice"]}'
+    assert values["c5"] == '{"required_tools": [{"tool": "lookup_invoice"}]}'
     mock_configure_scorecard.assert_called_once()
     score_body = mock_configure_scorecard.call_args[0][5]
     assert score_body["steps"][0]["title"] == "required_tools"
@@ -2156,8 +2156,7 @@ def test_evaluate_raises_rich_trajectory_failure(
     from promptlayer import EvaluationFailedError, trajectory_scorer
 
     expected = {
-        "required_tools": ["create_folder"],
-        "tool_checks": [
+        "required_tools": [
             {
                 "tool": "create_folder",
                 "success": True,

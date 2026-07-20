@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Union
 
 from promptlayer.evaluations.columns import column
-from promptlayer.evaluations.scorers._helpers import require_non_empty_title
+from promptlayer.evaluations.scorers._helpers import (
+    apply_scorecard_step_options,
+    pop_scorecard_step_options,
+    require_non_empty_title,
+)
 from promptlayer.evaluations.validation import validation_error
 from promptlayer.types.table import EvalScorerColumn
 
@@ -31,9 +35,10 @@ def compare_scorer(
         comparison = {"type": comparison_type}
     else:
         comparison = comparison_type
+    step_options, config_settings = pop_scorecard_step_options(settings)
     config: Dict[str, Any] = {
         "sources": list(resolved_sources),
         "comparison_type": comparison,
-        **settings,
+        **config_settings,
     }
-    return column(title, "COMPARE", config)
+    return apply_scorecard_step_options(column(title, "COMPARE", config), **step_options)

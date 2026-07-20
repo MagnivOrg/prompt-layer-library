@@ -123,13 +123,16 @@ def test_predefined_scorer_payloads():
         "config": {"source": "contact", "type": "email"},
     }
 
-    trajectory = trajectory_scorer(["search", "checkout"], mode="strict")
+    trajectory = trajectory_scorer(
+        accepted_scenarios=[["search", "checkout"]],
+        mode="strict",
+    )
     assert trajectory == {
         "title": "Trajectory",
         "type": "TRAJECTORY",
         "config": {
             "trace_source": "Trace",
-            "expected_tools": ["search", "checkout"],
+            "accepted_scenarios": [["search", "checkout"]],
             "mode": "strict",
         },
     }
@@ -138,28 +141,36 @@ def test_predefined_scorer_payloads():
     assert advanced_trajectory == {
         "title": "trajectory assertions v3",
         "type": "TRAJECTORY",
-        "config": {"trace_source": "Trace", "expected_source": "expected"},
+        "config": {"trace_source": "Trace", "expected_source": "expected", "mode": "strict"},
     }
 
     expected_trace_trajectory = trajectory_scorer(
         title="expected trace trajectory",
         expected_source="expected_trace",
+        mode="non_strict",
     )
     assert expected_trace_trajectory["config"] == {
         "trace_source": "Trace",
         "expected_source": "expected_trace",
+        "mode": "non_strict",
     }
 
 
 def test_predefined_scorer_validation():
     with pytest.raises(PromptLayerValidationError):
-        trajectory_scorer([])
+        trajectory_scorer(accepted_scenarios=[])
     with pytest.raises(PromptLayerValidationError):
         trajectory_scorer()
     with pytest.raises(PromptLayerValidationError):
-        trajectory_scorer(["search"], expected_source="expected")
+        trajectory_scorer(
+            accepted_scenarios=[["search"]],
+            expected_source="expected",
+        )
     with pytest.raises(PromptLayerValidationError):
-        trajectory_scorer(["search"], mode="invalid")  # type: ignore[arg-type]
+        trajectory_scorer(
+            accepted_scenarios=[["search"]],
+            mode="invalid",  # type: ignore[arg-type]
+        )
     with pytest.raises(PromptLayerValidationError):
         contains_scorer()
     with pytest.raises(PromptLayerValidationError):
@@ -196,7 +207,8 @@ def test_trajectory_scorer_modes(
     expected_tools: list[str],
     expected_score: bool,
 ):
-    assert score_trajectory(_trace_with_tools(*trace_tools), expected_tools, mode) is expected_score
+    expected = {"accepted_scenarios": [{"required_tools": expected_tools}]}
+    assert score_trajectory(_trace_with_tools(*trace_tools), expected, mode) is expected_score
 
 
 def test_trajectory_tool_prefix_is_normalized():
@@ -208,8 +220,13 @@ def test_trajectory_tool_prefix_is_normalized():
         ],
     }
 
-    assert score_trajectory(trace, ["search", "checkout"]) is True
-    assert score_trajectory(trace, {"required_tools": ["search", "checkout"]}) is True
+    assert (
+        score_trajectory(
+            trace,
+            {"accepted_scenarios": [{"required_tools": ["search", "checkout"]}]},
+        )
+        is True
+    )
 
 
 def test_count_scorer_settings():
@@ -230,157 +247,129 @@ def test_assert_valid_scorer_validation():
 
 
 def test_trajectory_scorer_references_trace_for_dependencies():
-    scorer = trajectory_scorer(["search"])
+    scorer = trajectory_scorer(accepted_scenarios=[["search"]])
     assert scorers_reference_trace([scorer])
 
 
-def test_trajectory_spec_scorer_passes_and_fails():
-    expected = {
-        "required_tools": ["create_folder"],
-        "tool_checks": [
-            {
-                "tool": "create_folder",
-                "success": True,
-                "output_fields": {"folder.name": "my-folder"},
-            }
-        ],
-    }
-    matching = _tool_trace(
-        ("create_folder", {"success": True, "folder": {"name": "my-folder"}}),
+def test_trajectory_source_parses_accepted_scenarios():
+    matching = _tool_trace(("create_folder", {"success": True, "folder": {"name": "my-folder"}}))
+    assert (
+        score_trajectory(
+            matching,
+            {"accepted_scenarios": [{"required_tools": ["create_folder"]}]},
+        )
+        is True
     )
-    mismatch = _tool_trace(
-        ("create_folder", {"success": True, "folder": {"name": "wrong"}}),
-    )
-    assert score_trajectory(matching, expected) is True
-    assert score_trajectory(mismatch, expected) is False
+    # Objects / legacy shapes are rejected
+    assert score_trajectory(matching, {"required_tools": ["create_folder"]}) is False
+    assert score_trajectory(matching, {"accepted_scenarios": [["create_folder"]]}) is False
+    assert score_trajectory(matching, ["create_folder"]) is False
 
     scorer = trajectory_scorer(expected_source="expected")
     assert scorer["type"] == "TRAJECTORY"
     assert scorer["config"]["trace_source"] == "Trace"
     assert scorer["config"]["expected_source"] == "expected"
+    assert scorer["config"]["mode"] == "strict"
 
 
-def test_trajectory_spec_scorer_accepts_scenarios_and_any_tool_success():
+def test_trajectory_source_matches_any_scenario():
     expected = {
-        "scenarios": [
-            {
-                "required_tools": ["create_dataset"],
-                "tool_checks": [
-                    {
-                        "tool": "create_dataset",
-                        "success": True,
-                        "output_fields": {"rows_created_count": 2},
-                    }
-                ],
-            },
-            {
-                "required_tools": ["create_dataset", "update_dataset"],
-                "tool_checks": [
-                    {"tool": "create_dataset", "success": True},
-                    {"tool": "update_dataset", "success": True},
-                ],
-            },
+        "accepted_scenarios": [
+            {"required_tools": ["get_model_config", "create_prompt"]},
+            {"required_tools": ["list_model_configs", "create_prompt"]},
+            {"required_tools": ["select_model_config", "create_prompt"]},
         ]
     }
-    trace = _tool_trace(
-        ("create_dataset", {"success": True}),
-        ("update_dataset", {"success": True}),
-    )
-    assert score_trajectory(trace, expected) is True
+    assert score_trajectory(_tool_trace(("list_model_configs", None), ("create_prompt", None)), expected) is True
+    assert score_trajectory(_tool_trace(("create_prompt", None)), expected) is False
+    reason = diagnose_trajectory_failure(_tool_trace(("create_prompt", None)), expected)
+    assert reason is not None
+    assert "scenario 1:" in reason
+    assert "scenario 2:" in reason
 
-    any_success = {
-        "required_tools": ["create_table"],
-        "any_tool_success": [["add_rows", "update_cell"]],
-        "tool_checks": [{"tool": "create_table", "success": True}],
-    }
-    assert (
-        score_trajectory(
-            _tool_trace(
-                ("create_table", {"success": True}),
-                ("update_cell", {"success": True}),
-            ),
-            any_success,
-        )
-        is True
+
+def test_trajectory_scorer_accepts_config_accepted_scenarios():
+    scorer = trajectory_scorer(
+        accepted_scenarios=[
+            ["get_model_config", "create_prompt"],
+            ["list_model_configs", "create_prompt"],
+        ],
+        title="multi path",
     )
+    assert scorer["config"] == {
+        "trace_source": "Trace",
+        "accepted_scenarios": [
+            ["get_model_config", "create_prompt"],
+            ["list_model_configs", "create_prompt"],
+        ],
+        "mode": "strict",
+    }
+    single = trajectory_scorer(accepted_scenarios=[["search"]], title="one path")
+    assert single["config"]["accepted_scenarios"] == [["search"]]
+
+
+def test_trajectory_scorer_supports_weight_and_failure_threshold():
+    scorer = trajectory_scorer(
+        accepted_scenarios=[["search"]],
+        weight=2.5,
+        failure_threshold=0.5,
+        pass_threshold=0.9,
+        required=True,
+    )
+    assert scorer["weight"] == 2.5
+    assert scorer["required"] is True
+    assert scorer["thresholds"] == {"pass": 0.9, "warn": 0.5}
+    assert "weight" not in scorer["config"]
+    assert "thresholds" not in scorer["config"]
+
+    from promptlayer.evaluations.scorecard import build_scorecard_steps_from_scorers
+
+    steps = build_scorecard_steps_from_scorers(
+        [scorer],
+        [{"id": "tr-1", "title": "Trace"}],
+    )
+    assert steps[0]["weight"] == 2.5
+    assert steps[0]["required"] is True
+    assert steps[0]["thresholds"] == {"pass": 0.9, "warn": 0.5}
 
 
 def test_diagnose_trajectory_failure_categories():
-    assert diagnose_trajectory_failure(None, {"required_tools": ["x"]}) == "trace is missing or not a dict"
+    assert (
+        diagnose_trajectory_failure(
+            None,
+            {"accepted_scenarios": [{"required_tools": ["x"]}]},
+        )
+        == "trace is missing or not a dict"
+    )
     assert diagnose_trajectory_failure({"name": "root", "children": []}, None) == "expected is missing or not a dict"
+    assert (
+        diagnose_trajectory_failure(
+            {"name": "root", "children": []},
+            {"accepted_scenarios": []},
+        )
+        == "expected tools could not be parsed from source"
+    )
 
     order_reason = diagnose_trajectory_failure(
         _tool_trace(("b", {"success": True}), ("a", {"success": True})),
-        {"required_tools": ["a", "b"]},
+        {"accepted_scenarios": [{"required_tools": ["a", "b"]}]},
+        mode="non_strict",
     )
     assert order_reason is not None
     assert "required tool order" in order_reason
 
     missing_tool = diagnose_trajectory_failure(
         {"name": "root", "children": []},
-        {"required_tools": [], "tool_checks": [{"tool": "create_folder", "success": True}]},
+        {"accepted_scenarios": [{"required_tools": ["create_folder"]}]},
     )
     assert missing_tool is not None
-    assert "was not called" in missing_tool
+    assert "create_folder" in missing_tool
 
-    field_reason = diagnose_trajectory_failure(
-        _tool_trace(("create_folder", {"success": True, "folder": {"name": "wrong"}})),
-        {
-            "required_tools": ["create_folder"],
-            "tool_checks": [
-                {
-                    "tool": "create_folder",
-                    "success": True,
-                    "output_fields": {"folder.name": "expected"},
-                }
-            ],
-        },
-    )
-    assert field_reason is not None
-    assert "folder.name" in field_reason
-
-    list_reason = diagnose_trajectory_failure(
-        _tool_trace(("search", {"success": True, "results": [{"name": "other"}]})),
-        {
-            "tool_checks": [
-                {
-                    "tool": "search",
-                    "success": True,
-                    "list_contains": [{"path": "results", "field": "name", "value": "wanted"}],
-                }
-            ]
-        },
-    )
-    assert list_reason is not None
-    assert "missing" in list_reason
-
-    scenario_reason = diagnose_trajectory_failure(
-        {"name": "root", "children": []},
-        {
-            "scenarios": [
-                {"required_tools": ["create_dataset"]},
-                {"required_tools": ["create_dataset", "update_dataset"]},
-            ]
-        },
-    )
-    assert scenario_reason is not None
-    assert "scenario 1:" in scenario_reason
-    assert "scenario 2:" in scenario_reason
-
-    matching = _tool_trace(("create_folder", {"success": True, "folder": {"name": "ok"}}))
+    matching = _tool_trace(("create_folder", {"success": True}))
     assert (
         diagnose_trajectory_failure(
             matching,
-            {
-                "required_tools": ["create_folder"],
-                "tool_checks": [
-                    {
-                        "tool": "create_folder",
-                        "success": True,
-                        "output_fields": {"folder.name": "ok"},
-                    }
-                ],
-            },
+            {"accepted_scenarios": [{"required_tools": ["create_folder"]}]},
         )
         is None
     )
@@ -413,21 +402,34 @@ def test_trajectory_tool_order_uses_chronological_not_tree_order():
             }
         ],
     }
-    assert score_trajectory(trace, ["search", "checkout"]) is True
-    assert score_trajectory(trace, {"required_tools": ["search", "checkout"]}) is True
-    assert score_trajectory(trace, ["checkout", "search"]) is False
-    assert score_trajectory(trace, {"required_tools": ["checkout", "search"]}) is False
+    assert (
+        score_trajectory(
+            trace,
+            {"accepted_scenarios": [{"required_tools": ["search", "checkout"]}]},
+        )
+        is True
+    )
+    assert (
+        score_trajectory(
+            trace,
+            {"accepted_scenarios": [{"required_tools": ["checkout", "search"]}]},
+        )
+        is False
+    )
 
 
 def test_diagnose_trajectory_failure_list_expected():
-    reason = diagnose_trajectory_failure(_trace_with_tools("search"), ["search", "checkout"])
+    reason = diagnose_trajectory_failure(
+        _trace_with_tools("search"),
+        {"accepted_scenarios": [{"required_tools": ["search", "checkout"]}]},
+    )
     assert reason is not None
     assert "checkout" in reason
 
 
 def test_trajectory_scorer_empty_trace_source_mentions_field():
     with pytest.raises(PromptLayerValidationError, match="trace_source"):
-        trajectory_scorer(["search"], trace_source="")
+        trajectory_scorer(accepted_scenarios=[["search"]], trace_source="")
 
 
 def test_all_predefined_scorers_are_publicly_exported():

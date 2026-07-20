@@ -7,7 +7,7 @@ from promptlayer.tables.helpers import extract_list
 from promptlayer.types.table import Column
 
 BASE_TEXT_COLUMNS = ("input", "expected", "output")
-TRACE_TEXT_COLUMNS = ("Trace link", "Trace")
+TRACE_TEXT_COLUMNS = ("Trace link", "Trace", "total_trace_time", "total_price")
 
 _DEFAULT_POLL_INTERVAL_SECONDS = 0.5
 _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS = 300.0

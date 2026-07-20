@@ -336,6 +336,9 @@ class EvalScorerColumn(TypedDict, total=False):
     title: Required[str]
     type: Required[ColumnTypeValue]
     config: Optional[Dict[str, Any]]
+    weight: Optional[float]
+    required: Optional[bool]
+    thresholds: Optional[Dict[str, float]]
 
 
 # Supporting/preprocessing columns share the same wire shape as scorer defs.

@@ -6,6 +6,8 @@ from typing import Any, Dict
 
 from promptlayer.evaluations.columns import column
 from promptlayer.evaluations.scorers._helpers import (
+    apply_scorecard_step_options,
+    pop_scorecard_step_options,
     require_non_empty_source,
     require_non_empty_string,
     require_non_empty_title,
@@ -24,9 +26,10 @@ def regex_scorer(
     require_non_empty_title(title, "regex_scorer")
     require_non_empty_source(source, "regex_scorer")
     require_non_empty_string(regex_pattern, field="regex_pattern", scorer_name="regex_scorer")
+    step_options, config_settings = pop_scorecard_step_options(settings)
     config: Dict[str, Any] = {
         "source": source,
         "regex_pattern": regex_pattern,
-        **settings,
+        **config_settings,
     }
-    return column(title, "REGEX", config)
+    return apply_scorecard_step_options(column(title, "REGEX", config), **step_options)

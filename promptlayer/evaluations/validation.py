@@ -17,9 +17,21 @@ from promptlayer.evaluations.scores import (  # noqa: F401 - re-exported for cal
     extract_overall_score,
     scorer_pass_rates,
 )
-from promptlayer.evaluations.utils import BASE_TEXT_COLUMNS, TRACE_TEXT_COLUMNS
+from promptlayer.evaluations.utils import (
+    BASE_TEXT_COLUMNS,
+    COLUMN_TITLE_ALIASES,
+    EXPECTED_TRACE_COLUMN,
+    TRACE_RESERVED_COLUMN_TITLES,
+    TRACE_TEXT_COLUMNS,
+    find_column_by_title,
+)
 
-_RESERVED_EVAL_COLUMN_TITLES = frozenset(BASE_TEXT_COLUMNS + TRACE_TEXT_COLUMNS + ("expected_trace",))
+_RESERVED_EVAL_COLUMN_TITLES = frozenset(
+    BASE_TEXT_COLUMNS
+    + TRACE_RESERVED_COLUMN_TITLES
+    + (EXPECTED_TRACE_COLUMN,)
+    + tuple(COLUMN_TITLE_ALIASES.keys())
+)
 
 # Config keys that bind a single source column by title (must match backend NAMED_SOURCE_KEYS).
 _NAMED_SOURCE_KEYS = (
@@ -328,7 +340,7 @@ def scorer_dependencies_from_config(
     def _require_column(title: Any) -> Optional[Column]:
         if not isinstance(title, str) or not title.strip():
             return None
-        column = columns_by_title.get(title)
+        column = find_column_by_title(columns_by_title, title)
         if column is None:
             missing.append(title)
             return None
@@ -343,7 +355,7 @@ def scorer_dependencies_from_config(
         unique_missing = ", ".join(sorted(set(missing)))
         raise validation_error(
             f"Eval {label} source column(s) not found: {unique_missing}. "
-            "Use exact column titles (e.g. 'output' or 'Trace'), or declare "
+            "Use exact column titles (e.g. 'Output' or 'Trace'), or declare "
             "supporting columns before they are referenced."
         )
     return dependencies
@@ -355,7 +367,7 @@ def resolve_config_sources_to_column_ids(
 ) -> Dict[str, Any]:
     """Return a copy of config with source column titles rewritten to column IDs.
 
-    Authoring APIs keep human-readable titles (e.g. ``source="output"``). The
+    Authoring APIs keep human-readable titles (e.g. ``source="Output"``). The
     scorecard UI and backing-column dependency wiring expect UUIDs in
     ``primitive_config``, so rewrite titles once columns exist.
     """
@@ -367,7 +379,7 @@ def resolve_config_sources_to_column_ids(
     def _resolve_ref(reference: Any) -> Any:
         if not isinstance(reference, str) or not reference.strip():
             return reference
-        column = columns_by_title.get(reference) or by_id.get(reference)
+        column = find_column_by_title(columns_by_title, reference) or by_id.get(reference)
         if column is None:
             return reference
         return str(column["id"])
@@ -402,12 +414,12 @@ def _config_references_trace(config: Optional[Dict[str, Any]]) -> bool:
 
 
 def scorers_reference_trace(scorers: List[EvalScorerColumn]) -> bool:
-    """True when any scorer config references Trace / Trace link by title."""
+    """True when any scorer config references the Trace column by title."""
     return any(_config_references_trace(scorer.get("config") if isinstance(scorer, dict) else None) for scorer in scorers)
 
 
 def columns_reference_trace(columns: List[EvalProcessingColumn]) -> bool:
-    """True when any supporting column config references Trace / Trace link by title."""
+    """True when any supporting column config references the Trace column by title."""
     return any(
         _config_references_trace(column.get("config") if isinstance(column, dict) else None) for column in columns
     )

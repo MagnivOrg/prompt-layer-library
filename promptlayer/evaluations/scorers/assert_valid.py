@@ -18,7 +18,7 @@ from promptlayer.types.table import EvalScorerColumn
 def assert_valid_scorer(
     title: str = "Assert valid",
     *,
-    source: str = "output",
+    source: str = "Output",
     type: str = "object",
     **settings: Any,
 ) -> EvalScorerColumn:

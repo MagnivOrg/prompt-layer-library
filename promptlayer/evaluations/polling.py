@@ -8,6 +8,7 @@ from promptlayer.types.table import ResourceId, Column
 from promptlayer.evaluations.utils import (
     _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
     _DEFAULT_POLL_INTERVAL_SECONDS,
+    find_column_by_title,
     serialize_cell_value,
 )
 from promptlayer.evaluations.terminal import get_terminal
@@ -23,7 +24,7 @@ def _iter_cell_updates(
 ):
     cells = row.get("cells") or {}
     for title, value in values_by_title.items():
-        column = columns_by_title_map.get(title)
+        column = find_column_by_title(columns_by_title_map, title)
         if not column:
             continue
         cell = cells.get(str(column["id"]))

@@ -10,9 +10,9 @@ from promptlayer.types.table import ColumnType, EvalScorerColumn, ColumnTypeValu
 # Scorer args mapped onto eval row column titles.
 # CODE_EXECUTION sandboxes expose row columns via the `data` object.
 _SCORER_PARAM_COLUMN_ALIASES = {
-    "input": "input",
-    "output": "output",
-    "expected": "expected",
+    "input": "Input",
+    "output": "Output",
+    "expected": "Expected",
     "trace": "Trace",
 }
 
@@ -120,8 +120,6 @@ def _function_body_source(fn: Callable[..., Any], fn_name: str) -> str:
 
 
 def _rewrite_trace_column_lookups(node: ast.AST) -> ast.AST:
-    """Map ``data.get("trace")`` / ``data["trace"]`` onto the Trace column title."""
-
     class _Rewriter(ast.NodeTransformer):
         def visit_Call(self, call: ast.Call) -> ast.AST:
             self.generic_visit(call)
@@ -132,9 +130,9 @@ def _rewrite_trace_column_lookups(node: ast.AST) -> ast.AST:
                 and call.func.value.id == "data"
                 and call.args
                 and isinstance(call.args[0], ast.Constant)
-                and call.args[0].value == "trace"
+                and call.args[0].value in _SCORER_PARAM_COLUMN_ALIASES
             ):
-                call.args[0] = ast.Constant(value="Trace")
+                call.args[0] = ast.Constant(value=_SCORER_PARAM_COLUMN_ALIASES[call.args[0].value])
             return call
 
         def visit_Subscript(self, sub: ast.Subscript) -> ast.AST:
@@ -143,9 +141,9 @@ def _rewrite_trace_column_lookups(node: ast.AST) -> ast.AST:
                 isinstance(sub.value, ast.Name)
                 and sub.value.id == "data"
                 and isinstance(sub.slice, ast.Constant)
-                and sub.slice.value == "trace"
+                and sub.slice.value in _SCORER_PARAM_COLUMN_ALIASES
             ):
-                sub.slice = ast.Constant(value="Trace")
+                sub.slice = ast.Constant(value=_SCORER_PARAM_COLUMN_ALIASES[sub.slice.value])
             return sub
 
     return _Rewriter().visit(node)

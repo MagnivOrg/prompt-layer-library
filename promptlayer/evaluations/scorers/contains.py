@@ -18,7 +18,7 @@ from promptlayer.types.table import EvalScorerColumn
 def contains_scorer(
     title: str = "Contains",
     *,
-    source: str = "output",
+    source: str = "Output",
     value: Optional[str] = None,
     value_source: Optional[str] = None,
     **settings: Any,

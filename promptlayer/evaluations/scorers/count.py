@@ -19,7 +19,7 @@ from promptlayer.types.table import EvalScorerColumn
 def count_scorer(
     title: str = "Count",
     *,
-    source: str = "output",
+    source: str = "Output",
     type: str = "chars",
     min_count: Optional[int] = None,
     max_count: Optional[int] = None,

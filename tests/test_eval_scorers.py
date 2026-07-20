@@ -71,7 +71,7 @@ def test_predefined_scorer_payloads():
         "title": "Compare",
         "type": "COMPARE",
         "config": {
-            "sources": ["output", "expected"],
+            "sources": ["Output", "Expected"],
             "comparison_type": {"type": "STRING"},
         },
     }
@@ -80,21 +80,21 @@ def test_predefined_scorer_payloads():
     assert contains == {
         "title": "Contains",
         "type": "CONTAINS",
-        "config": {"source": "output", "value": "refund"},
+        "config": {"source": "Output", "value": "refund"},
     }
 
     regex = regex_scorer(regex_pattern=r"inv_\d+")
     assert regex == {
         "title": "Regex",
         "type": "REGEX",
-        "config": {"source": "output", "regex_pattern": r"inv_\d+"},
+        "config": {"source": "Output", "regex_pattern": r"inv_\d+"},
     }
 
     llm = llm_assertion_scorer(prompt="Is the answer helpful?")
     assert llm == {
         "title": "LLM assertion",
         "type": "LLM_ASSERTION",
-        "config": {"source": "output", "prompt": "Is the answer helpful?"},
+        "config": {"source": "Output", "prompt": "Is the answer helpful?"},
     }
 
     count = count_scorer(min_count=1, max_count=500)
@@ -102,7 +102,7 @@ def test_predefined_scorer_payloads():
         "title": "Count",
         "type": "COUNT",
         "config": {
-            "source": "output",
+            "source": "Output",
             "type": "chars",
             "min_count": 1,
             "max_count": 500,
@@ -113,7 +113,7 @@ def test_predefined_scorer_payloads():
     assert assert_valid == {
         "title": "Assert valid",
         "type": "ASSERT_VALID",
-        "config": {"source": "output", "type": "object"},
+        "config": {"source": "Output", "type": "object"},
     }
 
     assert_valid_custom = assert_valid_scorer(type="email", source="contact")
@@ -232,7 +232,7 @@ def test_trajectory_tool_prefix_is_normalized():
 def test_count_scorer_settings():
     words = count_scorer(type="words", min_count=2, max_count=4)
     assert words["config"] == {
-        "source": "output",
+        "source": "Output",
         "type": "words",
         "min_count": 2,
         "max_count": 4,

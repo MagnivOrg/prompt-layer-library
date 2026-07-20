@@ -18,7 +18,7 @@ from promptlayer.types.table import EvalScorerColumn
 def llm_assertion_scorer(
     title: str = "LLM assertion",
     *,
-    source: str = "output",
+    source: str = "Output",
     prompt: Optional[str] = None,
     prompt_source: Optional[str] = None,
     variable_mappings: Optional[Dict[str, str]] = None,

@@ -18,7 +18,7 @@ from promptlayer.types.table import EvalScorerColumn
 def regex_scorer(
     title: str = "Regex",
     *,
-    source: str = "output",
+    source: str = "Output",
     regex_pattern: str,
     **settings: Any,
 ) -> EvalScorerColumn:

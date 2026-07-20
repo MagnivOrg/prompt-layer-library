@@ -23,7 +23,7 @@ def compare_scorer(
 ) -> EvalScorerColumn:
     """Build a COMPARE scorer column."""
     require_non_empty_title(title, "compare_scorer")
-    resolved_sources = ["output", "expected"] if sources is None else sources
+    resolved_sources = ["Output", "Expected"] if sources is None else sources
     if not isinstance(resolved_sources, list) or len(resolved_sources) != 2:
         raise validation_error("compare_scorer requires exactly two sources.")
     for source in resolved_sources:

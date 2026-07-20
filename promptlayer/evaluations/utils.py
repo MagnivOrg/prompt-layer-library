@@ -6,8 +6,46 @@ from urllib.parse import urlparse, urlunparse
 from promptlayer.tables.helpers import extract_list
 from promptlayer.types.table import Column
 
-BASE_TEXT_COLUMNS = ("input", "expected", "output")
-TRACE_TEXT_COLUMNS = ("Trace link", "Trace", "total_trace_time", "total_price")
+BASE_TEXT_COLUMNS = ("Input", "Expected", "Output")
+EXPECTED_TRACE_COLUMN = "Expected Trace"
+TRACE_TEXT_COLUMNS = ("Trace",)
+TRACE_RESERVED_COLUMN_TITLES = (
+    "Trace",
+    "Trace.price",
+    "Trace.latency",
+    "Trace link",
+    "total_trace_time",
+    "total_price",
+)
+COLUMN_TITLE_ALIASES = {
+    "input": "Input",
+    "expected": "Expected",
+    "output": "Output",
+    "expected_trace": EXPECTED_TRACE_COLUMN,
+    "trace": "Trace",
+}
+LEGACY_COLUMN_TITLES = {canonical: alias for alias, canonical in COLUMN_TITLE_ALIASES.items()}
+
+
+def resolve_column_title(title: str) -> str:
+    return COLUMN_TITLE_ALIASES.get(title, title)
+
+
+def find_column_by_title(columns_by_title_map: dict, title: str):
+    if not title:
+        return None
+    column = columns_by_title_map.get(title)
+    if column is not None:
+        return column
+    canonical = COLUMN_TITLE_ALIASES.get(title)
+    if canonical is not None:
+        column = columns_by_title_map.get(canonical)
+        if column is not None:
+            return column
+    legacy = LEGACY_COLUMN_TITLES.get(title)
+    if legacy is not None:
+        return columns_by_title_map.get(legacy)
+    return None
 
 _DEFAULT_POLL_INTERVAL_SECONDS = 0.5
 _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS = 300.0
@@ -194,12 +232,12 @@ def build_row_values(
 ) -> Dict[str, Any]:
     values: Dict[str, Any] = {}
     for title, value in (
-        ("input", input_value),
-        ("expected", expected_value),
-        ("expected_trace", expected_trace_value),
-        ("output", output_value),
+        ("Input", input_value),
+        ("Expected", expected_value),
+        (EXPECTED_TRACE_COLUMN, expected_trace_value),
+        ("Output", output_value),
     ):
-        column = columns_by_title_map.get(title)
+        column = find_column_by_title(columns_by_title_map, title)
         if not column:
             continue
         values[str(column["id"])] = serialize_cell_value(value if value is not None else "")
@@ -251,9 +289,9 @@ def cases_from_rows(
     columns: List[Column],
 ) -> List[Dict[str, Any]]:
     by_title = columns_by_title(columns)
-    input_col = by_title.get("input")
-    expected_col = by_title.get("expected")
-    expected_trace_col = by_title.get("expected_trace")
+    input_col = find_column_by_title(by_title, "Input")
+    expected_col = find_column_by_title(by_title, "Expected")
+    expected_trace_col = find_column_by_title(by_title, EXPECTED_TRACE_COLUMN)
     cases: List[Dict[str, Any]] = []
     for row in extract_rows(rows_payload):
         cells = row.get("cells") or {}

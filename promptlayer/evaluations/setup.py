@@ -15,6 +15,8 @@ from promptlayer.types.table import (
 
 from promptlayer.evaluations.utils import (
     BASE_TEXT_COLUMNS,
+    EXPECTED_TRACE_COLUMN,
+    LEGACY_COLUMN_TITLES,
     TRACE_TEXT_COLUMNS,
     blank_row_indices,
     build_scorer_column_body,
@@ -158,6 +160,10 @@ def ensure_named_text_columns(
     for title in titles:
         if title in by_title:
             continue
+        legacy_title = LEGACY_COLUMN_TITLES.get(title)
+        if legacy_title and legacy_title in by_title:
+            by_title[title] = by_title[legacy_title]
+            continue
         repurposed = _repurpose_scaffold_column(api_key, base_url, throw_on_error, table_id, sheet_id, columns, title)
         if repurposed is not None:
             columns = merge_column(columns, repurposed)
@@ -194,6 +200,10 @@ async def aensure_named_text_columns(
     columns = list(existing)
     for title in titles:
         if title in by_title:
+            continue
+        legacy_title = LEGACY_COLUMN_TITLES.get(title)
+        if legacy_title and legacy_title in by_title:
+            by_title[title] = by_title[legacy_title]
             continue
         repurposed = await _arepurpose_scaffold_column(
             api_key, base_url, throw_on_error, table_id, sheet_id, columns, title
@@ -341,7 +351,7 @@ def ensure_eval_scaffold_columns(
 ) -> List[Column]:
     """Create the full eval column scaffold in declaration order.
 
-    Order: input/expected/output (+ Trace columns) → expected_trace → supporting columns.
+    Order: Input/Expected/Output (+ Trace columns) → Expected Trace → supporting columns.
     """
     columns = ensure_text_columns(
         api_key,
@@ -360,7 +370,7 @@ def ensure_eval_scaffold_columns(
             table_id,
             sheet_id,
             columns,
-            ("expected_trace",),
+            (EXPECTED_TRACE_COLUMN,),
         )
     if processing_columns:
         columns = ensure_processing_columns(
@@ -404,7 +414,7 @@ async def aensure_eval_scaffold_columns(
             table_id,
             sheet_id,
             columns,
-            ("expected_trace",),
+            (EXPECTED_TRACE_COLUMN,),
         )
     if processing_columns:
         columns = await aensure_processing_columns(

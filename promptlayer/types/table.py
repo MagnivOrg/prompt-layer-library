@@ -22,6 +22,7 @@ class ColumnType(str, Enum):
     COUNT = "COUNT"
     REGEX = "REGEX"
     TRAJECTORY = "TRAJECTORY"
+    TRACE = "TRACE"
     COSINE_SIMILARITY = "COSINE_SIMILARITY"
     ASSERT_VALID = "ASSERT_VALID"
     AI_DATA_EXTRACTION = "AI_DATA_EXTRACTION"
@@ -45,6 +46,7 @@ ColumnTypeValue = Literal[
     "COUNT",
     "REGEX",
     "TRAJECTORY",
+    "TRACE",
     "COSINE_SIMILARITY",
     "ASSERT_VALID",
     "AI_DATA_EXTRACTION",

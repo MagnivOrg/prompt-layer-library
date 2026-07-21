@@ -287,6 +287,7 @@ class ToolCall(TypedDict, total=False):
     tool_id: Union[str, None]
     type: Literal["function"]
     function: FunctionCall
+    provider_metadata: Union[Dict[str, Any], None]
 
 
 class AssistantMessage(TypedDict, total=False):

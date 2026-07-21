@@ -24,6 +24,10 @@ from promptlayer.evaluations.polling import (
     fill_row_cells,
     wait_for_sheet_operations,
 )
+from promptlayer.evaluations.trace_price import (
+    await_for_trace_request_price,
+    wait_for_trace_request_price,
+)
 from promptlayer.evaluations.scorecard import (
     aconfigure_scorecard_from_scorers,
     afetch_scorecard_row_scores,
@@ -343,6 +347,7 @@ def _persist_trace_rows_sync(
     updated: List[CaseExecution] = []
     for case in executed:
         flush_traces(tracer_provider, throw_on_error=throw_on_error)
+        wait_for_trace_request_price(api_key, base_url, case.trace_id)
         import_response = tables_api.add_trace_import(
             api_key,
             base_url,
@@ -419,6 +424,7 @@ async def _persist_trace_rows_async(
     updated: List[CaseExecution] = []
     for case in executed:
         flush_traces(tracer_provider, throw_on_error=throw_on_error)
+        await await_for_trace_request_price(api_key, base_url, case.trace_id)
         import_response = await tables_api.aadd_trace_import(
             api_key,
             base_url,

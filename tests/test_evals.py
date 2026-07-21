@@ -1,7 +1,7 @@
 import asyncio
 import threading
 import time
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -32,6 +32,11 @@ def _terminal_sheet_status_counts():
         patch("promptlayer.tables.api.get_sheet_status_counts", return_value=terminal),
         patch("promptlayer.tables.api.aget_sheet_status_counts", return_value=terminal),
         patch("opentelemetry.sdk.trace.export.BatchSpanProcessor.on_end"),
+        patch("promptlayer.evaluations.runner.wait_for_trace_request_price"),
+        patch(
+            "promptlayer.evaluations.runner.await_for_trace_request_price",
+            new_callable=AsyncMock,
+        ),
     ):
         yield
 

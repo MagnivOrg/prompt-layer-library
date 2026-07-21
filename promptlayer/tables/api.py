@@ -188,6 +188,14 @@ def _add_trace_endpoint(base_url: str) -> str:
     return f"{base_url}/api/public/v2/dataset-versions/add-trace"
 
 
+def _trace_endpoint(base_url: str, trace_id: str) -> str:
+    return f"{base_url}/api/public/v2/traces/{quote(str(trace_id), safe='')}"
+
+
+def _request_endpoint(base_url: str, request_id: int) -> str:
+    return f"{base_url}/api/public/v2/requests/{int(request_id)}"
+
+
 def _headers(api_key: str) -> Dict[str, str]:
     return {"X-API-KEY": api_key}
 
@@ -1955,4 +1963,72 @@ async def aadd_trace_import(
         expected_statuses=(200, 201),
         json_body=build_add_trace_body(body),
         use_json_headers=True,
+    )
+
+
+@retry_on_api_error
+def get_trace(
+    api_key: str,
+    base_url: str,
+    throw_on_error: bool,
+    trace_id: str,
+) -> Union[Dict[str, Any], None]:
+    return _request(
+        method="GET",
+        url=_trace_endpoint(base_url, trace_id),
+        api_key=api_key,
+        throw_on_error=throw_on_error,
+        action="getting your trace",
+        expected_statuses=(200,),
+    )
+
+
+@retry_on_api_error
+async def aget_trace(
+    api_key: str,
+    base_url: str,
+    throw_on_error: bool,
+    trace_id: str,
+) -> Union[Dict[str, Any], None]:
+    return await _arequest(
+        method="GET",
+        url=_trace_endpoint(base_url, trace_id),
+        api_key=api_key,
+        throw_on_error=throw_on_error,
+        action="getting your trace",
+        expected_statuses=(200,),
+    )
+
+
+@retry_on_api_error
+def get_request(
+    api_key: str,
+    base_url: str,
+    throw_on_error: bool,
+    request_id: int,
+) -> Union[Dict[str, Any], None]:
+    return _request(
+        method="GET",
+        url=_request_endpoint(base_url, request_id),
+        api_key=api_key,
+        throw_on_error=throw_on_error,
+        action="getting your request",
+        expected_statuses=(200,),
+    )
+
+
+@retry_on_api_error
+async def aget_request(
+    api_key: str,
+    base_url: str,
+    throw_on_error: bool,
+    request_id: int,
+) -> Union[Dict[str, Any], None]:
+    return await _arequest(
+        method="GET",
+        url=_request_endpoint(base_url, request_id),
+        api_key=api_key,
+        throw_on_error=throw_on_error,
+        action="getting your request",
+        expected_statuses=(200,),
     )

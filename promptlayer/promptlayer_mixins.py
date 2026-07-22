@@ -4,12 +4,7 @@ from copy import deepcopy
 from functools import wraps
 from typing import Any, Dict, Union
 
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.semconv.resource import ResourceAttributes
-
-from promptlayer.span_exporter import PromptLayerSpanExporter
+from promptlayer.otlp import initialize_promptlayer_tracer
 from promptlayer.tracing_context import resolve_tracer
 from promptlayer.streaming import (
     aanthropic_stream_completion,
@@ -299,18 +294,12 @@ class PromptLayerMixin:
 
     @staticmethod
     def _initialize_tracer(api_key: str, base_url: str, throw_on_error: bool, enable_tracing: bool = False):
-        if enable_tracing:
-            resource = Resource(attributes={ResourceAttributes.SERVICE_NAME: "prompt-layer-library"})
-            tracer_provider = TracerProvider(resource=resource)
-            promptlayer_exporter = PromptLayerSpanExporter(
-                api_key=api_key, base_url=base_url, throw_on_error=throw_on_error
-            )
-            span_processor = BatchSpanProcessor(promptlayer_exporter)
-            tracer_provider.add_span_processor(span_processor)
-            tracer = tracer_provider.get_tracer(__name__)
-            return tracer_provider, tracer
-        else:
-            return None, None
+        del throw_on_error  # OTLP exporter does not use this flag.
+        return initialize_promptlayer_tracer(
+            api_key=api_key,
+            base_url=base_url,
+            enable_tracing=enable_tracing,
+        )
 
     @staticmethod
     def _prepare_get_prompt_template_params(
@@ -494,5 +483,24 @@ class PromptLayerMixin:
                     return await func(*args, **kwargs)
 
             return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+
+        return decorator
+
+    def traceTool(self, name=None, attributes=None):
+        """Trace a tool execution for Trajectory scoring and the Trace UI.
+
+        Creates a span named ``Tool: {tool}`` with ``node_type=CODE_EXECUTION`` and
+        ``tool.name`` / ``function_name`` set to the tool identity.
+        """
+
+        def decorator(func):
+            tool_name = name or func.__name__
+            tool_attributes = {
+                "node_type": "CODE_EXECUTION",
+                "tool.name": tool_name,
+                "function_name": tool_name,
+                **(attributes or {}),
+            }
+            return self.traceable(attributes=tool_attributes, name=f"Tool: {tool_name}")(func)
 
         return decorator

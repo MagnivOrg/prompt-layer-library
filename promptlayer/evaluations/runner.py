@@ -195,6 +195,8 @@ def _execute_cases_sync(
     runner: Any,
     tracer_provider: Optional[TracerProvider],
     max_concurrency: int,
+    table_id: Any = None,
+    sheet_id: Any = None,
 ) -> List[CaseExecution]:
     total = len(cases)
     results: List[Optional[CaseExecution]] = [None] * total
@@ -209,6 +211,8 @@ def _execute_cases_sync(
                 runner,
                 input_value,
                 tracer_provider,
+                table_id=table_id,
+                sheet_id=sheet_id,
             )
         else:
             output_value = maybe_await(runner(input_value))
@@ -261,6 +265,8 @@ async def _execute_cases_async(
     runner: Any,
     tracer_provider: Optional[TracerProvider],
     max_concurrency: int,
+    table_id: Any = None,
+    sheet_id: Any = None,
 ) -> List[CaseExecution]:
     total = len(cases)
     results: List[Optional[CaseExecution]] = [None] * total
@@ -277,6 +283,8 @@ async def _execute_cases_async(
                     runner,
                     input_value,
                     tracer_provider,
+                    table_id=table_id,
+                    sheet_id=sheet_id,
                 )
             else:
                 output_value = await maybe_await_async(runner(input_value))
@@ -891,6 +899,8 @@ def run_eval(
         runner=runner,
         tracer_provider=tracer_provider,
         max_concurrency=max_concurrency,
+        table_id=table["id"],
+        sheet_id=sheet["id"],
     )
 
     if _needs_trace_columns(context):
@@ -1007,6 +1017,8 @@ async def arun_eval(
         runner=runner,
         tracer_provider=tracer_provider,
         max_concurrency=max_concurrency,
+        table_id=table["id"],
+        sheet_id=sheet["id"],
     )
 
     if _needs_trace_columns(context):

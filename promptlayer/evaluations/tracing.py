@@ -23,11 +23,31 @@ def flush_traces(tracer_provider: Optional[TracerProvider], *, throw_on_error: b
             raise
 
 
+def _set_eval_span_metadata(
+    span: Any,
+    *,
+    name: str,
+    input_value: Any,
+    table_id: Any = None,
+    sheet_id: Any = None,
+) -> None:
+    span.set_attribute("node_type", "EVAL")
+    span.set_attribute("eval.name", name)
+    span.set_attribute("eval.input", serialize_cell_value(input_value))
+    if table_id is not None:
+        span.set_attribute("table_id", str(table_id))
+    if sheet_id is not None:
+        span.set_attribute("sheet_id", str(sheet_id))
+
+
 @contextmanager
 def eval_case_span(
     name: str,
     input_value: Any,
     tracer_provider: Optional[TracerProvider] = None,
+    *,
+    table_id: Any = None,
+    sheet_id: Any = None,
 ) -> Iterator[Tuple[Any, list]]:
     """Yield (span, ids_holder) where ids_holder becomes [trace_id, span_id]."""
     tracer = (
@@ -37,8 +57,13 @@ def eval_case_span(
     )
     ids = ["", ""]
     with tracer.start_as_current_span(f"Eval: {name}") as span:
-        span.set_attribute("eval.name", name)
-        span.set_attribute("eval.input", serialize_cell_value(input_value))
+        _set_eval_span_metadata(
+            span,
+            name=name,
+            input_value=input_value,
+            table_id=table_id,
+            sheet_id=sheet_id,
+        )
         span_context = span.get_span_context()
         if span_context and span_context.is_valid:
             ids[0] = format_otel_trace_id(span_context.trace_id)
@@ -57,9 +82,18 @@ def run_case_in_span(
     runner: Any,
     input_value: Any,
     tracer_provider: Optional[TracerProvider] = None,
+    *,
+    table_id: Any = None,
+    sheet_id: Any = None,
 ) -> tuple:
     """Run the case runner inside an OTel span; returns (output, trace_id, span_id)."""
-    with eval_case_span(name, input_value, tracer_provider) as (span, ids):
+    with eval_case_span(
+        name,
+        input_value,
+        tracer_provider,
+        table_id=table_id,
+        sheet_id=sheet_id,
+    ) as (span, ids):
         try:
             output_value = maybe_await(runner(input_value))
         except Exception as exc:
@@ -75,8 +109,17 @@ async def arun_case_in_span(
     runner: Any,
     input_value: Any,
     tracer_provider: Optional[TracerProvider] = None,
+    *,
+    table_id: Any = None,
+    sheet_id: Any = None,
 ) -> tuple:
-    with eval_case_span(name, input_value, tracer_provider) as (span, ids):
+    with eval_case_span(
+        name,
+        input_value,
+        tracer_provider,
+        table_id=table_id,
+        sheet_id=sheet_id,
+    ) as (span, ids):
         try:
             output_value = await maybe_await_async(runner(input_value))
         except Exception as exc:

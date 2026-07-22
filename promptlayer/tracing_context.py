@@ -6,6 +6,7 @@ import inspect
 from contextvars import ContextVar
 from typing import Any, AsyncGenerator, Generator, Optional
 
+from opentelemetry import trace
 from opentelemetry.trace import Tracer
 
 # Set by Eval while a case runner executes. PromptLayer clients resolve this
@@ -24,6 +25,18 @@ def format_otel_trace_id(trace_id: int) -> str:
 
 def format_otel_span_id(span_id: int) -> str:
     return format(span_id, "016x")
+
+
+def current_traceparent() -> Optional[str]:
+    span_context = trace.get_current_span().get_span_context()
+    if span_context is None or not span_context.is_valid:
+        return None
+
+    flags = int(span_context.trace_flags) & 0xFF
+    return (
+        f"00-{format_otel_trace_id(span_context.trace_id)}-"
+        f"{format_otel_span_id(span_context.span_id)}-{flags:02x}"
+    )
 
 
 def is_stream_result(result: Any) -> bool:

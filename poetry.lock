@@ -3304,9 +3304,9 @@ test = ["big-O", "importlib-resources ; python_version < \"3.9\"", "jaraco.funct
 
 [extras]
 claude-agents = ["claude-agent-sdk"]
-openai-agents = ["eval-type-backport", "openai-agents", "opentelemetry-exporter-otlp-proto-http"]
+openai-agents = ["eval-type-backport", "openai-agents"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "d464b48856d7c93832b3607266ee5a8bad4cc10f9aa7f0e6d85e5cebe1db0d57"
+content-hash = "95e420bbecd3dd64d7ce656fde22add75b0b0369fcf9e4d576b5bd94f5c488f2"

@@ -64,7 +64,14 @@ def test_run_case_in_span_publishes_active_eval_tracer_and_nests_child_spans(in_
             seen["parent"] = child.parent
         return "ok"
 
-    output, trace_id, span_id = run_case_in_span("demo", runner, {"q": "hi"}, provider)
+    output, trace_id, span_id = run_case_in_span(
+        "demo",
+        runner,
+        {"q": "hi"},
+        provider,
+        table_id="table-123",
+        sheet_id="sheet-456",
+    )
     assert output == "ok"
     assert trace_id
     assert span_id
@@ -76,6 +83,9 @@ def test_run_case_in_span_publishes_active_eval_tracer_and_nests_child_spans(in_
     assert "Eval: demo" in by_name
     assert "agent-turn" in by_name
     eval_span = by_name["Eval: demo"]
+    assert eval_span.attributes.get("node_type") == "EVAL"
+    assert eval_span.attributes.get("table_id") == "table-123"
+    assert eval_span.attributes.get("sheet_id") == "sheet-456"
     child = by_name["agent-turn"]
     assert child.parent is not None
     assert child.parent.span_id == eval_span.context.span_id
@@ -108,3 +118,51 @@ def test_promptlayer_traceable_uses_active_eval_tracer_at_call_time(
     child = next(span for span in spans if span.name == "customer-op")
     assert child.parent is not None
     assert child.parent.span_id == eval_span.context.span_id
+
+
+def test_promptlayer_trace_tool_sets_tool_execution_attributes(
+    in_memory_spans,
+    promptlayer_api_key,
+    base_url,
+):
+    provider, exporter = in_memory_spans
+    exporter.clear()
+    client = PromptLayer(api_key=promptlayer_api_key, base_url=base_url, enable_tracing=False)
+
+    @client.traceTool(name="lookup_account")
+    def lookup(email):
+        return {"plan": "pro", "email": email}
+
+    def runner(_input):
+        return lookup("user@example.com")
+
+    output, _, _ = run_case_in_span("demo-trace-tool", runner, {}, provider)
+    assert output == {"plan": "pro", "email": "user@example.com"}
+
+    spans = exporter.get_finished_spans()
+    tool_span = next(span for span in spans if span.name == "Tool: lookup_account")
+    assert tool_span.attributes.get("node_type") == "CODE_EXECUTION"
+    assert tool_span.attributes.get("tool.name") == "lookup_account"
+    assert tool_span.attributes.get("function_name") == "lookup_account"
+
+
+def test_promptlayer_trace_tool_defaults_name_to_function_name(
+    in_memory_spans,
+    promptlayer_api_key,
+    base_url,
+):
+    provider, exporter = in_memory_spans
+    exporter.clear()
+    client = PromptLayer(api_key=promptlayer_api_key, base_url=base_url, enable_tracing=False)
+
+    @client.traceTool()
+    def send_reset_email(email):
+        return {"sent": True, "email": email}
+
+    run_case_in_span("demo-trace-tool-default", lambda _input: send_reset_email("a@b.com"), {}, provider)
+
+    spans = exporter.get_finished_spans()
+    tool_span = next(span for span in spans if span.name == "Tool: send_reset_email")
+    assert tool_span.attributes.get("node_type") == "CODE_EXECUTION"
+    assert tool_span.attributes.get("tool.name") == "send_reset_email"
+    assert tool_span.attributes.get("function_name") == "send_reset_email"

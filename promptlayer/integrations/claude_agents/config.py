@@ -7,6 +7,8 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Literal, TypedDict
 
+from promptlayer.tracing_context import current_traceparent
+
 
 class PromptLayerClaudeAgentsPlugin(TypedDict):
     type: Literal["local"]
@@ -67,8 +69,9 @@ def get_claude_config(*, api_key: str | None = None, traceparent: str | None = N
         TRACE_TO_PROMPTLAYER="true",
         PROMPTLAYER_API_KEY=resolved_api_key,
     )
-    if traceparent is not None:
-        env["PROMPTLAYER_TRACEPARENT"] = traceparent
+    resolved_traceparent = traceparent or current_traceparent()
+    if resolved_traceparent is not None:
+        env["PROMPTLAYER_TRACEPARENT"] = resolved_traceparent
 
     return PromptLayerClaudeAgentsConfig(plugin=plugin, env=env)
 

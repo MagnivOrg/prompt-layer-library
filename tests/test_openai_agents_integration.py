@@ -17,6 +17,7 @@ from promptlayer.integrations.openai_agents import (
 )
 from promptlayer.integrations.openai_agents.ids import map_span_id, map_trace_id
 from promptlayer.integrations.openai_agents.mapping import normalize_response_items
+from promptlayer.evaluations.tracing import run_case_in_span
 from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 
@@ -294,17 +295,19 @@ def test_traceparent_metadata_parents_the_synthetic_root(in_memory_tracer_provid
     traceparent = "00-11111111111111111111111111111111-2222222222222222-01"
     agents_trace_id = "trace_" + ("a" * 32)
 
-    with trace(
-        "Traceparent workflow",
-        trace_id=agents_trace_id,
-        metadata={"traceparent": traceparent, "tenant": "acme"},
-    ):
-        with generation_span(
-            input=[{"role": "user", "content": "hi"}],
-            output=[{"role": "assistant", "content": "hello"}],
-            model="gpt-4.1",
+    upstream_tracer = provider.get_tracer("upstream")
+    with upstream_tracer.start_as_current_span("active-parent"):
+        with trace(
+            "Traceparent workflow",
+            trace_id=agents_trace_id,
+            metadata={"traceparent": traceparent, "tenant": "acme"},
         ):
-            pass
+            with generation_span(
+                input=[{"role": "user", "content": "hi"}],
+                output=[{"role": "assistant", "content": "hello"}],
+                model="gpt-4.1",
+            ):
+                pass
 
     spans = _finished_spans(exporter)
     root = next(span for span in spans if span.parent is not None and span.name == "OpenAI session")
@@ -318,14 +321,14 @@ def test_traceparent_metadata_parents_the_synthetic_root(in_memory_tracer_provid
     assert dict(root.attributes)["openai_agents.trace_id_original"] == agents_trace_id
 
 
-def test_active_local_context_does_not_override_agents_trace_id_without_traceparent(in_memory_tracer_provider):
+def test_active_local_context_parents_agents_trace_without_traceparent(in_memory_tracer_provider):
     provider, exporter = in_memory_tracer_provider
     processor = PromptLayerOpenAIAgentsProcessor(tracer_provider=provider)
     set_trace_processors([processor])
 
     upstream_tracer = provider.get_tracer("upstream")
 
-    with upstream_tracer.start_as_current_span("upstream"):
+    with upstream_tracer.start_as_current_span("upstream") as upstream:
         with trace("No traceparent workflow", trace_id="trace_" + ("c" * 32)):
             with generation_span(
                 input=[{"role": "user", "content": "hi"}],
@@ -337,15 +340,57 @@ def test_active_local_context_does_not_override_agents_trace_id_without_tracepar
     spans = _finished_spans(exporter)
     root = next(span for span in spans if span.name == "OpenAI session")
 
-    assert f"{root.context.trace_id:032x}" == "c" * 32
-    assert root.parent is None
+    assert root.context.trace_id == upstream.context.trace_id
+    assert root.parent is not None
+    assert root.parent.span_id == upstream.context.span_id
+
+
+def test_openai_agents_trace_nests_under_eval_span(in_memory_tracer_provider):
+    provider, exporter = in_memory_tracer_provider
+    agent_exporter = InMemorySpanExporter()
+    agent_provider = TracerProvider()
+    agent_provider.add_span_processor(SimpleSpanProcessor(agent_exporter))
+    processor = PromptLayerOpenAIAgentsProcessor(tracer_provider=agent_provider)
+    set_trace_processors([processor])
+
+    def runner(_input):
+        with trace("Eval workflow", trace_id="trace_" + ("d" * 32)):
+            with generation_span(
+                input=[{"role": "user", "content": "hi"}],
+                output=[{"role": "assistant", "content": "hello"}],
+                model="gpt-4.1",
+            ):
+                pass
+        return "ok"
+
+    output, trace_id, span_id = run_case_in_span(
+        "openai-agents",
+        runner,
+        {"message": "hi"},
+        provider,
+    )
+
+    spans = _finished_spans(exporter)
+    eval_span = next(span for span in spans if span.name == "Eval: openai-agents")
+    agents_root = next(span for span in spans if span.name == "OpenAI session")
+    generation = next(span for span in spans if span.name == "LLM call")
+
+    assert output == "ok"
+    assert trace_id == f"{eval_span.context.trace_id:032x}"
+    assert span_id == f"{eval_span.context.span_id:016x}"
+    assert agents_root.context.trace_id == eval_span.context.trace_id
+    assert agents_root.parent is not None
+    assert agents_root.parent.span_id == eval_span.context.span_id
+    assert generation.context.trace_id == eval_span.context.trace_id
+    assert agent_exporter.get_finished_spans() == ()
+    agent_provider.shutdown()
 
 
 def test_create_openai_agents_tracer_provider_targets_public_v1_traces(monkeypatch):
     seen = {}
 
     monkeypatch.setattr(
-        "promptlayer.integrations.openai_agents.instrumentation.OTLPSpanExporter",
+        "promptlayer.otlp.OTLPSpanExporter",
         _FakeExporter(seen),
     )
 
@@ -364,7 +409,7 @@ def test_create_openai_agents_tracer_provider_allows_endpoint_override(monkeypat
     seen = {}
 
     monkeypatch.setattr(
-        "promptlayer.integrations.openai_agents.instrumentation.OTLPSpanExporter",
+        "promptlayer.otlp.OTLPSpanExporter",
         _FakeExporter(seen),
     )
 

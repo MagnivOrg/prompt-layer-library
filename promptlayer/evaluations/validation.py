@@ -111,6 +111,13 @@ def _normalize_column_dict(
         if require_object_config and not isinstance(column["config"], dict):
             raise validation_error(f"Eval {label} '{title}' config must be a dict.")
         normalized["config"] = column["config"]
+    if column.get("weight") is not None:
+        normalized["weight"] = float(column["weight"])
+    if "required" in column:
+        normalized["required"] = bool(column["required"])
+    thresholds = column.get("thresholds")
+    if isinstance(thresholds, dict):
+        normalized["thresholds"] = dict(thresholds)
     return normalized
 
 

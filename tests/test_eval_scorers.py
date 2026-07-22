@@ -323,9 +323,15 @@ def test_trajectory_scorer_supports_weight_and_failure_threshold():
     assert "thresholds" not in scorer["config"]
 
     from promptlayer.evaluations.scorecard import build_scorecard_steps_from_scorers
+    from promptlayer.evaluations.validation import normalize_scorer
+
+    normalized = normalize_scorer(scorer)
+    assert normalized["weight"] == 2.5
+    assert normalized["required"] is True
+    assert normalized["thresholds"] == {"pass": 0.9, "warn": 0.5}
 
     steps = build_scorecard_steps_from_scorers(
-        [scorer],
+        [normalized],
         [{"id": "tr-1", "title": "Trace"}],
     )
     assert steps[0]["weight"] == 2.5

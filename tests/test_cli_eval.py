@@ -15,35 +15,42 @@ from promptlayer.cli.eval_cmd import (
 
 
 def test_discover_eval_files_single_file(tmp_path: Path):
-    eval_file = tmp_path / "my_eval.py"
+    eval_file = tmp_path / "my.eval.py"
     eval_file.write_text("from promptlayer import evaluate\nevaluate(...)\n", encoding="utf-8")
     assert discover_eval_files([str(eval_file)]) == [eval_file.resolve()]
 
 
 def test_discover_eval_files_directory_skips_non_evals_and_venv(tmp_path: Path):
-    (tmp_path / "skip.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "skip.py").write_text("evaluate(...)\n", encoding="utf-8")
+    (tmp_path / "legacy_eval.py").write_text("evaluate(...)\n", encoding="utf-8")
     nested = tmp_path / "suite"
     nested.mkdir()
-    (nested / "nested_eval.py").write_text("import promptlayer as pl\npl.aevaluate(...)\n", encoding="utf-8")
+    (nested / "nested.eval.py").write_text("import promptlayer as pl\npl.aevaluate(...)\n", encoding="utf-8")
     venv = tmp_path / ".venv" / "lib"
     venv.mkdir(parents=True)
-    (venv / "ignored.py").write_text("evaluate(...)\n", encoding="utf-8")
+    (venv / "ignored.eval.py").write_text("evaluate(...)\n", encoding="utf-8")
 
     found = discover_eval_files([str(tmp_path)])
     names = {path.name for path in found}
-    assert names == {"nested_eval.py"}
+    assert names == {"nested.eval.py"}
 
 
 def test_discover_eval_files_supports_wrapper_calls(tmp_path: Path):
-    eval_file = tmp_path / "wrapped.py"
+    eval_file = tmp_path / "wrapped.eval.py"
     eval_file.write_text("run_suite_eval(dataset=[])\n", encoding="utf-8")
 
     assert discover_eval_files([str(eval_file)]) == [eval_file.resolve()]
 
 
+def test_discover_eval_files_ignores_non_eval_filename(tmp_path: Path):
+    eval_file = tmp_path / "my_eval.py"
+    eval_file.write_text("evaluate(...)\n", encoding="utf-8")
+    assert discover_eval_files([str(eval_file)]) == []
+
+
 def test_discover_eval_files_missing_path(tmp_path: Path):
     with pytest.raises(FileNotFoundError):
-        discover_eval_files([str(tmp_path / "missing.py")])
+        discover_eval_files([str(tmp_path / "missing.eval.py")])
 
 
 def test_apply_dotenv_does_not_override_existing(tmp_path: Path, monkeypatch):
@@ -76,7 +83,7 @@ def test_load_dotenv_files_prefers_local_over_env(tmp_path: Path, monkeypatch):
 
 def test_cli_eval_run_executes_file(tmp_path: Path, capsys):
     marker = tmp_path / "ran.txt"
-    eval_file = tmp_path / "sample_eval.py"
+    eval_file = tmp_path / "sample.eval.py"
     eval_file.write_text(
         "\n".join(
             [
@@ -95,7 +102,7 @@ def test_cli_eval_run_executes_file(tmp_path: Path, capsys):
     assert marker.read_text(encoding="utf-8") == "ok"
     out = capsys.readouterr().out
     assert "eval session starts" in out
-    assert "sample_eval.py" in out
+    assert "sample.eval.py" in out
     assert "PASSED" in out
     assert "1 passed" in out
     assert str(tmp_path) not in sys.path
@@ -103,7 +110,7 @@ def test_cli_eval_run_executes_file(tmp_path: Path, capsys):
 
 def test_cli_eval_run_resets_argv_for_script_argparse(tmp_path: Path):
     marker = tmp_path / "argv.txt"
-    eval_file = tmp_path / "argparse_eval.py"
+    eval_file = tmp_path / "argparse.eval.py"
     eval_file.write_text(
         "\n".join(
             [
@@ -127,7 +134,7 @@ def test_cli_eval_run_resets_argv_for_script_argparse(tmp_path: Path):
 
 
 def test_cli_eval_run_reports_failure(tmp_path: Path, capsys):
-    eval_file = tmp_path / "bad_eval.py"
+    eval_file = tmp_path / "bad.eval.py"
     eval_file.write_text("if False:\n    evaluate()\nraise RuntimeError('boom')\n", encoding="utf-8")
 
     code = main(["eval", "run", str(eval_file)])
@@ -140,7 +147,7 @@ def test_cli_eval_run_reports_failure(tmp_path: Path, capsys):
 
 
 def test_cli_eval_run_reports_evaluation_failed(tmp_path: Path, capsys):
-    eval_file = tmp_path / "failing_score_eval.py"
+    eval_file = tmp_path / "failing_score.eval.py"
     eval_file.write_text(
         "\n".join(
             [
@@ -176,7 +183,7 @@ def test_cli_eval_run_no_files(tmp_path: Path):
 
 
 def test_cli_eval_run_system_exit_nonzero(tmp_path: Path, capsys):
-    eval_file = tmp_path / "exit_eval.py"
+    eval_file = tmp_path / "exit.eval.py"
     eval_file.write_text(
         "\n".join(
             [
@@ -205,7 +212,7 @@ def test_cli_eval_run_ignores_non_python_file(tmp_path: Path):
 
 
 def test_cli_eval_run_fails_when_no_eval_calls(tmp_path: Path, capsys):
-    eval_file = tmp_path / "empty_eval.py"
+    eval_file = tmp_path / "empty.eval.py"
     marker = tmp_path / "should_not_run.txt"
     eval_file.write_text(
         f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran')\n",
@@ -215,13 +222,13 @@ def test_cli_eval_run_fails_when_no_eval_calls(tmp_path: Path, capsys):
     code = main(["eval", "run", str(eval_file)])
     assert code == 1
     captured = capsys.readouterr()
-    assert "No files containing evaluate(...), aevaluate(...), or *_eval(...)" in captured.err
+    assert "No *.eval.py files containing evaluate(...), aevaluate(...), or *_eval(...)" in captured.err
     assert not marker.exists()
 
 
 def test_run_eval_command_multiple_files(tmp_path: Path):
-    a = tmp_path / "a.py"
-    b = tmp_path / "b.py"
+    a = tmp_path / "a.eval.py"
+    b = tmp_path / "b.eval.py"
     a.write_text("evaluate()\n", encoding="utf-8")
     b.write_text("aevaluate()\n", encoding="utf-8")
 

@@ -25,6 +25,16 @@ COLUMN_TITLE_ALIASES = {
     "trace": "Trace",
 }
 LEGACY_COLUMN_TITLES = {canonical: alias for alias, canonical in COLUMN_TITLE_ALIASES.items()}
+RESERVED_EVAL_COLUMN_TITLES = frozenset(
+    BASE_TEXT_COLUMNS
+    + TRACE_RESERVED_COLUMN_TITLES
+    + (EXPECTED_TRACE_COLUMN,)
+    + tuple(COLUMN_TITLE_ALIASES.keys())
+)
+
+
+def is_reserved_eval_column_title(title: str) -> bool:
+    return title in RESERVED_EVAL_COLUMN_TITLES
 
 
 def resolve_column_title(title: str) -> str:

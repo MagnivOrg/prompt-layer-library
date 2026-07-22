@@ -18,19 +18,9 @@ from promptlayer.evaluations.scores import (  # noqa: F401 - re-exported for cal
     scorer_pass_rates,
 )
 from promptlayer.evaluations.utils import (
-    BASE_TEXT_COLUMNS,
-    COLUMN_TITLE_ALIASES,
-    EXPECTED_TRACE_COLUMN,
-    TRACE_RESERVED_COLUMN_TITLES,
+    RESERVED_EVAL_COLUMN_TITLES,
     TRACE_TEXT_COLUMNS,
     find_column_by_title,
-)
-
-_RESERVED_EVAL_COLUMN_TITLES = frozenset(
-    BASE_TEXT_COLUMNS
-    + TRACE_RESERVED_COLUMN_TITLES
-    + (EXPECTED_TRACE_COLUMN,)
-    + tuple(COLUMN_TITLE_ALIASES.keys())
 )
 
 # Config keys that bind a single source column by title (must match backend NAMED_SOURCE_KEYS).
@@ -162,7 +152,7 @@ def _assert_unique_column_titles(
     seen: Dict[str, str] = {}
     for column in processing_columns:
         title = column["title"]
-        if title in _RESERVED_EVAL_COLUMN_TITLES:
+        if title in RESERVED_EVAL_COLUMN_TITLES:
             raise validation_error(
                 f"Eval column title {title!r} is reserved for built-in eval columns."
             )
@@ -171,7 +161,7 @@ def _assert_unique_column_titles(
         seen[title] = "columns"
     for scorer in scorers:
         title = scorer["title"]
-        if title in _RESERVED_EVAL_COLUMN_TITLES:
+        if title in RESERVED_EVAL_COLUMN_TITLES:
             raise validation_error(
                 f"Eval scorer title {title!r} is reserved for built-in eval columns."
             )

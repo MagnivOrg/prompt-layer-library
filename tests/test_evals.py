@@ -240,6 +240,17 @@ def test_generic_column_helpers_validate_required_fields():
         code_execution_column("x", code=" ")
 
 
+def test_column_rejects_reserved_titles_and_text_type():
+    with pytest.raises(PromptLayerValidationError, match="reserved"):
+        column("Input", "JSON_PATH", {"source": "Output", "json_path": "$"})
+    with pytest.raises(PromptLayerValidationError, match="reserved"):
+        column("output", "JSON_PATH", {"source": "Output", "json_path": "$"})
+    with pytest.raises(PromptLayerValidationError, match="cannot be TEXT"):
+        column("summary", "TEXT")
+    with pytest.raises(PromptLayerValidationError, match="reserved"):
+        contains_scorer(title="Trace", source="Output", value="x")
+
+
 def exact_match(output, expected):
     return 1 if output == expected else 0
 

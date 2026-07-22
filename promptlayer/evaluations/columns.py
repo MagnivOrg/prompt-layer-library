@@ -4,6 +4,7 @@ import json
 import textwrap
 from typing import Any, Callable, Dict, List, Literal, Optional, Union
 
+from promptlayer.evaluations.utils import is_reserved_eval_column_title
 from promptlayer.evaluations.validation import validation_error
 from promptlayer.types.table import ColumnType, EvalScorerColumn, ColumnTypeValue
 
@@ -182,7 +183,15 @@ def column(
         raise validation_error(
             "Column title must be a non-empty string.",
         )
+    if is_reserved_eval_column_title(title):
+        raise validation_error(
+            f"Eval column title {title!r} is reserved for built-in eval columns.",
+        )
     resolved_type: ColumnTypeValue = type.value if isinstance(type, ColumnType) else type
+    if str(resolved_type).upper() == "TEXT":
+        raise validation_error(
+            "Eval columns cannot be TEXT; use dataset fields or built-in input/expected/output columns.",
+        )
     payload: EvalScorerColumn = {
         "title": title,
         "type": resolved_type,

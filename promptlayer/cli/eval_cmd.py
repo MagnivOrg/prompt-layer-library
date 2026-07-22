@@ -62,12 +62,12 @@ def add_eval_parser(subparsers: argparse._SubParsersAction) -> None:
 
     run_parser = eval_subparsers.add_parser(
         "run",
-        help="Run Python files containing evaluate, aevaluate, or *_eval calls",
+        help="Run *.eval.py files containing evaluate, aevaluate, or *_eval calls",
     )
     run_parser.add_argument(
         "paths",
         nargs="+",
-        help="Eval file(s) or directories to scan for eval entry points",
+        help="*.eval.py file(s) or directories to scan for eval entry points",
     )
     run_parser.set_defaults(handler=run_eval_command)
 
@@ -84,7 +84,10 @@ def run_eval_command(args: argparse.Namespace) -> int:
         return 1
 
     if not files:
-        terminal.write("No files containing evaluate(...), aevaluate(...), or *_eval(...) calls were found.", err=True)
+        terminal.write(
+            "No *.eval.py files containing evaluate(...), aevaluate(...), or *_eval(...) calls were found.",
+            err=True,
+        )
         return 1
 
     _load_dotenv_files(Path.cwd())
@@ -150,17 +153,23 @@ def _display_path(path: Path) -> str:
         return str(path)
 
 
+def _is_eval_filename(path: Path) -> bool:
+    name = path.name
+    return name.endswith(".eval.py") and not name.startswith(".")
+
+
 def _iter_python_files(path: Path) -> Iterable[Path]:
     if path.is_file():
-        if path.suffix == ".py":
+        if _is_eval_filename(path):
             yield path
         return
 
     for root, dirnames, filenames in os.walk(path):
         dirnames[:] = sorted(name for name in dirnames if name not in _SKIP_DIR_NAMES and not name.startswith("."))
         for filename in sorted(filenames):
-            if filename.endswith(".py") and not filename.startswith("."):
-                yield Path(root) / filename
+            file_path = Path(root) / filename
+            if _is_eval_filename(file_path):
+                yield file_path
 
 
 def _contains_eval_call(path: Path) -> bool:

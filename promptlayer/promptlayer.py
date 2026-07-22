@@ -5,8 +5,10 @@ import os
 from typing import Any, Dict, List, Literal, Optional, Union
 
 import nest_asyncio
+from opentelemetry import context as otel_context, trace as otel_trace
 
 from promptlayer import exceptions as _exceptions
+from promptlayer.evaluations import AsyncEvalManager, EvalManager
 from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
@@ -15,6 +17,13 @@ from promptlayer.streaming import astream_response, stream_response
 from promptlayer.tables import AsyncTableManager, TableManager
 from promptlayer.template_cache import PromptTemplateCache
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
+from promptlayer.tracing_context import (
+    awrap_stream_with_span,
+    format_otel_span_id,
+    format_run_output,
+    is_stream_result,
+    wrap_stream_with_span,
+)
 from promptlayer.track import AsyncTrackManager, TrackManager
 from promptlayer.track.error_tracking import categorize_error
 from promptlayer.types.prompt_template import PromptTemplate
@@ -81,10 +90,11 @@ class PromptLayer(PromptLayerMixin):
         self.templates = TemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
         self.skills = SkillManager(api_key, self.base_url, self.throw_on_error)
         self.tables = TableManager(api_key, self.base_url, self.throw_on_error)
-        self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing
         )
+        self.evals = EvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
+        self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
         self.track = TrackManager(api_key, self.base_url, self.throw_on_error)
 
     def invalidate(self, prompt_name: Optional[str] = None) -> None:
@@ -99,7 +109,7 @@ class PromptLayer(PromptLayerMixin):
             import openai as openai_module
 
             return PromptLayerBase(
-                self.api_key, self.base_url, openai_module, function_name="openai", tracer=self.tracer
+                self.api_key, self.base_url, openai_module, function_name="openai", tracer=self._tracer
             )
         elif name == "anthropic":
             import anthropic as anthropic_module
@@ -110,7 +120,7 @@ class PromptLayer(PromptLayerMixin):
                 anthropic_module,
                 function_name="anthropic",
                 provider_type="anthropic",
-                tracer=self.tracer,
+                tracer=self._tracer,
             )
         else:
             raise AttributeError(f"module {__name__} has no attribute {name}")
@@ -309,14 +319,27 @@ class PromptLayer(PromptLayerMixin):
         }
 
         if self.tracer:
-            with self.tracer.start_as_current_span("PromptLayer Run") as span:
+            span = self.tracer.start_span("PromptLayer Run")
+            token = otel_context.attach(otel_trace.set_span_in_context(span))
+            try:
                 span.set_attribute("prompt_name", prompt_name)
                 span.set_attribute("function_input", str(_run_internal_kwargs))
                 span_ctx = span.get_span_context()
-                pl_run_span_id = hex(span_ctx.span_id)[2:].zfill(16) if span_ctx and span_ctx.is_valid else None
+                pl_run_span_id = format_otel_span_id(span_ctx.span_id) if span_ctx and span_ctx.is_valid else None
                 result = self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
-                span.set_attribute("function_output", str(result))
+                if is_stream_result(result):
+                    # Keep the span open until the stream is fully consumed.
+                    otel_context.detach(token)
+                    return wrap_stream_with_span(result, span)
+                span.set_attribute("function_output", format_run_output(result))
                 return result
+            except Exception as exc:
+                span.record_exception(exc)
+                raise
+            finally:
+                if not is_stream_result(locals().get("result")):
+                    span.end()
+                    otel_context.detach(token)
         else:
             return self._run_internal(**_run_internal_kwargs)
 
@@ -470,10 +493,11 @@ class AsyncPromptLayer(PromptLayerMixin):
         self.templates = AsyncTemplateManager(api_key, self.base_url, self.throw_on_error, cache=cache)
         self.skills = AsyncSkillManager(api_key, self.base_url, self.throw_on_error)
         self.tables = AsyncTableManager(api_key, self.base_url, self.throw_on_error)
-        self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
             api_key, self.base_url, self.throw_on_error, enable_tracing
         )
+        self.evals = AsyncEvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
+        self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
         self.track = AsyncTrackManager(api_key, self.base_url, self.throw_on_error)
 
     def invalidate(self, prompt_name: Optional[str] = None) -> None:
@@ -485,7 +509,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             import openai as openai_module
 
             openai = PromptLayerBase(
-                self.api_key, self.base_url, openai_module, function_name="openai", tracer=self.tracer
+                self.api_key, self.base_url, openai_module, function_name="openai", tracer=self._tracer
             )
             return openai
         elif name == "anthropic":
@@ -497,7 +521,7 @@ class AsyncPromptLayer(PromptLayerMixin):
                 anthropic_module,
                 function_name="anthropic",
                 provider_type="anthropic",
-                tracer=self.tracer,
+                tracer=self._tracer,
             )
             return anthropic
         else:
@@ -574,14 +598,27 @@ class AsyncPromptLayer(PromptLayerMixin):
         }
 
         if self.tracer:
-            with self.tracer.start_as_current_span("PromptLayer Run") as span:
+            span = self.tracer.start_span("PromptLayer Run")
+            token = otel_context.attach(otel_trace.set_span_in_context(span))
+            try:
                 span.set_attribute("prompt_name", prompt_name)
                 span.set_attribute("function_input", str(_run_internal_kwargs))
                 span_ctx = span.get_span_context()
-                pl_run_span_id = hex(span_ctx.span_id)[2:].zfill(16) if span_ctx and span_ctx.is_valid else None
+                pl_run_span_id = format_otel_span_id(span_ctx.span_id) if span_ctx and span_ctx.is_valid else None
                 result = await self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
-                span.set_attribute("function_output", str(result))
+                if is_stream_result(result):
+                    # Keep the span open until the stream is fully consumed.
+                    otel_context.detach(token)
+                    return awrap_stream_with_span(result, span)
+                span.set_attribute("function_output", format_run_output(result))
                 return result
+            except Exception as exc:
+                span.record_exception(exc)
+                raise
+            finally:
+                if not is_stream_result(locals().get("result")):
+                    span.end()
+                    otel_context.detach(token)
         else:
             return await self._run_internal(**_run_internal_kwargs)
 

@@ -3,19 +3,11 @@ from __future__ import annotations
 import os
 
 from opentelemetry import trace as trace_api
-from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.semconv.resource import ResourceAttributes
 
-from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
+from promptlayer.otlp import create_promptlayer_tracer_provider, resolve_otlp_traces_endpoint
 
 from .processor import PromptLayerOpenAIAgentsProcessor
-
-try:
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-except ImportError:
-    OTLPSpanExporter = None
 
 
 class OpenAIAgentsTracingProviderError(RuntimeError):
@@ -70,26 +62,12 @@ def create_openai_agents_tracer_provider(
     endpoint: str | None = None,
     base_url: str | None = None,
 ) -> TracerProvider:
-    if OTLPSpanExporter is None:
-        raise ImportError(
-            "opentelemetry-exporter-otlp-proto-http is required to create a PromptLayer OTLP "
-            "tracer provider for OpenAI Agents."
-        )
-
-    endpoint = _resolve_endpoint(endpoint=endpoint, base_url=base_url)
-    exporter = OTLPSpanExporter(
+    return create_promptlayer_tracer_provider(
+        api_key=api_key,
         endpoint=endpoint,
-        headers={
-            "X-Api-Key": api_key,
-            "User-Agent": _PROMPTLAYER_USER_AGENT,
-            "X-SDK-Version": SDK_VERSION,
-        },
+        base_url=base_url,
+        service_name="promptlayer-openai-agents",
     )
-    provider = TracerProvider(
-        resource=Resource(attributes={ResourceAttributes.SERVICE_NAME: "promptlayer-openai-agents"})
-    )
-    provider.add_span_processor(BatchSpanProcessor(exporter))
-    return provider
 
 
 def _validate_tracer_provider(provider) -> TracerProvider:
@@ -108,14 +86,4 @@ def _validate_tracer_provider(provider) -> TracerProvider:
 
 
 def _resolve_endpoint(*, endpoint: str | None, base_url: str | None) -> str:
-    if endpoint:
-        return endpoint
-
-    env_endpoint = os.environ.get("PROMPTLAYER_OTLP_TRACES_ENDPOINT")
-    if env_endpoint:
-        return env_endpoint
-
-    normalized_base_url = (base_url or os.environ.get("PROMPTLAYER_BASE_URL") or "https://api.promptlayer.com").rstrip(
-        "/"
-    )
-    return f"{normalized_base_url}/v1/traces"
+    return resolve_otlp_traces_endpoint(endpoint=endpoint, base_url=base_url)

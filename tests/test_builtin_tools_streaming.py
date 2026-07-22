@@ -10,6 +10,7 @@ from promptlayer.streaming.blueprint_builder import (
     build_prompt_blueprint_from_openai_responses_event,
 )
 from promptlayer.streaming.response_handlers import (
+    _build_google_response_from_parts,
     _process_openai_response_event,
     openai_images_stream,
 )
@@ -619,6 +620,24 @@ def _make_google_event(parts, grounding_metadata=None, url_context_metadata=None
 class TestGoogleBlueprintBuilder:
     """Test Google blueprint builder with new part types."""
 
+    def test_stream_response_preserves_function_call_thought_signature(self):
+        from google.genai import types
+
+        response = SimpleNamespace(candidates=[SimpleNamespace(content=SimpleNamespace(parts=[]))])
+        last_result = MagicMock()
+        last_result.model_copy.return_value = response
+        function_call = types.FunctionCall(name="get_knowledge", args={"customerQuery": "store information"})
+
+        result = _build_google_response_from_parts(
+            "",
+            "",
+            [(function_call, b"thought-signature")],
+            [],
+            last_result,
+        )
+
+        assert result.candidates[0].content.parts[0].thought_signature == b"thought-signature"
+
     def test_executable_code_part(self):
         exec_code = SimpleNamespace(code="print('hello')", language="PYTHON")
         part = SimpleNamespace(
@@ -723,6 +742,28 @@ class TestGoogleBlueprintBuilder:
         msg = bp["prompt_template"]["messages"][0]
         assert msg["content"][0]["type"] == "thinking"
         assert msg["content"][0]["thinking"] == "thinking..."
+
+    def test_function_call_preserves_thought_signature(self):
+        function_call = SimpleNamespace(
+            id="call_get_knowledge",
+            name="get_knowledge",
+            args={"customerQuery": "store information"},
+        )
+        part = SimpleNamespace(
+            thought=False,
+            thought_signature="U0lHX1RPT0xfQ0FMTA==",
+            executable_code=None,
+            code_execution_result=None,
+            inline_data=None,
+            text=None,
+            function_call=function_call,
+        )
+
+        event = _make_google_event([part])
+        bp = build_prompt_blueprint_from_google_event(event, METADATA)
+        tool_call = bp["prompt_template"]["messages"][0]["tool_calls"][0]
+
+        assert tool_call["provider_metadata"] == {"thought_signature": "U0lHX1RPT0xfQ0FMTA=="}
 
     def test_web_search_grounding_annotations(self):
         """Grounding metadata with web chunks produces url_citation annotations on text."""

@@ -16,11 +16,19 @@ _OUTPUT_FORMAT_TO_MIME = {
 }
 
 
-def _create_tool_call(call_id: str, function_name: str, arguments: Any, tool_id: str = None) -> Dict[str, Any]:
+def _create_tool_call(
+    call_id: str,
+    function_name: str,
+    arguments: Any,
+    tool_id: str = None,
+    provider_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Create a standardized tool call structure"""
     tool_call = {"id": call_id, "type": "function", "function": {"name": function_name, "arguments": arguments}}
     if tool_id:
         tool_call["tool_id"] = tool_id
+    if provider_metadata:
+        tool_call["provider_metadata"] = provider_metadata
     return tool_call
 
 
@@ -978,15 +986,23 @@ def build_prompt_blueprint_from_google_event(event, metadata):
                     content_kwargs["provider_metadata"] = {"thought_signature": thought_sig}
                 assistant_content.append(_create_content_item("output_media", **content_kwargs))
             elif hasattr(part, "thought") and part.thought is True and hasattr(part, "text") and part.text:
-                assistant_content.append(_create_content_item("thinking", thinking=part.text, signature=None))
+                assistant_content.append(
+                    _create_content_item(
+                        "thinking",
+                        thinking=part.text,
+                        signature=getattr(part, "thought_signature", None),
+                    )
+                )
             elif hasattr(part, "text") and part.text is not None:
                 assistant_content.append(_create_content_item("text", text=part.text))
             elif hasattr(part, "function_call") and part.function_call:
+                thought_signature = getattr(part, "thought_signature", None)
                 tool_calls.append(
                     _create_tool_call(
                         getattr(part.function_call, "id", ""),
                         getattr(part.function_call, "name", ""),
                         getattr(part.function_call, "args", {}),
+                        provider_metadata={"thought_signature": thought_signature} if thought_signature else None,
                     )
                 )
 

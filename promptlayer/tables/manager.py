@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, Union
 
 from promptlayer.tables import api as tables_api
+from promptlayer.tables.scorecards import AsyncScorecardManager, ScorecardManager
 from promptlayer.types.table import (
     AddTableRows,
     AddTraceImport,
@@ -599,10 +600,37 @@ class AsyncTableImportsManager(_TableResourceContext):
         )
 
 
+class SheetManager:
+    """Sheets namespace: call with table_id, or use ``.scorecards`` for scorecard APIs."""
+
+    def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.throw_on_error = throw_on_error
+        self.scorecards: ScorecardManager = ScorecardManager(api_key, base_url, throw_on_error)
+
+    def __call__(self, table_id: ResourceId) -> TableSheetsManager:
+        return TableSheetsManager(self.api_key, self.base_url, self.throw_on_error, table_id)
+
+
+class AsyncSheetManager:
+    """Async sheets namespace: call with table_id, or use ``.scorecards`` for scorecard APIs."""
+
+    def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.throw_on_error = throw_on_error
+        self.scorecards: AsyncScorecardManager = AsyncScorecardManager(api_key, base_url, throw_on_error)
+
+    def __call__(self, table_id: ResourceId) -> AsyncTableSheetsManager:
+        return AsyncTableSheetsManager(self.api_key, self.base_url, self.throw_on_error, table_id)
+
+
 class TableManager(_TableResourceContext):
     def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
         super().__init__(api_key, base_url, throw_on_error)
         self.imports = TableImportsManager(api_key, base_url, throw_on_error)
+        self.sheets = SheetManager(api_key, base_url, throw_on_error)
 
     def list(self, params: Optional[ListTablesParams] = None) -> Union[TableListResponse, None]:
         return tables_api.list_tables(
@@ -645,14 +673,12 @@ class TableManager(_TableResourceContext):
             table_id,
         )
 
-    def sheets(self, table_id: ResourceId) -> TableSheetsManager:
-        return TableSheetsManager(self.api_key, self.base_url, self.throw_on_error, table_id)
-
 
 class AsyncTableManager(_TableResourceContext):
     def __init__(self, api_key: str, base_url: str, throw_on_error: bool):
         super().__init__(api_key, base_url, throw_on_error)
         self.imports = AsyncTableImportsManager(api_key, base_url, throw_on_error)
+        self.sheets = AsyncSheetManager(api_key, base_url, throw_on_error)
 
     async def list(self, params: Optional[ListTablesParams] = None) -> Union[TableListResponse, None]:
         return await tables_api.alist_tables(
@@ -694,6 +720,3 @@ class AsyncTableManager(_TableResourceContext):
             self.throw_on_error,
             table_id,
         )
-
-    def sheets(self, table_id: ResourceId) -> AsyncTableSheetsManager:
-        return AsyncTableSheetsManager(self.api_key, self.base_url, self.throw_on_error, table_id)

@@ -1,15 +1,6 @@
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from promptlayer import exceptions as _exceptions
-from promptlayer.types.table import (
-    EvalDataset,
-    EvalProcessingColumn,
-    EvalResult,
-    EvalScorerColumn,
-    ResourceId,
-    Column,
-)
-
 from promptlayer.evaluations.scores import (  # noqa: F401 - re-exported for callers/tests
     case_has_failed_scorer,
     collect_failed_cell_row_indices,
@@ -21,6 +12,14 @@ from promptlayer.evaluations.utils import (
     RESERVED_EVAL_COLUMN_TITLES,
     TRACE_TEXT_COLUMNS,
     find_column_by_title,
+)
+from promptlayer.types.table import (
+    Column,
+    EvalDataset,
+    EvalProcessingColumn,
+    EvalResult,
+    EvalScorerColumn,
+    ResourceId,
 )
 
 # Config keys that bind a single source column by title (must match backend NAMED_SOURCE_KEYS).
@@ -153,22 +152,16 @@ def _assert_unique_column_titles(
     for column in processing_columns:
         title = column["title"]
         if title in RESERVED_EVAL_COLUMN_TITLES:
-            raise validation_error(
-                f"Eval column title {title!r} is reserved for built-in eval columns."
-            )
+            raise validation_error(f"Eval column title {title!r} is reserved for built-in eval columns.")
         if title in seen:
             raise validation_error(f"Duplicate eval column title {title!r}.")
         seen[title] = "columns"
     for scorer in scorers:
         title = scorer["title"]
         if title in RESERVED_EVAL_COLUMN_TITLES:
-            raise validation_error(
-                f"Eval scorer title {title!r} is reserved for built-in eval columns."
-            )
+            raise validation_error(f"Eval scorer title {title!r} is reserved for built-in eval columns.")
         if title in seen:
-            raise validation_error(
-                f"Eval scorer title {title!r} conflicts with a supporting column title."
-            )
+            raise validation_error(f"Eval scorer title {title!r} conflicts with a supporting column title.")
         seen[title] = "scorers"
 
 
@@ -397,10 +390,7 @@ def resolve_config_sources_to_column_ids(
     for key in _MAPPING_SOURCE_KEYS:
         mapping = resolved.get(key)
         if isinstance(mapping, dict):
-            resolved[key] = {
-                variable_name: _resolve_ref(source_ref)
-                for variable_name, source_ref in mapping.items()
-            }
+            resolved[key] = {variable_name: _resolve_ref(source_ref) for variable_name, source_ref in mapping.items()}
     return resolved
 
 
@@ -412,7 +402,9 @@ def _config_references_trace(config: Optional[Dict[str, Any]]) -> bool:
 
 def scorers_reference_trace(scorers: List[EvalScorerColumn]) -> bool:
     """True when any scorer config references the Trace column by title."""
-    return any(_config_references_trace(scorer.get("config") if isinstance(scorer, dict) else None) for scorer in scorers)
+    return any(
+        _config_references_trace(scorer.get("config") if isinstance(scorer, dict) else None) for scorer in scorers
+    )
 
 
 def columns_reference_trace(columns: List[EvalProcessingColumn]) -> bool:

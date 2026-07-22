@@ -5,6 +5,9 @@ from promptlayer.types.table import (
     AddTableRows,
     AddTraceImport,
     BatchRecalculateCells,
+    CellResponse,
+    ColumnListResponse,
+    ColumnResponse,
     ConfigureSheetScore,
     CreateColumn,
     CreateSheet,
@@ -12,9 +15,6 @@ from promptlayer.types.table import (
     CreateTable,
     ListTablesParams,
     ResourceId,
-    CellResponse,
-    ColumnListResponse,
-    ColumnResponse,
     SheetListResponse,
     SheetResponse,
     SheetStatusCountsResponse,
@@ -91,7 +91,6 @@ class AsyncTableSheetRowsManager(_TableResourceContext):
 
 
 class TableSheetColumnsManager(_TableResourceContext):
-
     def list(self) -> Union[ColumnListResponse, None]:
         return tables_api.list_smart_sheet_columns(
             self.api_key,
@@ -138,7 +137,6 @@ class TableSheetColumnsManager(_TableResourceContext):
 
 
 class AsyncTableSheetColumnsManager(_TableResourceContext):
-
     async def list(self) -> Union[ColumnListResponse, None]:
         return await tables_api.alist_smart_sheet_columns(
             self.api_key,
@@ -185,7 +183,6 @@ class AsyncTableSheetColumnsManager(_TableResourceContext):
 
 
 class TableSheetCellsManager(_TableResourceContext):
-
     def get(self, cell_id: ResourceId) -> Union[CellResponse, None]:
         return tables_api.get_sheet_cell(
             self.api_key,
@@ -229,7 +226,6 @@ class TableSheetCellsManager(_TableResourceContext):
 
 
 class AsyncTableSheetCellsManager(_TableResourceContext):
-
     async def get(self, cell_id: ResourceId) -> Union[CellResponse, None]:
         return await tables_api.aget_sheet_cell(
             self.api_key,
@@ -273,7 +269,6 @@ class AsyncTableSheetCellsManager(_TableResourceContext):
 
 
 class TableSheetVersionsManager(_TableResourceContext):
-
     def list(self) -> Union[SheetVersionListResponse, None]:
         return tables_api.list_sheet_versions(
             self.api_key,
@@ -314,7 +309,6 @@ class TableSheetVersionsManager(_TableResourceContext):
 
 
 class AsyncTableSheetVersionsManager(_TableResourceContext):
-
     async def list(self) -> Union[SheetVersionListResponse, None]:
         return await tables_api.alist_sheet_versions(
             self.api_key,
@@ -358,7 +352,6 @@ class AsyncTableSheetVersionsManager(_TableResourceContext):
 
 
 class TableSheetScoreManager(_TableResourceContext):
-
     def get(self) -> Union[TableScoreResponse, None]:
         return tables_api.get_sheet_score(
             self.api_key,
@@ -389,7 +382,6 @@ class TableSheetScoreManager(_TableResourceContext):
 
 
 class AsyncTableSheetScoreManager(_TableResourceContext):
-
     async def get(self) -> Union[TableScoreResponse, None]:
         return await tables_api.aget_sheet_score(
             self.api_key,
@@ -528,7 +520,6 @@ class AsyncTableSheetManager(_TableResourceContext):
 
 
 class TableSheetsManager(_TableResourceContext):
-
     def list(self) -> Union[SheetListResponse, None]:
         return tables_api.list_sheets(
             self.api_key,
@@ -559,7 +550,6 @@ class TableSheetsManager(_TableResourceContext):
 
 
 class AsyncTableSheetsManager(_TableResourceContext):
-
     async def list(self) -> Union[SheetListResponse, None]:
         return await tables_api.alist_sheets(
             self.api_key,
@@ -590,7 +580,6 @@ class AsyncTableSheetsManager(_TableResourceContext):
 
 
 class TableImportsManager(_TableResourceContext):
-
     def add_trace(self, body: AddTraceImport) -> Union[Dict[str, Any], None]:
         return tables_api.add_trace_import(
             self.api_key,
@@ -601,7 +590,6 @@ class TableImportsManager(_TableResourceContext):
 
 
 class AsyncTableImportsManager(_TableResourceContext):
-
     async def add_trace(self, body: AddTraceImport) -> Union[Dict[str, Any], None]:
         return await tables_api.aadd_trace_import(
             self.api_key,

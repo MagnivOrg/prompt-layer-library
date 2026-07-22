@@ -189,9 +189,7 @@ class PromptLayerOpenAIAgentsProcessor:
         trace_id_hex: str | None = None,
         span_id_hex: str,
     ):
-        tracer = resolve_tracer(
-            self._tracer_provider.get_tracer("promptlayer.integrations.openai_agents")
-        )
+        tracer = resolve_tracer(self._tracer_provider.get_tracer("promptlayer.integrations.openai_agents"))
         tracer.id_generator = _FixedIdGenerator(
             trace_id=hex_id_to_int(trace_id_hex) if trace_id_hex is not None else None,
             span_id=hex_id_to_int(span_id_hex),

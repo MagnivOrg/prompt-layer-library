@@ -5,7 +5,6 @@ from functools import wraps
 from typing import Any, Dict, Union
 
 from promptlayer.otlp import initialize_promptlayer_tracer
-from promptlayer.tracing_context import resolve_tracer
 from promptlayer.streaming import (
     aanthropic_stream_completion,
     aanthropic_stream_message,
@@ -28,6 +27,7 @@ from promptlayer.streaming import (
     openai_stream_chat,
     openai_stream_completion,
 )
+from promptlayer.tracing_context import resolve_tracer
 from promptlayer.utils import (
     aamazon_bedrock_request,
     aanthropic_bedrock_request,

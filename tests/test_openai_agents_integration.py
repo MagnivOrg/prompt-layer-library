@@ -9,6 +9,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import SpanContext
 from opentelemetry.trace.status import StatusCode
 
+from promptlayer.evaluations.tracing import run_case_in_span
 from promptlayer.integrations.openai_agents import (
     OpenAIAgentsTracingProviderError,
     PromptLayerOpenAIAgentsProcessor,
@@ -17,7 +18,6 @@ from promptlayer.integrations.openai_agents import (
 )
 from promptlayer.integrations.openai_agents.ids import map_span_id, map_trace_id
 from promptlayer.integrations.openai_agents.mapping import normalize_response_items
-from promptlayer.evaluations.tracing import run_case_in_span
 from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 

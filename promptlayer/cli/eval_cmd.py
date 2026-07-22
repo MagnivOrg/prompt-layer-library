@@ -13,8 +13,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, Iterator, List, Optional, Sequence
 
-from promptlayer.exceptions import EvaluationFailedError
 from promptlayer.evaluations.terminal import EvalTerminal, set_terminal
+from promptlayer.exceptions import EvaluationFailedError
 
 _SIGINT_COUNT = 0
 
@@ -32,6 +32,7 @@ def _install_double_sigint_handler() -> None:
         os._exit(130)
 
     signal.signal(signal.SIGINT, _handler)
+
 
 _SKIP_DIR_NAMES = frozenset(
     {

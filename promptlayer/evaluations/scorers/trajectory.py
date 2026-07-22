@@ -14,8 +14,8 @@ from promptlayer.evaluations.scorers._helpers import (
     require_non_empty_tools,
     require_one_of_modes,
 )
-from promptlayer.evaluations.validation import validation_error
 from promptlayer.evaluations.trace_output import extract_tool_names
+from promptlayer.evaluations.validation import validation_error
 from promptlayer.types.table import EvalScorerColumn
 
 TrajectoryMode = Literal["strict", "non_strict"]

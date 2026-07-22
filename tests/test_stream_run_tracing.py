@@ -22,9 +22,7 @@ def test_is_stream_result_detects_generators():
 
 
 def test_format_run_output_prefers_prompt_blueprint():
-    assert format_run_output({"prompt_blueprint": {"messages": []}, "raw_response": "x"}) == str(
-        {"messages": []}
-    )
+    assert format_run_output({"prompt_blueprint": {"messages": []}, "raw_response": "x"}) == str({"messages": []})
     assert format_run_output({"raw_response": "hello"}) == "hello"
 
 

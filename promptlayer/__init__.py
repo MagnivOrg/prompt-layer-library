@@ -9,12 +9,12 @@ from .evaluations import (
     contains_scorer,
     count_scorer,
     diagnose_trajectory_failure,
+    evaluate,
     llm_assertion_scorer,
     regex_scorer,
     score_trajectory,
     scorer_from_function,
     trajectory_scorer,
-    evaluate,
 )
 from .exceptions import (
     EvaluationFailedError,

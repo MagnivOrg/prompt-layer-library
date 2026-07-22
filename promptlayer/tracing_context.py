@@ -33,10 +33,7 @@ def current_traceparent() -> Optional[str]:
         return None
 
     flags = int(span_context.trace_flags) & 0xFF
-    return (
-        f"00-{format_otel_trace_id(span_context.trace_id)}-"
-        f"{format_otel_span_id(span_context.span_id)}-{flags:02x}"
-    )
+    return f"00-{format_otel_trace_id(span_context.trace_id)}-{format_otel_span_id(span_context.span_id)}-{flags:02x}"
 
 
 def is_stream_result(result: Any) -> bool:

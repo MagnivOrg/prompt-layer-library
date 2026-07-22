@@ -13,9 +13,9 @@ from promptlayer import (
     column,
     compare_scorer,
     contains_scorer,
+    evaluate,
     llm_assertion_scorer,
     regex_scorer,
-    evaluate,
 )
 from promptlayer.evaluations.runner import _execute_cases_sync
 from promptlayer.evaluations.setup import (
@@ -436,7 +436,6 @@ def _scorer_column():
     }
 
 
-
 def _stub_scorecard_apis(
     mock_configure_scorecard,
     mock_recalculate_scorecard,
@@ -836,9 +835,7 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
             "config_key": "source",
         }
     ]
-    assert not any(
-        call[0][5].get("type") == "CODE_EXECUTION" for call in mock_create_column.call_args_list
-    )
+    assert not any(call[0][5].get("type") == "CODE_EXECUTION" for call in mock_create_column.call_args_list)
 
     mock_create_operation.assert_called_once()
     operation_body = mock_create_operation.call_args[0][5]

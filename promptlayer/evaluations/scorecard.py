@@ -1,8 +1,5 @@
 from typing import Any, Dict, List, Optional, Sequence
 
-from promptlayer.tables import api as tables_api
-from promptlayer.types.table import EvalScorerColumn, ResourceId, Column
-
 from promptlayer.evaluations.polling import _apoll_until, _poll_until
 from promptlayer.evaluations.terminal import get_terminal
 from promptlayer.evaluations.utils import (
@@ -15,6 +12,8 @@ from promptlayer.evaluations.validation import (
     resolve_config_sources_to_column_ids,
     scorer_dependencies_from_config,
 )
+from promptlayer.tables import api as tables_api
+from promptlayer.types.table import Column, EvalScorerColumn, ResourceId
 
 _DEFAULT_AGGREGATION = {
     "method": "weighted_mean",
@@ -29,11 +28,7 @@ _TERMINAL_CALCULATION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 def _strip_sdk_only_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     if not config:
         return {}
-    return {
-        key: value
-        for key, value in config.items()
-        if key not in {"_sdkDiagnosis", "_sdk_diagnosis"}
-    }
+    return {key: value for key, value in config.items() if key not in {"_sdkDiagnosis", "_sdk_diagnosis"}}
 
 
 def _infer_code_execution_source_ids(
@@ -193,9 +188,7 @@ def recalculate_and_wait_scorecard(
     calculation_id = str(recalculate["calculation_id"])
 
     payload = _poll_until(
-        fetch=lambda: tables_api.get_sheet_scorecard(
-            api_key, base_url, throw_on_error, table_id, sheet_id
-        ),
+        fetch=lambda: tables_api.get_sheet_scorecard(api_key, base_url, throw_on_error, table_id, sheet_id),
         is_done=lambda response: _scorecard_is_done(response, calculation_id),
         timeout_seconds=timeout_seconds,
         poll_interval_seconds=poll_interval_seconds,
@@ -225,9 +218,7 @@ async def arecalculate_and_wait_scorecard(
     calculation_id = str(recalculate["calculation_id"])
 
     payload = await _apoll_until(
-        fetch=lambda: tables_api.aget_sheet_scorecard(
-            api_key, base_url, throw_on_error, table_id, sheet_id
-        ),
+        fetch=lambda: tables_api.aget_sheet_scorecard(api_key, base_url, throw_on_error, table_id, sheet_id),
         is_done=lambda response: _scorecard_is_done(response, calculation_id),
         timeout_seconds=timeout_seconds,
         poll_interval_seconds=poll_interval_seconds,
@@ -246,10 +237,7 @@ def _map_step_result_to_score_value(result: Optional[Dict[str, Any]]) -> Any:
     if verdict == "error":
         return {
             "status": "FAILED",
-            "error": result.get("error_message")
-            or result.get("evidence")
-            or result.get("raw_value")
-            or result,
+            "error": result.get("error_message") or result.get("evidence") or result.get("raw_value") or result,
         }
     if result.get("raw_value") is not None:
         return result["raw_value"]

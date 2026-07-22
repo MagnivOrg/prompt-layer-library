@@ -5,8 +5,8 @@ from promptlayer.evaluations.columns import (
 )
 from promptlayer.evaluations.manager import AsyncEvalManager, EvalManager
 from promptlayer.evaluations.runner import aevaluate, evaluate
-from promptlayer.evaluations.scorers import __all__ as _SCORER_EXPORTS
 from promptlayer.evaluations.scorers import *  # noqa: F403
+from promptlayer.evaluations.scorers import __all__ as _SCORER_EXPORTS
 from promptlayer.types.table import ColumnType
 
 __all__ = [

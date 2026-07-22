@@ -1,18 +1,6 @@
 import re
 from typing import Any, Dict, List, Optional, Set
 
-from promptlayer.tables import api as tables_api
-from promptlayer.tables.helpers import extract_columns, extract_sheets
-from promptlayer.types.table import (
-    EvalCase,
-    EvalDataset,
-    EvalProcessingColumn,
-    ResourceId,
-    Column,
-    Sheet,
-    Table,
-)
-
 from promptlayer.evaluations.utils import (
     BASE_TEXT_COLUMNS,
     EXPECTED_TRACE_COLUMN,
@@ -29,6 +17,17 @@ from promptlayer.evaluations.validation import (
     api_error,
     not_found_error,
     scorer_dependencies_from_config,
+)
+from promptlayer.tables import api as tables_api
+from promptlayer.tables.helpers import extract_columns, extract_sheets
+from promptlayer.types.table import (
+    Column,
+    EvalCase,
+    EvalDataset,
+    EvalProcessingColumn,
+    ResourceId,
+    Sheet,
+    Table,
 )
 
 
@@ -675,11 +674,7 @@ async def aresolve_cases(
             raise api_error("Failed to resolve sheet for dataset table reference.")
         sheet_id = sheet["id"]
 
-    columns_response = await tables_api.alist_smart_sheet_columns(
-        api_key, base_url, throw_on_error, table_id, sheet_id
-    )
+    columns_response = await tables_api.alist_smart_sheet_columns(api_key, base_url, throw_on_error, table_id, sheet_id)
     source_columns = extract_columns(columns_response or {})
-    rows_payload = await tables_api.alist_all_smart_sheet_rows(
-        api_key, base_url, throw_on_error, table_id, sheet_id
-    )
+    rows_payload = await tables_api.alist_all_smart_sheet_rows(api_key, base_url, throw_on_error, table_id, sheet_id)
     return cases_from_rows(rows_payload, source_columns)  # type: ignore[return-value]

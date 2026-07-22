@@ -2,17 +2,16 @@ import asyncio
 import time
 from typing import Any, Callable, Dict, List, Optional
 
-from promptlayer.tables import api as tables_api
-from promptlayer.types.table import ResourceId, Column
-
+from promptlayer.evaluations.terminal import get_terminal
 from promptlayer.evaluations.utils import (
     _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
     _DEFAULT_POLL_INTERVAL_SECONDS,
     find_column_by_title,
     serialize_cell_value,
 )
-from promptlayer.evaluations.terminal import get_terminal
 from promptlayer.evaluations.validation import api_error, timeout_error
+from promptlayer.tables import api as tables_api
+from promptlayer.types.table import Column, ResourceId
 
 _TERMINAL_OPERATION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
@@ -205,9 +204,7 @@ def _wait_for_sheet_cells(
 ) -> Dict[str, Any]:
     return (
         _poll_until(
-            fetch=lambda: tables_api.get_sheet_status_counts(
-                api_key, base_url, throw_on_error, table_id, sheet_id
-            ),
+            fetch=lambda: tables_api.get_sheet_status_counts(api_key, base_url, throw_on_error, table_id, sheet_id),
             is_done=_status_counts_are_terminal,
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,
@@ -232,9 +229,7 @@ async def _await_for_sheet_cells(
 ) -> Dict[str, Any]:
     return (
         await _apoll_until(
-            fetch=lambda: tables_api.aget_sheet_status_counts(
-                api_key, base_url, throw_on_error, table_id, sheet_id
-            ),
+            fetch=lambda: tables_api.aget_sheet_status_counts(api_key, base_url, throw_on_error, table_id, sheet_id),
             is_done=_status_counts_are_terminal,
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,
@@ -389,24 +384,18 @@ def wait_for_sheet_operations(
     for operation_id in operation_ids:
         last = _poll_until(
             fetch=lambda operation_id=operation_id: _normalize_operation_status_payload(
-                tables_api.get_sheet_operation(
-                    api_key, base_url, throw_on_error, table_id, sheet_id, operation_id
-                )
+                tables_api.get_sheet_operation(api_key, base_url, throw_on_error, table_id, sheet_id, operation_id)
             ),
             is_done=_operation_is_terminal,
             timeout_seconds=timeout_seconds,
             poll_interval_seconds=poll_interval_seconds,
             timeout_message="Timed out waiting for supporting column computation to finish.",
             backoff=True,
-            on_update=lambda payload: _report_operation_cell_progress(
-                payload, _report_terminal_operation_progress
-            ),
+            on_update=lambda payload: _report_operation_cell_progress(payload, _report_terminal_operation_progress),
         )
         status = str((last or {}).get("status") or "").lower()
         if status == "failed":
-            raise api_error(
-                f"Supporting column operation {operation_id} failed while computing preprocessing columns."
-            )
+            raise api_error(f"Supporting column operation {operation_id} failed while computing preprocessing columns.")
         if status == "cancelled":
             raise api_error(
                 f"Supporting column operation {operation_id} was cancelled while computing preprocessing columns."
@@ -465,15 +454,11 @@ async def await_for_sheet_operations(
             poll_interval_seconds=poll_interval_seconds,
             timeout_message="Timed out waiting for supporting column computation to finish.",
             backoff=True,
-            on_update=lambda payload: _report_operation_cell_progress(
-                payload, _report_terminal_operation_progress
-            ),
+            on_update=lambda payload: _report_operation_cell_progress(payload, _report_terminal_operation_progress),
         )
         status = str((last or {}).get("status") or "").lower()
         if status == "failed":
-            raise api_error(
-                f"Supporting column operation {operation_id} failed while computing preprocessing columns."
-            )
+            raise api_error(f"Supporting column operation {operation_id} failed while computing preprocessing columns.")
         if status == "cancelled":
             raise api_error(
                 f"Supporting column operation {operation_id} was cancelled while computing preprocessing columns."

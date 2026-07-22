@@ -5,21 +5,18 @@ import os
 from typing import Any, Dict, List, Literal, Optional, Union
 
 import nest_asyncio
-from opentelemetry import context as otel_context
-from opentelemetry import trace as otel_trace
+from opentelemetry import context as otel_context, trace as otel_trace
 
 from promptlayer import exceptions as _exceptions
-from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.evaluations import AsyncEvalManager, EvalManager
+from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
 from promptlayer.skills import AsyncSkillManager, SkillManager
-from promptlayer.tables import AsyncTableManager, TableManager
 from promptlayer.streaming import astream_response, stream_response
+from promptlayer.tables import AsyncTableManager, TableManager
 from promptlayer.template_cache import PromptTemplateCache
 from promptlayer.templates import AsyncTemplateManager, TemplateManager
-from promptlayer.track import AsyncTrackManager, TrackManager
-from promptlayer.track.error_tracking import categorize_error
 from promptlayer.tracing_context import (
     awrap_stream_with_span,
     format_otel_span_id,
@@ -27,6 +24,8 @@ from promptlayer.tracing_context import (
     is_stream_result,
     wrap_stream_with_span,
 )
+from promptlayer.track import AsyncTrackManager, TrackManager
+from promptlayer.track.error_tracking import categorize_error
 from promptlayer.types.prompt_template import PromptTemplate
 from promptlayer.utils import (
     RERAISE_ORIGINAL_EXCEPTION,

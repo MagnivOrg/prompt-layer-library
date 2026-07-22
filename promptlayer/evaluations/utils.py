@@ -26,10 +26,7 @@ COLUMN_TITLE_ALIASES = {
 }
 LEGACY_COLUMN_TITLES = {canonical: alias for alias, canonical in COLUMN_TITLE_ALIASES.items()}
 RESERVED_EVAL_COLUMN_TITLES = frozenset(
-    BASE_TEXT_COLUMNS
-    + TRACE_RESERVED_COLUMN_TITLES
-    + (EXPECTED_TRACE_COLUMN,)
-    + tuple(COLUMN_TITLE_ALIASES.keys())
+    BASE_TEXT_COLUMNS + TRACE_RESERVED_COLUMN_TITLES + (EXPECTED_TRACE_COLUMN,) + tuple(COLUMN_TITLE_ALIASES.keys())
 )
 
 
@@ -56,6 +53,7 @@ def find_column_by_title(columns_by_title_map: dict, title: str):
     if legacy is not None:
         return columns_by_title_map.get(legacy)
     return None
+
 
 _DEFAULT_POLL_INTERVAL_SECONDS = 0.5
 _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS = 300.0

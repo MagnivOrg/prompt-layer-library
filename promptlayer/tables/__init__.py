@@ -1,9 +1,9 @@
 from promptlayer.tables.api import (
     aadd_trace_import,
+    add_trace_import,
     aensure_default_sheet,
     aget_sheet_status_counts,
     aupsert_table_by_title,
-    add_trace_import,
     ensure_default_sheet,
     get_sheet_status_counts,
     upsert_table_by_title,

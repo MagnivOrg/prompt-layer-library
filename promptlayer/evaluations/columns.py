@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Union
 
 from promptlayer.evaluations.utils import is_reserved_eval_column_title
 from promptlayer.evaluations.validation import validation_error
-from promptlayer.types.table import ColumnType, EvalScorerColumn, ColumnTypeValue
+from promptlayer.types.table import ColumnType, ColumnTypeValue, EvalScorerColumn
 
 # Scorer args mapped onto eval row column titles.
 # CODE_EXECUTION sandboxes expose row columns via the `data` object.

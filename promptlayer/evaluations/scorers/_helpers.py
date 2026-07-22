@@ -7,9 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from promptlayer.evaluations.validation import validation_error
 from promptlayer.types.table import EvalScorerColumn
 
-_SCORECARD_STEP_OPTION_KEYS = frozenset(
-    {"weight", "failure_threshold", "pass_threshold", "required", "thresholds"}
-)
+_SCORECARD_STEP_OPTION_KEYS = frozenset({"weight", "failure_threshold", "pass_threshold", "required", "thresholds"})
 _DEFAULT_PASS_THRESHOLD = 0.8
 _DEFAULT_WARN_THRESHOLD = 0.6
 

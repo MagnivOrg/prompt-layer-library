@@ -2,9 +2,8 @@ from typing import Any, Dict, Optional
 
 from opentelemetry.sdk.trace import TracerProvider
 
-from promptlayer.types.table import EvalDefinition, EvalResult
-
 from promptlayer.evaluations.runner import arun_eval, run_eval
+from promptlayer.types.table import EvalDefinition, EvalResult
 
 
 def definition_to_run_kwargs(

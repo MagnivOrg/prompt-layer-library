@@ -5,28 +5,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from opentelemetry.sdk.trace import TracerProvider
 
-from promptlayer.tables import api as tables_api
-from promptlayer.tables.helpers import extract_columns
-from promptlayer.types.table import (
-    EvalCase,
-    EvalCaseResult,
-    EvalDataset,
-    EvalProcessingColumn,
-    EvalResult,
-    EvalScorerColumn,
-    ResourceId,
-    Column,
-)
-
 from promptlayer.evaluations.polling import (
     afill_row_cells,
     await_for_sheet_operations,
     fill_row_cells,
     wait_for_sheet_operations,
-)
-from promptlayer.evaluations.trace_price import (
-    await_for_trace_request_price,
-    wait_for_trace_request_price,
 )
 from promptlayer.evaluations.scorecard import (
     aconfigure_scorecard_from_scorers,
@@ -36,6 +19,12 @@ from promptlayer.evaluations.scorecard import (
     extract_scorecard_overall_score,
     fetch_scorecard_row_scores,
     recalculate_and_wait_scorecard,
+)
+from promptlayer.evaluations.scores import (
+    case_has_failed_scorer,
+    collect_failing_row_indices,
+    extract_overall_score,
+    scorer_pass_rates,
 )
 from promptlayer.evaluations.setup import (
     aclear_blank_scaffold_rows,
@@ -51,18 +40,16 @@ from promptlayer.evaluations.setup import (
 )
 from promptlayer.evaluations.terminal import format_score_value, get_terminal
 from promptlayer.evaluations.trace_output import resolve_output_from_trace_row
+from promptlayer.evaluations.trace_price import (
+    await_for_trace_request_price,
+    wait_for_trace_request_price,
+)
 from promptlayer.evaluations.tracing import (
     arun_case_in_span,
     flush_traces,
     maybe_await,
     maybe_await_async,
     run_case_in_span,
-)
-from promptlayer.evaluations.scores import (
-    case_has_failed_scorer,
-    collect_failing_row_indices,
-    extract_overall_score,
-    scorer_pass_rates,
 )
 from promptlayer.evaluations.utils import (
     build_case_result,
@@ -80,6 +67,18 @@ from promptlayer.evaluations.validation import (
     columns_reference_trace,
     scorers_reference_trace,
     validation_error,
+)
+from promptlayer.tables import api as tables_api
+from promptlayer.tables.helpers import extract_columns
+from promptlayer.types.table import (
+    Column,
+    EvalCase,
+    EvalCaseResult,
+    EvalDataset,
+    EvalProcessingColumn,
+    EvalResult,
+    EvalScorerColumn,
+    ResourceId,
 )
 
 

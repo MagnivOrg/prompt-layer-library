@@ -9,6 +9,8 @@ from opentelemetry.trace import SpanKind
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from opentelemetry.trace.status import Status, StatusCode
 
+from promptlayer.tracing_context import resolve_tracer
+
 from .ids import hex_id_to_int, map_span_id, map_trace_id, synthetic_root_span_id
 from .mapping import base_span_attributes, base_trace_attributes, span_data_attributes, span_kind_for, span_name_for
 from .time import iso_to_unix_nano
@@ -165,6 +167,10 @@ class PromptLayerOpenAIAgentsProcessor:
                 if self._context_has_valid_span(extracted):
                     return extracted
 
+        current = context_api.get_current()
+        if self._context_has_valid_span(current):
+            return current
+
         return None
 
     @staticmethod
@@ -183,7 +189,7 @@ class PromptLayerOpenAIAgentsProcessor:
         trace_id_hex: str | None = None,
         span_id_hex: str,
     ):
-        tracer = self._tracer_provider.get_tracer("promptlayer.integrations.openai_agents")
+        tracer = resolve_tracer(self._tracer_provider.get_tracer("promptlayer.integrations.openai_agents"))
         tracer.id_generator = _FixedIdGenerator(
             trace_id=hex_id_to_int(trace_id_hex) if trace_id_hex is not None else None,
             span_id=hex_id_to_int(span_id_hex),

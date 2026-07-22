@@ -115,7 +115,7 @@ The SDK relies on the following environment variables:
 | --- | --- | --- |
 | `PROMPTLAYER_API_KEY` | Yes, unless passed as `api_key=` | API key used to authenticate requests to PromptLayer. |
 | `PROMPTLAYER_BASE_URL` | No | Overrides the PromptLayer API base URL. Defaults to `https://api.promptlayer.com`. |
-| `PROMPTLAYER_OTLP_TRACES_ENDPOINT` | No | Overrides the OTLP trace endpoint used by the OpenAI Agents tracing integration. |
+| `PROMPTLAYER_OTLP_TRACES_ENDPOINT` | No | Overrides the OTLP trace endpoint (`/v1/traces`) used when SDK tracing is enabled. |
 | `PROMPTLAYER_TRACEPARENT` | No | Optional trace context passed through the Claude Agents integration. |
 
 ## Client Resources

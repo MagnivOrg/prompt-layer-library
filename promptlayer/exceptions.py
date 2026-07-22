@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class PromptLayerError(Exception):
     """Base exception for all PromptLayer SDK errors."""
 
@@ -117,3 +120,22 @@ class PromptLayerValidationError(PromptLayerError):
     """
 
     pass
+
+
+class EvaluationFailedError(PromptLayerError):
+    """Raised when an eval has a failed scorer cell or misses ``passing_score``."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        score: Any = None,
+        passing_score: Any = None,
+        result: Any = None,
+        failing_row_indices: Any = None,
+    ):
+        super().__init__(message)
+        self.score = score
+        self.passing_score = passing_score
+        self.result = result
+        self.failing_row_indices = list(failing_row_indices or [])

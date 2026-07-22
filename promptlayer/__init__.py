@@ -1,4 +1,23 @@
+from .evaluations import (
+    ColumnType,
+    TrajectoryMode,
+    aevaluate,
+    assert_valid_scorer,
+    code_execution_column,
+    column,
+    compare_scorer,
+    contains_scorer,
+    count_scorer,
+    diagnose_trajectory_failure,
+    evaluate,
+    llm_assertion_scorer,
+    regex_scorer,
+    score_trajectory,
+    scorer_from_function,
+    trajectory_scorer,
+)
 from .exceptions import (
+    EvaluationFailedError,
     PromptLayerAPIConnectionError,
     PromptLayerAPIError,
     PromptLayerAPIStatusError,
@@ -16,13 +35,30 @@ from .exceptions import (
 )
 from .promptlayer import AsyncPromptLayer, PromptLayer
 
-__version__ = "1.4.6"
+__version__ = "1.5.0"
 __all__ = [
     "PromptLayer",
     "AsyncPromptLayer",
+    "evaluate",
+    "aevaluate",
+    "ColumnType",
+    "column",
+    "code_execution_column",
+    "scorer_from_function",
+    "TrajectoryMode",
+    "assert_valid_scorer",
+    "compare_scorer",
+    "contains_scorer",
+    "count_scorer",
+    "diagnose_trajectory_failure",
+    "llm_assertion_scorer",
+    "regex_scorer",
+    "score_trajectory",
+    "trajectory_scorer",
     "__version__",
     # Exceptions
     "PromptLayerError",
+    "EvaluationFailedError",
     "PromptLayerAPIError",
     "PromptLayerBadRequestError",
     "PromptLayerAuthenticationError",

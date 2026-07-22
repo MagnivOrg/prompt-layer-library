@@ -8,8 +8,6 @@ ResourceId = Union[str, int]
 
 class ColumnType(str, Enum):
     TEXT = "TEXT"
-    NUMBER = "NUMBER"
-    BOOLEAN = "BOOLEAN"
     PROMPT_TEMPLATE = "PROMPT_TEMPLATE"
     LLM_ASSERTION = "LLM_ASSERTION"
     CODE_EXECUTION = "CODE_EXECUTION"
@@ -32,8 +30,6 @@ class ColumnType(str, Enum):
 # Literal form kept for TypedDict / backwards-compatible string literals.
 ColumnTypeValue = Literal[
     "TEXT",
-    "NUMBER",
-    "BOOLEAN",
     "PROMPT_TEMPLATE",
     "LLM_ASSERTION",
     "CODE_EXECUTION",

@@ -20,8 +20,6 @@ import httpx
 import requests
 import urllib3
 import urllib3.util
-from ably import AblyRealtime
-from ably.types.message import Message
 from cachetools import LRUCache
 from centrifuge import (
     Client,
@@ -69,11 +67,6 @@ _PROMPTLAYER_USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VE
 WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
 WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
 SET_WORKFLOW_COMPLETE_MESSAGE = "SET_WORKFLOW_COMPLETE"
-WS_TOKEN_REQUEST_LIBRARY_URL = (
-    f"{os.getenv('PROMPTLAYER_BASE_URL', 'https://api.promptlayer.com')}/ws-token-request-library"
-)
-
-
 logger = logging.getLogger(__name__)
 
 # Module-level session for connection pooling (thread-safe initialization)
@@ -257,7 +250,7 @@ async def _resolve_workflow_id(base_url: str, workflow_id_or_name: Union[int, st
         return response.json()["workflow"]["id"]
 
 
-async def _get_ably_token(base_url: str, channel_name, authentication_headers):
+async def _get_websocket_token(base_url: str, channel_name, authentication_headers):
     try:
         async with _make_httpx_client() as client:
             response = await client.post(
@@ -282,12 +275,12 @@ async def _get_ably_token(base_url: str, channel_name, authentication_headers):
 
 def _make_message_listener(base_url: str, results_future, execution_id_future, return_all_outputs, headers):
     # We need this function to be mocked by unittests
-    async def message_listener(message: Message):
-        if results_future.cancelled() or message.name != SET_WORKFLOW_COMPLETE_MESSAGE:
+    async def message_listener(message_name: str, data: str):
+        if results_future.cancelled() or message_name != SET_WORKFLOW_COMPLETE_MESSAGE:
             return  # TODO(dmu) LOW: Do we really need this check?
 
         execution_id = await asyncio.wait_for(execution_id_future, _get_http_timeout() * 1.1)
-        message_data = json.loads(message.data)
+        message_data = json.loads(data)
         if message_data["workflow_version_execution_id"] != execution_id:
             return
 
@@ -304,17 +297,6 @@ def _make_message_listener(base_url: str, results_future, execution_id_future, r
         results_future.set_result(results)
 
     return message_listener
-
-
-async def _subscribe_to_workflow_completion_channel(
-    base_url: str, channel, execution_id_future, return_all_outputs, headers
-):
-    results_future = asyncio.Future()
-    message_listener = _make_message_listener(
-        base_url, results_future, execution_id_future, return_all_outputs, headers
-    )
-    await channel.subscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
-    return results_future, message_listener
 
 
 async def _post_workflow_id_run(
@@ -362,35 +344,22 @@ async def _post_workflow_id_run(
     return result.get("workflow_version_execution_id")
 
 
-async def _wait_for_workflow_completion(channel, results_future, message_listener, timeout):
-    # We need this function for mocking in unittests
-    try:
-        return await asyncio.wait_for(results_future, timeout)
-    except asyncio.TimeoutError:
-        raise _exceptions.PromptLayerAPITimeoutError(
-            "Workflow execution did not complete properly", response=None, body=None
-        )
-    finally:
-        channel.unsubscribe(SET_WORKFLOW_COMPLETE_MESSAGE, message_listener)
-
-
 def _make_channel_name_suffix():
     # We need this function for mocking in unittests
     return uuid4().hex
 
 
-MessageCallback = Callable[[Message], Coroutine[None, None, None]]
+MessageCallback = Callable[[str, str], Coroutine[None, None, None]]
 
 
-class SubscriptionEventLoggerHandler(SubscriptionEventHandler):
+class WorkflowSubscriptionEventHandler(SubscriptionEventHandler):
     def __init__(self, callback: MessageCallback):
         self.callback = callback
 
     async def on_publication(self, ctx: PublicationContext):
         message_name = ctx.pub.data.get("message_name", "unknown")
         data = ctx.pub.data.get("data", "")
-        message = Message(name=message_name, data=data)
-        await self.callback(message)
+        await self.callback(message_name, data)
 
 
 @asynccontextmanager
@@ -407,7 +376,7 @@ async def centrifugo_client(address: str, token: str):
 async def centrifugo_subscription(client: Client, topic: str, message_listener: MessageCallback):
     subscription = client.new_subscription(
         topic,
-        events=SubscriptionEventLoggerHandler(message_listener),
+        events=WorkflowSubscriptionEventHandler(message_listener),
     )
     try:
         await subscription.subscribe()
@@ -443,63 +412,41 @@ async def arun_workflow_request(
     channel_name = WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE.format(
         workflow_id=workflow_id, channel_name_suffix=channel_name_suffix
     )
-    ably_token = await _get_ably_token(base_url, channel_name, headers)
-    token = ably_token["token_details"]["token"]
+    websocket_token = await _get_websocket_token(base_url, channel_name, headers)
+    token = websocket_token["token_details"]["token"]
 
     execution_id_future = asyncio.Future[int]()
 
-    if ably_token.get("messaging_backend") == "centrifugo":
-        ws_scheme = "wss" if urllib3.util.parse_url(base_url).scheme == "https" else "ws"
-        address = urllib3.util.parse_url(base_url)._replace(scheme=ws_scheme, path="/connection/websocket").url
-        async with centrifugo_client(address, token) as client:
-            results_future = asyncio.Future[dict[str, Any]]()
-            async with centrifugo_subscription(
-                client,
-                channel_name,
-                _make_message_listener(
-                    base_url,
-                    results_future,
-                    execution_id_future,
-                    return_all_outputs,
-                    headers,
-                ),
-            ):
-                execution_id = await _post_workflow_id_run(
-                    base_url=base_url,
-                    authentication_headers=headers,
-                    workflow_id=workflow_id,
-                    input_variables=input_variables,
-                    metadata=metadata,
-                    workflow_label_name=workflow_label_name,
-                    workflow_version_number=workflow_version_number,
-                    return_all_outputs=return_all_outputs,
-                    channel_name_suffix=channel_name_suffix,
-                )
-                execution_id_future.set_result(execution_id)
-                await asyncio.wait_for(results_future, timeout)
-                return results_future.result()
-
-    async with AblyRealtime(token=token) as ably_client:
-        # It is crucial to subscribe before running a workflow, otherwise we may miss a completion message
-        channel = ably_client.channels.get(channel_name)
-        results_future, message_listener = await _subscribe_to_workflow_completion_channel(
-            base_url, channel, execution_id_future, return_all_outputs, headers
-        )
-
-        execution_id = await _post_workflow_id_run(
-            base_url=base_url,
-            authentication_headers=headers,
-            workflow_id=workflow_id,
-            input_variables=input_variables,
-            metadata=metadata,
-            workflow_label_name=workflow_label_name,
-            workflow_version_number=workflow_version_number,
-            return_all_outputs=return_all_outputs,
-            channel_name_suffix=channel_name_suffix,
-        )
-        execution_id_future.set_result(execution_id)
-
-        return await _wait_for_workflow_completion(channel, results_future, message_listener, timeout)
+    ws_scheme = "wss" if urllib3.util.parse_url(base_url).scheme == "https" else "ws"
+    address = urllib3.util.parse_url(base_url)._replace(scheme=ws_scheme, path="/connection/websocket").url
+    # Ably once served this WebSocket layer; Centrifugo is now its sole client.
+    async with centrifugo_client(address, token) as client:
+        results_future = asyncio.Future[dict[str, Any]]()
+        async with centrifugo_subscription(
+            client,
+            channel_name,
+            _make_message_listener(
+                base_url,
+                results_future,
+                execution_id_future,
+                return_all_outputs,
+                headers,
+            ),
+        ):
+            execution_id = await _post_workflow_id_run(
+                base_url=base_url,
+                authentication_headers=headers,
+                workflow_id=workflow_id,
+                input_variables=input_variables,
+                metadata=metadata,
+                workflow_label_name=workflow_label_name,
+                workflow_version_number=workflow_version_number,
+                return_all_outputs=return_all_outputs,
+                channel_name_suffix=channel_name_suffix,
+            )
+            execution_id_future.set_result(execution_id)
+            await asyncio.wait_for(results_future, timeout)
+            return results_future.result()
 
 
 def promptlayer_api_handler(

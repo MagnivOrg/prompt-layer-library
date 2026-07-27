@@ -10,8 +10,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from promptlayer import AsyncPromptLayer, PromptLayer
-from promptlayer import tracing
+from promptlayer import AsyncPromptLayer, PromptLayer, tracing
 from promptlayer.span_exporter import (
     OpenAIPromptTemplateSpanProcessor,
     set_prompt_span_attributes,
@@ -130,9 +129,7 @@ def test_openai_prompt_processor_enriches_native_genai_span():
 
 def test_promptlayer_recognizes_instrumented_openai_streams():
     chat_patch = pytest.importorskip("opentelemetry.instrumentation.openai_v2.patch")
-    response_wrappers = pytest.importorskip(
-        "opentelemetry.instrumentation.openai_v2.response_wrappers"
-    )
+    response_wrappers = pytest.importorskip("opentelemetry.instrumentation.openai_v2.response_wrappers")
     wrapper_classes = (
         chat_patch.ChatStreamWrapper,
         chat_patch.LegacyChatStreamWrapper,
@@ -288,10 +285,7 @@ def test_promptlayer_default_tracing_remains_backward_compatible(monkeypatch):
         openai_span = spans_by_name["chat gpt-4o-mini"]
         assert completion.choices[0].message.content == "Hello."
         assert promptlayer_client.tracer_provider is not None
-        assert (
-            promptlayer_client.tracer_provider.resource.attributes["service.name"]
-            == "prompt-layer-library"
-        )
+        assert promptlayer_client.tracer_provider.resource.attributes["service.name"] == "prompt-layer-library"
         assert set(spans_by_name) == {"legacy-promptlayer-span", "chat gpt-4o-mini"}
         assert openai_span.parent is not None
         assert openai_span.parent.span_id == parent_span.get_span_context().span_id

@@ -58,8 +58,7 @@ class OpenAIPromptTemplateSpanProcessor(SpanProcessor):
         scope_name = getattr(instrumentation_scope, "name", "")
         attributes = getattr(span, "attributes", {}) or {}
         is_openai_span = scope_name == _OPENAI_INSTRUMENTATION_SCOPE or (
-            scope_name == _GENAI_HANDLER_SCOPE
-            and attributes.get("gen_ai.provider.name") == "openai"
+            scope_name == _GENAI_HANDLER_SCOPE and attributes.get("gen_ai.provider.name") == "openai"
         )
         if not is_openai_span:
             return

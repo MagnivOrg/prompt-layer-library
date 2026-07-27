@@ -6,7 +6,6 @@ from openai import OpenAI
 
 from promptlayer import configure_tracing
 
-
 tracer_provider = configure_tracing(providers=("openai",))
 client = OpenAI()
 

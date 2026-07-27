@@ -15,7 +15,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
 from promptlayer.span_exporter import OpenAIPromptTemplateSpanProcessor
-from promptlayer.utils import SDK_VERSION, _PROMPTLAYER_USER_AGENT
+from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,7 @@ def configure_tracing(
     resolved_api_key = api_key or os.environ.get("PROMPTLAYER_API_KEY")
     if not resolved_api_key:
         raise ValueError(
-            "PromptLayer API key not provided. "
-            "Please set PROMPTLAYER_API_KEY or pass the api_key parameter."
+            "PromptLayer API key not provided. Please set PROMPTLAYER_API_KEY or pass the api_key parameter."
         )
 
     provider = tracer_provider if tracer_provider is not None else _get_or_create_tracer_provider()
@@ -64,9 +63,7 @@ def _get_or_create_tracer_provider() -> Any:
     if callable(getattr(provider, "add_span_processor", None)):
         return provider
 
-    provider = TracerProvider(
-        resource=Resource.create({ResourceAttributes.SERVICE_NAME: "promptlayer-python"})
-    )
+    provider = TracerProvider(resource=Resource.create({ResourceAttributes.SERVICE_NAME: "promptlayer-python"}))
     trace.set_tracer_provider(provider)
     return provider
 

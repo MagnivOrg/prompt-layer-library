@@ -472,6 +472,10 @@ def promptlayer_api_handler(
             "AsyncStream",
             "AsyncMessageStreamManager",
             "MessageStreamManager",
+            "ChatStreamWrapper",
+            "LegacyChatStreamWrapper",
+            "ResponseStreamWrapper",
+            "AsyncResponseStreamWrapper",
         ]
     ):
         return GeneratorProxy(

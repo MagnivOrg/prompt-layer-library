@@ -1,6 +1,8 @@
+from contextvars import ContextVar
 from typing import Any, Dict, Optional
 
 from opentelemetry import baggage, context, trace
+from opentelemetry.sdk.trace import SpanProcessor
 
 _BAGGAGE_KEYS = (
     "promptlayer.prompt.name",
@@ -8,6 +10,32 @@ _BAGGAGE_KEYS = (
     "promptlayer.prompt.version",
     "promptlayer.prompt.label",
 )
+_OPENAI_INSTRUMENTATION_SCOPE = "opentelemetry.instrumentation.openai_v2"
+_GENAI_HANDLER_SCOPE = "opentelemetry.util.genai.handler"
+_active_prompt_template: ContextVar[Optional[Dict[str, str]]] = ContextVar(
+    "promptlayer_active_prompt_template",
+    default=None,
+)
+
+
+class OpenAIPromptTemplateSpanProcessor(SpanProcessor):
+    """Add the active PromptLayer template identity to native OpenAI spans."""
+
+    def on_start(self, span: Any, parent_context: Any = None) -> None:
+        instrumentation_scope = getattr(span, "instrumentation_scope", None)
+        scope_name = getattr(instrumentation_scope, "name", "")
+        attributes = getattr(span, "attributes", {}) or {}
+        is_openai_span = scope_name == _OPENAI_INSTRUMENTATION_SCOPE or (
+            scope_name == _GENAI_HANDLER_SCOPE
+            and attributes.get("gen_ai.provider.name") == "openai"
+        )
+        if not is_openai_span:
+            return
+
+        span.set_attribute("gen_ai.provider.name", "openai")
+        prompt_attributes = _active_prompt_template.get()
+        if prompt_attributes:
+            span.set_attributes(prompt_attributes)
 
 
 def set_prompt_span_attributes(
@@ -24,11 +52,6 @@ def set_prompt_span_attributes(
 
     Also sets the attributes on the current span for direct visibility.
     """
-    span = trace.get_current_span()
-    if not span.is_recording():
-        return
-
-    # Build the set of entries to propagate
     entries: Dict[str, str] = {"promptlayer.prompt.name": prompt_name}
 
     prompt_id = prompt_blueprint.get("id")
@@ -42,12 +65,13 @@ def set_prompt_span_attributes(
     if label is not None:
         entries["promptlayer.prompt.label"] = label
 
-    # Set on current span
-    for key, value in entries.items():
-        span.set_attribute(key, value)
+    _active_prompt_template.set(entries)
 
-    # Set as baggage so BaggageSpanProcessor copies them onto child spans.
-    # Clear any stale keys from a previous prompt fetch first.
+    span = trace.get_current_span()
+    if span.is_recording():
+        for key, value in entries.items():
+            span.set_attribute(key, value)
+
     ctx = context.get_current()
     for key in _BAGGAGE_KEYS:
         if key in entries:

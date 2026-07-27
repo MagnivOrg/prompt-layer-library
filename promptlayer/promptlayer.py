@@ -73,6 +73,7 @@ class PromptLayer(PromptLayerMixin):
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
         cache_ttl_seconds: int = 0,
+        tracer_provider=None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -91,7 +92,11 @@ class PromptLayer(PromptLayerMixin):
         self.skills = SkillManager(api_key, self.base_url, self.throw_on_error)
         self.tables = TableManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
-            api_key, self.base_url, self.throw_on_error, enable_tracing
+            api_key,
+            self.base_url,
+            self.throw_on_error,
+            enable_tracing,
+            tracer_provider,
         )
         self.evals = EvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
         self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
@@ -476,6 +481,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         base_url: Union[str, None] = None,
         throw_on_error: bool = True,
         cache_ttl_seconds: int = 0,
+        tracer_provider=None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -494,7 +500,11 @@ class AsyncPromptLayer(PromptLayerMixin):
         self.skills = AsyncSkillManager(api_key, self.base_url, self.throw_on_error)
         self.tables = AsyncTableManager(api_key, self.base_url, self.throw_on_error)
         self.tracer_provider, self.tracer = self._initialize_tracer(
-            api_key, self.base_url, self.throw_on_error, enable_tracing
+            api_key,
+            self.base_url,
+            self.throw_on_error,
+            enable_tracing,
+            tracer_provider,
         )
         self.evals = AsyncEvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
         self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)

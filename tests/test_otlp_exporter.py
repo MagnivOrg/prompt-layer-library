@@ -63,18 +63,22 @@ def test_create_promptlayer_tracer_provider_targets_v1_traces(monkeypatch):
 
 def test_initialize_tracer_uses_otlp_exporter(monkeypatch):
     seen = {}
-    monkeypatch.setattr("promptlayer.otlp.OTLPSpanExporter", _FakeExporter(seen))
+    provider = TracerProvider()
+    monkeypatch.setattr("promptlayer.tracing.OTLPSpanExporter", _FakeExporter(seen))
+    monkeypatch.setattr("promptlayer.tracing._instrument_openai", lambda *args, **kwargs: None)
 
-    provider, tracer = PromptLayerMixin._initialize_tracer(
+    configured_provider, tracer = PromptLayerMixin._initialize_tracer(
         "pl_test",
         "https://api.promptlayer.com",
         True,
         enable_tracing=True,
+        tracer_provider=provider,
     )
 
-    assert provider is not None
+    assert configured_provider is provider
     assert tracer is not None
     assert seen["endpoint"] == "https://api.promptlayer.com/v1/traces"
+    provider.shutdown()
 
 
 def test_initialize_promptlayer_tracer_disabled():

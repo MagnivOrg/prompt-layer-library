@@ -1,5 +1,7 @@
+from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Iterator, Optional
 
 from opentelemetry import baggage, context, trace
 from opentelemetry.sdk.trace import SpanProcessor
@@ -12,14 +14,44 @@ _BAGGAGE_KEYS = (
 )
 _OPENAI_INSTRUMENTATION_SCOPE = "opentelemetry.instrumentation.openai_v2"
 _GENAI_HANDLER_SCOPE = "opentelemetry.util.genai.handler"
+_PROMPTLAYER_REQUEST_LOG_MANAGED = "promptlayer.request_log.managed"
+_PROMPTLAYER_REQUEST_LOG_SPAN_ID = "promptlayer.request_log.span_id"
 _active_prompt_template: ContextVar[Optional[Dict[str, str]]] = ContextVar(
     "promptlayer_active_prompt_template",
     default=None,
 )
 
 
+@dataclass(frozen=True)
+class _OpenAIRequestSpanState:
+    request_log_span_id: Optional[str] = None
+
+
+_OPENAI_REQUEST_SPAN_STATE_KEY = context.create_key("promptlayer.openai_request_span")
+
+
+@contextmanager
+def _mark_openai_request_span(
+    *,
+    enabled: bool,
+    request_log_span_id: Optional[str],
+) -> Iterator[None]:
+    """Link a native OpenAI span to the request log managed by PromptLayer.run."""
+
+    if not enabled:
+        yield
+        return
+
+    state = _OpenAIRequestSpanState(request_log_span_id=request_log_span_id)
+    token = context.attach(context.set_value(_OPENAI_REQUEST_SPAN_STATE_KEY, state))
+    try:
+        yield
+    finally:
+        context.detach(token)
+
+
 class OpenAIPromptTemplateSpanProcessor(SpanProcessor):
-    """Add the active PromptLayer template identity to native OpenAI spans."""
+    """Enrich native OpenAI spans and correlate PromptLayer-managed requests."""
 
     def on_start(self, span: Any, parent_context: Any = None) -> None:
         instrumentation_scope = getattr(span, "instrumentation_scope", None)
@@ -36,6 +68,18 @@ class OpenAIPromptTemplateSpanProcessor(SpanProcessor):
         prompt_attributes = _active_prompt_template.get()
         if prompt_attributes:
             span.set_attributes(prompt_attributes)
+
+        request_span_state = context.get_value(_OPENAI_REQUEST_SPAN_STATE_KEY, parent_context)
+        if request_span_state is None:
+            return
+
+        # PromptLayer.run creates the request log; OTLP ingestion must not create another.
+        span.set_attribute(_PROMPTLAYER_REQUEST_LOG_MANAGED, True)
+        if request_span_state.request_log_span_id:
+            span.set_attribute(
+                _PROMPTLAYER_REQUEST_LOG_SPAN_ID,
+                request_span_state.request_log_span_id,
+            )
 
 
 def set_prompt_span_attributes(

@@ -13,6 +13,7 @@ from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
 from promptlayer.skills import AsyncSkillManager, SkillManager
+from promptlayer.span_exporter import _mark_openai_request_span
 from promptlayer.streaming import astream_response, stream_response
 from promptlayer.tables import AsyncTableManager, TableManager
 from promptlayer.template_cache import PromptTemplateCache
@@ -206,11 +207,15 @@ class PromptLayer(PromptLayerMixin):
         # streaming=False > Pydantic model instance
         # streaming=True > generator that yields ChatCompletionChunk pieces as they arrive
         try:
-            response = llm_data["request_function"](
-                prompt_blueprint=llm_data["prompt_blueprint"],
-                client_kwargs=llm_data["client_kwargs"],
-                function_kwargs=llm_data["function_kwargs"],
-            )
+            with _mark_openai_request_span(
+                enabled=llm_data["provider"] in {"openai", "openai.azure"},
+                request_log_span_id=pl_run_span_id,
+            ):
+                response = llm_data["request_function"](
+                    prompt_blueprint=llm_data["prompt_blueprint"],
+                    client_kwargs=llm_data["client_kwargs"],
+                    function_kwargs=llm_data["function_kwargs"],
+                )
         except Exception as e:
             request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
             try:
@@ -780,11 +785,15 @@ class AsyncPromptLayer(PromptLayerMixin):
         request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
         try:
-            response = await llm_data["request_function"](
-                prompt_blueprint=llm_data["prompt_blueprint"],
-                client_kwargs=llm_data["client_kwargs"],
-                function_kwargs=llm_data["function_kwargs"],
-            )
+            with _mark_openai_request_span(
+                enabled=llm_data["provider"] in {"openai", "openai.azure"},
+                request_log_span_id=pl_run_span_id,
+            ):
+                response = await llm_data["request_function"](
+                    prompt_blueprint=llm_data["prompt_blueprint"],
+                    client_kwargs=llm_data["client_kwargs"],
+                    function_kwargs=llm_data["function_kwargs"],
+                )
         except Exception as e:
             request_end_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
             try:

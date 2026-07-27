@@ -106,7 +106,8 @@ response = openai.chat.completions.create(
 - `base_url: str | None = None`: Overrides the PromptLayer API base URL. If omitted, the SDK uses `PROMPTLAYER_BASE_URL` or the default API URL.
 - `throw_on_error: bool = True`: Controls whether SDK methods raise PromptLayer exceptions or return `None` for many API errors.
 - `cache_ttl_seconds: int = 0`: Enables in-memory prompt-template caching when greater than `0`.
-- `tracer_provider: TracerProvider | None = None`: Uses an application-owned OpenTelemetry SDK tracer provider instead of the global provider.
+- `tracer_provider: TracerProvider | None = None`: Uses an application-owned OpenTelemetry SDK tracer provider instead
+  of the default PromptLayer-managed provider.
 
 ### Environment Variables
 
@@ -160,9 +161,10 @@ response = openai_client.chat.completions.create(
 )
 ```
 
-This setup enables only the official OpenAI SDK instrumentor. It does not
-instrument the OpenAI Agents SDK or any other model provider. Applications
-that configure tracing independently can use
+This preserves the existing PromptLayer-managed tracing provider and additionally
+enables only the official OpenAI SDK instrumentor. It does not instrument the
+OpenAI Agents SDK or any other model provider. Applications that configure
+tracing independently can use
 `configure_tracing(providers=("openai",))`.
 
 ## Table Scorecards

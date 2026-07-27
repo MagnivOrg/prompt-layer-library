@@ -145,6 +145,15 @@ def _instrument_openai(tracer_provider: Any, *, explicit: bool) -> None:
         instrumentor.instrument(tracer_provider=tracer_provider)
 
 
+def _configure_openai_sdk_instrumentation(tracer_provider: Any) -> None:
+    """Add OpenAI auto-instrumentation to an already configured provider."""
+
+    _validate_tracer_provider(tracer_provider)
+    _add_openai_prompt_processor(tracer_provider)
+    _enable_latest_genai_semantic_conventions()
+    _instrument_openai(tracer_provider, explicit=False)
+
+
 def _normalize_providers(providers: Optional[Iterable[str]]) -> Tuple[str, ...]:
     if providers is None:
         return NATIVE_OTEL_PROVIDERS

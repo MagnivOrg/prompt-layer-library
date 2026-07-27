@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
@@ -63,9 +65,39 @@ def test_create_promptlayer_tracer_provider_targets_v1_traces(monkeypatch):
 
 def test_initialize_tracer_uses_otlp_exporter(monkeypatch):
     seen = {}
+    instrument_openai = Mock()
+    monkeypatch.setattr("promptlayer.otlp.OTLPSpanExporter", _FakeExporter(seen))
+    monkeypatch.setattr(
+        "promptlayer.promptlayer_mixins._configure_openai_sdk_instrumentation",
+        instrument_openai,
+    )
+
+    provider, tracer = PromptLayerMixin._initialize_tracer(
+        "pl_test",
+        "https://api.promptlayer.com",
+        True,
+        enable_tracing=True,
+    )
+
+    assert provider is not None
+    assert tracer is not None
+    assert seen["endpoint"] == "https://api.promptlayer.com/v1/traces"
+    instrument_openai.assert_called_once_with(provider)
+    provider.shutdown()
+
+
+def test_initialize_tracer_uses_explicit_tracer_provider_additively(monkeypatch):
     provider = TracerProvider()
-    monkeypatch.setattr("promptlayer.tracing.OTLPSpanExporter", _FakeExporter(seen))
-    monkeypatch.setattr("promptlayer.tracing._instrument_openai", lambda *args, **kwargs: None)
+    configure_tracing = Mock(return_value=provider)
+    initialize_tracer = Mock()
+    monkeypatch.setattr(
+        "promptlayer.promptlayer_mixins.configure_tracing",
+        configure_tracing,
+    )
+    monkeypatch.setattr(
+        "promptlayer.promptlayer_mixins.initialize_promptlayer_tracer",
+        initialize_tracer,
+    )
 
     configured_provider, tracer = PromptLayerMixin._initialize_tracer(
         "pl_test",
@@ -77,7 +109,12 @@ def test_initialize_tracer_uses_otlp_exporter(monkeypatch):
 
     assert configured_provider is provider
     assert tracer is not None
-    assert seen["endpoint"] == "https://api.promptlayer.com/v1/traces"
+    configure_tracing.assert_called_once_with(
+        api_key="pl_test",
+        base_url="https://api.promptlayer.com",
+        tracer_provider=provider,
+    )
+    initialize_tracer.assert_not_called()
     provider.shutdown()
 
 

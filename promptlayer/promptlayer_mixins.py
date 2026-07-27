@@ -4,6 +4,7 @@ from copy import deepcopy
 from functools import wraps
 from typing import Any, Dict, Union
 
+from promptlayer.otlp import initialize_promptlayer_tracer
 from promptlayer.streaming import (
     aanthropic_stream_completion,
     aanthropic_stream_message,
@@ -26,7 +27,7 @@ from promptlayer.streaming import (
     openai_stream_chat,
     openai_stream_completion,
 )
-from promptlayer.tracing import configure_tracing
+from promptlayer.tracing import _configure_openai_sdk_instrumentation, configure_tracing
 from promptlayer.tracing_context import resolve_tracer
 from promptlayer.utils import (
     aamazon_bedrock_request,
@@ -302,14 +303,28 @@ class PromptLayerMixin:
     ):
         del throw_on_error  # OTLP exporter does not use this flag.
         if not enable_tracing:
-            return None, None
+            return initialize_promptlayer_tracer(
+                api_key=api_key,
+                base_url=base_url,
+                enable_tracing=False,
+            )
 
-        provider = configure_tracing(
+        if tracer_provider is not None:
+            provider = configure_tracing(
+                api_key=api_key,
+                base_url=base_url,
+                tracer_provider=tracer_provider,
+            )
+            return provider, provider.get_tracer(__name__)
+
+        provider, tracer = initialize_promptlayer_tracer(
             api_key=api_key,
             base_url=base_url,
-            tracer_provider=tracer_provider,
+            enable_tracing=True,
         )
-        return provider, provider.get_tracer(__name__)
+        if provider is not None:
+            _configure_openai_sdk_instrumentation(provider)
+        return provider, tracer
 
     @staticmethod
     def _prepare_get_prompt_template_params(

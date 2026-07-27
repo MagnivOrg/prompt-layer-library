@@ -10,7 +10,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from promptlayer import AsyncPromptLayer, PromptLayer, tracing
+from promptlayer import AsyncPromptLayer, PromptLayer, instrument_openai, tracing
 from promptlayer.span_exporter import (
     OpenAIPromptTemplateSpanProcessor,
     set_prompt_span_attributes,
@@ -34,6 +34,7 @@ class _FakeTracerProvider:
 def reset_tracing_state(monkeypatch):
     monkeypatch.setattr(tracing, "_exporter_settings", WeakKeyDictionary())
     monkeypatch.setattr(tracing, "_prompt_processor_providers", WeakKeyDictionary())
+    monkeypatch.setattr(tracing, "_openai_instrumented_provider", None)
     original_semconv = os.environ.get("OTEL_SEMCONV_STABILITY_OPT_IN")
     yield
     if original_semconv is None:
@@ -42,27 +43,37 @@ def reset_tracing_state(monkeypatch):
         os.environ["OTEL_SEMCONV_STABILITY_OPT_IN"] = original_semconv
 
 
-def test_configure_tracing_instruments_only_openai_once(monkeypatch):
-    provider = _FakeTracerProvider()
-    exporter_calls = []
+def _install_fake_openai_instrumentor(monkeypatch):
     instrumentor = SimpleNamespace(
         is_instrumented_by_opentelemetry=False,
         instrument=Mock(),
     )
 
-    def instrument(**kwargs):
+    def instrument(**_kwargs):
         instrumentor.is_instrumented_by_opentelemetry = True
 
     instrumentor.instrument.side_effect = instrument
     module = SimpleNamespace(OpenAIInstrumentor=lambda: instrumentor)
     monkeypatch.setattr(tracing, "_module_available", lambda module_name: module_name == "openai")
     monkeypatch.setattr(tracing.importlib, "import_module", lambda module_name: module)
+    return instrumentor
+
+
+def _capture_otlp_exporters(monkeypatch):
+    exporter_calls = []
     monkeypatch.setattr(
         tracing,
         "OTLPSpanExporter",
         lambda **kwargs: exporter_calls.append(kwargs) or object(),
     )
     monkeypatch.setattr(tracing, "BatchSpanProcessor", lambda exporter: exporter)
+    return exporter_calls
+
+
+def test_configure_tracing_instruments_only_openai_once(monkeypatch):
+    provider = _FakeTracerProvider()
+    instrumentor = _install_fake_openai_instrumentor(monkeypatch)
+    exporter_calls = _capture_otlp_exporters(monkeypatch)
 
     first = tracing.configure_tracing(
         api_key="pl_test",
@@ -90,6 +101,89 @@ def test_configure_tracing_instruments_only_openai_once(monkeypatch):
             },
         }
     ]
+
+
+def test_instrument_openai_is_idempotent_for_application_provider(monkeypatch):
+    provider = _FakeTracerProvider()
+    instrumentor = _install_fake_openai_instrumentor(monkeypatch)
+    exporter_calls = _capture_otlp_exporters(monkeypatch)
+
+    first = instrument_openai(api_key="pl_test", tracer_provider=provider)
+    second = instrument_openai(api_key="pl_test", tracer_provider=provider)
+
+    assert first is provider
+    assert second is provider
+    assert len(provider.processors) == 2
+    assert isinstance(provider.processors[0], OpenAIPromptTemplateSpanProcessor)
+    instrumentor.instrument.assert_called_once_with(tracer_provider=provider)
+    assert len(exporter_calls) == 1
+
+
+def test_instrument_openai_uses_environment_and_global_provider(monkeypatch):
+    provider = _FakeTracerProvider()
+    instrumentor = _install_fake_openai_instrumentor(monkeypatch)
+    exporter_calls = _capture_otlp_exporters(monkeypatch)
+    get_provider = Mock(return_value=provider)
+    monkeypatch.setattr(tracing, "_get_or_create_tracer_provider", get_provider)
+    monkeypatch.setenv("PROMPTLAYER_API_KEY", "pl_from_env")
+
+    configured_provider = instrument_openai()
+
+    assert configured_provider is provider
+    get_provider.assert_called_once_with()
+    instrumentor.instrument.assert_called_once_with(tracer_provider=provider)
+    assert exporter_calls[0]["headers"]["X-Api-Key"] == "pl_from_env"
+
+
+def test_instrument_openai_rejects_known_provider_mismatch_before_mutation(monkeypatch):
+    first_provider = _FakeTracerProvider()
+    second_provider = _FakeTracerProvider()
+    _install_fake_openai_instrumentor(monkeypatch)
+    _capture_otlp_exporters(monkeypatch)
+
+    instrument_openai(api_key="pl_test", tracer_provider=first_provider)
+
+    with pytest.raises(RuntimeError, match="already instrumented with a different tracer provider"):
+        instrument_openai(api_key="pl_test", tracer_provider=second_provider)
+
+    assert second_provider.processors == []
+
+
+def test_instrument_openai_tracks_declared_provider_for_existing_instrumentor(monkeypatch):
+    first_provider = _FakeTracerProvider()
+    second_provider = _FakeTracerProvider()
+    instrumentor = _install_fake_openai_instrumentor(monkeypatch)
+    instrumentor.is_instrumented_by_opentelemetry = True
+    _capture_otlp_exporters(monkeypatch)
+
+    instrument_openai(api_key="pl_test", tracer_provider=first_provider)
+
+    with pytest.raises(RuntimeError, match="already instrumented with a different tracer provider"):
+        instrument_openai(api_key="pl_test", tracer_provider=second_provider)
+
+    instrumentor.instrument.assert_not_called()
+    assert second_provider.processors == []
+
+
+def test_instrument_openai_requires_optional_dependency_before_mutation(monkeypatch):
+    provider = _FakeTracerProvider()
+    monkeypatch.setattr(tracing, "_module_available", lambda _module_name: False)
+
+    with pytest.raises(ImportError, match=r"promptlayer\[otel-genai-instrumentation\]"):
+        instrument_openai(api_key="pl_test", tracer_provider=provider)
+
+    assert provider.processors == []
+
+
+def test_instrument_openai_requires_api_key_before_creating_global_provider(monkeypatch):
+    get_provider = Mock()
+    monkeypatch.delenv("PROMPTLAYER_API_KEY", raising=False)
+    monkeypatch.setattr(tracing, "_get_or_create_tracer_provider", get_provider)
+
+    with pytest.raises(ValueError, match="PromptLayer API key not provided"):
+        instrument_openai()
+
+    get_provider.assert_not_called()
 
 
 def test_configure_tracing_rejects_non_openai_provider():

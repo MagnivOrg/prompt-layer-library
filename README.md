@@ -163,9 +163,25 @@ response = openai_client.chat.completions.create(
 
 This preserves the existing PromptLayer-managed tracing provider and additionally
 enables only the official OpenAI SDK instrumentor. It does not instrument the
-OpenAI Agents SDK or any other model provider. Applications that configure
-tracing independently can use
-`configure_tracing(providers=("openai",))`.
+OpenAI Agents SDK or any other model provider.
+
+Applications that only use the direct OpenAI SDK can enable the same
+instrumentation without creating a PromptLayer client:
+
+```python
+from openai import OpenAI
+from promptlayer import instrument_openai
+
+tracer_provider = instrument_openai()
+openai_client = OpenAI()
+```
+
+`instrument_openai()` reads the PromptLayer API key and endpoint from the
+environment, is safe to call repeatedly with the same tracer provider, and
+returns the configured provider so short-lived processes can flush it.
+
+Applications with advanced OpenTelemetry configuration can continue to use
+`configure_tracing()` directly and pass an application-owned `tracer_provider`.
 
 ## Table Scorecards
 

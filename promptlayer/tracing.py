@@ -4,6 +4,7 @@ import importlib
 import importlib.util
 import logging
 import os
+import threading
 import weakref
 from typing import Any, Iterable, Optional, Tuple
 
@@ -28,6 +29,56 @@ _exporter_settings: weakref.WeakKeyDictionary[Any, Tuple[str, str]] = weakref.We
 _prompt_processor_providers: weakref.WeakKeyDictionary[Any, OpenAIPromptTemplateSpanProcessor] = (
     weakref.WeakKeyDictionary()
 )
+_configuration_lock = threading.RLock()
+_openai_instrumented_provider: Optional[Any] = None
+
+
+def instrument_openai(
+    *,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    tracer_provider: Optional[Any] = None,
+) -> Any:
+    """Export direct OpenAI SDK spans to PromptLayer.
+
+    This is the provider-specific convenience API for applications that do not
+    create a ``PromptLayer`` client. ``configure_tracing`` remains available for
+    advanced OpenTelemetry configuration.
+    """
+
+    global _openai_instrumented_provider
+
+    with _configuration_lock:
+        resolved_api_key = _resolve_api_key(api_key)
+        instrumentor = _load_openai_instrumentor(explicit=True)
+        provider = tracer_provider if tracer_provider is not None else _get_or_create_tracer_provider()
+        _validate_tracer_provider(provider)
+        if (
+            instrumentor is not None
+            and instrumentor.is_instrumented_by_opentelemetry
+            and _openai_instrumented_provider is not None
+            and _openai_instrumented_provider is not provider
+        ):
+            raise RuntimeError(
+                "The OpenAI SDK is already instrumented with a different tracer provider. "
+                "Reuse that tracer provider when calling instrument_openai()."
+            )
+
+        configured_provider = configure_tracing(
+            api_key=resolved_api_key,
+            base_url=base_url,
+            endpoint=endpoint,
+            tracer_provider=provider,
+            providers=("openai",),
+        )
+        if (
+            instrumentor is not None
+            and instrumentor.is_instrumented_by_opentelemetry
+            and _openai_instrumented_provider is None
+        ):
+            _openai_instrumented_provider = provider
+        return configured_provider
 
 
 def configure_tracing(
@@ -40,11 +91,7 @@ def configure_tracing(
 ) -> Any:
     """Export spans to PromptLayer and auto-instrument the OpenAI SDK."""
 
-    resolved_api_key = api_key or os.environ.get("PROMPTLAYER_API_KEY")
-    if not resolved_api_key:
-        raise ValueError(
-            "PromptLayer API key not provided. Please set PROMPTLAYER_API_KEY or pass the api_key parameter."
-        )
+    resolved_api_key = _resolve_api_key(api_key)
 
     provider = tracer_provider if tracer_provider is not None else _get_or_create_tracer_provider()
     _validate_tracer_provider(provider)
@@ -56,6 +103,15 @@ def configure_tracing(
     if "openai" in selected_providers:
         _instrument_openai(provider, explicit=providers is not None)
     return provider
+
+
+def _resolve_api_key(api_key: Optional[str]) -> str:
+    resolved_api_key = api_key or os.environ.get("PROMPTLAYER_API_KEY")
+    if not resolved_api_key:
+        raise ValueError(
+            "PromptLayer API key not provided. Please set PROMPTLAYER_API_KEY or pass the api_key parameter."
+        )
+    return resolved_api_key
 
 
 def _get_or_create_tracer_provider() -> Any:
@@ -115,6 +171,29 @@ def _add_exporter(provider: Any, api_key: str, endpoint: str) -> None:
 
 
 def _instrument_openai(tracer_provider: Any, *, explicit: bool) -> None:
+    global _openai_instrumented_provider
+
+    instrumentor = _load_openai_instrumentor(explicit=explicit)
+    if instrumentor is None:
+        return
+
+    if not instrumentor.is_instrumented_by_opentelemetry:
+        instrumentor.instrument(tracer_provider=tracer_provider)
+        if instrumentor.is_instrumented_by_opentelemetry:
+            _openai_instrumented_provider = tracer_provider
+        elif explicit:
+            raise RuntimeError(
+                "OpenTelemetry OpenAI instrumentation could not be enabled. "
+                "Check that the installed OpenAI SDK version is supported."
+            )
+    elif _openai_instrumented_provider is not None and _openai_instrumented_provider is not tracer_provider:
+        logger.warning(
+            "The OpenAI SDK is already instrumented with a different tracer provider; "
+            "the existing provider remains active"
+        )
+
+
+def _load_openai_instrumentor(*, explicit: bool) -> Optional[Any]:
     sdk_installed = _module_available("openai")
     instrumentor_class = None
     if sdk_installed:
@@ -135,11 +214,8 @@ def _instrument_openai(tracer_provider: Any, *, explicit: bool) -> None:
                 "OpenTelemetry instrumentation is unavailable for OpenAI; "
                 "install promptlayer[otel-genai-instrumentation]"
             )
-        return
-
-    instrumentor = instrumentor_class()
-    if not instrumentor.is_instrumented_by_opentelemetry:
-        instrumentor.instrument(tracer_provider=tracer_provider)
+        return None
+    return instrumentor_class()
 
 
 def _configure_openai_sdk_instrumentation(tracer_provider: Any) -> None:

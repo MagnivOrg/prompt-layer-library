@@ -24,6 +24,7 @@ from .response_handlers import (
     aopenai_responses_stream_chat,
     aopenai_stream_chat,
     aopenai_stream_completion,
+    aopenrouter_stream_chat,
     bedrock_stream_message,
     google_stream_chat,
     google_stream_completion,
@@ -32,6 +33,7 @@ from .response_handlers import (
     openai_responses_stream_chat,
     openai_stream_chat,
     openai_stream_completion,
+    openrouter_stream_chat,
 )
 from .stream_processor import (
     astream_response,
@@ -65,4 +67,6 @@ __all__ = [
     "amistral_stream_chat",
     "openai_images_stream",
     "aopenai_images_stream",
+    "openrouter_stream_chat",
+    "aopenrouter_stream_chat",
 ]

@@ -1,4 +1,23 @@
+from .evaluations import (
+    ColumnType,
+    TrajectoryMode,
+    aevaluate,
+    assert_valid_scorer,
+    code_execution_column,
+    column,
+    compare_scorer,
+    contains_scorer,
+    count_scorer,
+    diagnose_trajectory_failure,
+    evaluate,
+    llm_assertion_scorer,
+    regex_scorer,
+    score_trajectory,
+    scorer_from_function,
+    trajectory_scorer,
+)
 from .exceptions import (
+    EvaluationFailedError,
     PromptLayerAPIConnectionError,
     PromptLayerAPIError,
     PromptLayerAPIStatusError,
@@ -15,14 +34,35 @@ from .exceptions import (
     PromptLayerValidationError,
 )
 from .promptlayer import AsyncPromptLayer, PromptLayer
+from .tracing import NATIVE_OTEL_PROVIDERS, configure_tracing, instrument_openai
 
-__version__ = "1.4.6"
+__version__ = "1.5.2"
 __all__ = [
     "PromptLayer",
     "AsyncPromptLayer",
+    "configure_tracing",
+    "instrument_openai",
+    "NATIVE_OTEL_PROVIDERS",
+    "evaluate",
+    "aevaluate",
+    "ColumnType",
+    "column",
+    "code_execution_column",
+    "scorer_from_function",
+    "TrajectoryMode",
+    "assert_valid_scorer",
+    "compare_scorer",
+    "contains_scorer",
+    "count_scorer",
+    "diagnose_trajectory_failure",
+    "llm_assertion_scorer",
+    "regex_scorer",
+    "score_trajectory",
+    "trajectory_scorer",
     "__version__",
     # Exceptions
     "PromptLayerError",
+    "EvaluationFailedError",
     "PromptLayerAPIError",
     "PromptLayerBadRequestError",
     "PromptLayerAuthenticationError",

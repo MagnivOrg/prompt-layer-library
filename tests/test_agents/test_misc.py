@@ -1,11 +1,11 @@
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
-from ably.types.message import Message
 
-from promptlayer.utils import _get_final_output, _make_message_listener, _wait_for_workflow_completion
+from promptlayer.utils import WorkflowSubscriptionEventHandler, _get_final_output, _make_message_listener
 from tests.utils.vcr import assert_played
 
 
@@ -38,7 +38,7 @@ async def test_make_message_listener(
     execution_id_future = asyncio.Future()
     message_listener = _make_message_listener(base_url, results_future, execution_id_future, True, headers)
     execution_id_future.set_result(717)
-    await message_listener(Message(name="INVALID"))
+    await message_listener("INVALID", "")
     assert not results_future.done()
     assert execution_id_future.done()
 
@@ -48,7 +48,7 @@ async def test_make_message_listener(
         execution_id_future = asyncio.Future()
         execution_id_future.set_result(717)
         message_listener = _make_message_listener(base_url, results_future, execution_id_future, True, headers)
-        await message_listener(Message(name="SET_WORKFLOW_COMPLETE", data=json.dumps(message_data)))
+        await message_listener("SET_WORKFLOW_COMPLETE", json.dumps(message_data))
         assert results_future.done()
         assert (await asyncio.wait_for(results_future, 0.1)) == message_data["final_output"]
 
@@ -58,9 +58,7 @@ async def test_make_message_listener(
         execution_id_future = asyncio.Future()
         execution_id_future.set_result(717)
         message_listener = _make_message_listener(base_url, results_future, execution_id_future, True, headers)
-        await message_listener(
-            Message(name="SET_WORKFLOW_COMPLETE", data=json.dumps(workflow_update_data_exceeds_size_limit))
-        )
+        await message_listener("SET_WORKFLOW_COMPLETE", json.dumps(workflow_update_data_exceeds_size_limit))
         assert results_future.done()
         assert (await asyncio.wait_for(results_future, 0.1)) == {
             "Node 1": {
@@ -78,20 +76,18 @@ async def test_make_message_listener(
         execution_id_future = asyncio.Future()
         execution_id_future.set_result(717)
         message_listener = _make_message_listener(base_url, results_future, execution_id_future, False, headers)
-        await message_listener(
-            Message(name="SET_WORKFLOW_COMPLETE", data=json.dumps(workflow_update_data_exceeds_size_limit))
-        )
+        await message_listener("SET_WORKFLOW_COMPLETE", json.dumps(workflow_update_data_exceeds_size_limit))
         assert results_future.done()
         assert (await asyncio.wait_for(results_future, 0.1)) == "AAA"
 
 
 @pytest.mark.asyncio
-async def test_wait_for_workflow_completion(workflow_update_data_ok):
-    mock_channel = AsyncMock()
-    mock_channel.unsubscribe = MagicMock()
-    results_future = asyncio.Future()
-    results_future.set_result(workflow_update_data_ok["final_output"])
-    message_listener = AsyncMock()
-    actual_result = await _wait_for_workflow_completion(mock_channel, results_future, message_listener, 120)
-    assert workflow_update_data_ok["final_output"] == actual_result
-    mock_channel.unsubscribe.assert_called_once_with("SET_WORKFLOW_COMPLETE", message_listener)
+async def test_workflow_subscription_event_handler():
+    callback = AsyncMock()
+    handler = WorkflowSubscriptionEventHandler(callback)
+
+    await handler.on_publication(
+        SimpleNamespace(pub=SimpleNamespace(data={"message_name": "SET_WORKFLOW_COMPLETE", "data": "payload"}))
+    )
+
+    callback.assert_awaited_once_with("SET_WORKFLOW_COMPLETE", "payload")

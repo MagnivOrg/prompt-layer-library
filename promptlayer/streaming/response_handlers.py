@@ -1011,8 +1011,12 @@ def _build_google_response_from_parts(
         text_part = Part(text=regular_content, thought=None)
         final_parts.append(text_part)
 
-    for function_call in function_calls:
-        function_part = Part(function_call=function_call, thought=None)
+    for function_call, thought_signature in function_calls:
+        function_part = Part(
+            function_call=function_call,
+            thought=None,
+            thought_signature=thought_signature,
+        )
         final_parts.append(function_part)
 
     final_parts.extend(extra_parts)
@@ -1049,7 +1053,7 @@ async def amap_google_stream_response(generator: AsyncIterable[Any]):
                 elif hasattr(part, "text") and part.text:
                     regular_content = f"{regular_content}{part.text}"
                 elif hasattr(part, "function_call") and part.function_call:
-                    function_calls.append(part.function_call)
+                    function_calls.append((part.function_call, getattr(part, "thought_signature", None)))
 
     if not last_result:
         return response
@@ -1092,7 +1096,7 @@ def map_google_stream_response(results: list):
                 elif hasattr(part, "text") and part.text:
                     regular_content = f"{regular_content}{part.text}"
                 elif hasattr(part, "function_call") and part.function_call:
-                    function_calls.append(part.function_call)
+                    function_calls.append((part.function_call, getattr(part, "thought_signature", None)))
 
     return _build_google_response_from_parts(thought_content, regular_content, function_calls, extra_parts, results[-1])
 

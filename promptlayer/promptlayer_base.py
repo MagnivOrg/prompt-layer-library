@@ -3,6 +3,7 @@ import inspect
 import re
 
 from promptlayer import exceptions as _exceptions
+from promptlayer.tracing_context import format_otel_span_id, resolve_tracer
 from promptlayer.utils import async_wrapper, promptlayer_api_handler
 
 
@@ -67,13 +68,15 @@ class PromptLayerBase(object):
         return_pl_id = kwargs.pop("return_pl_id", False)
         request_start_time = datetime.datetime.now().timestamp()
         function_object = object.__getattribute__(self, "_obj")
-        tracer = object.__getattribute__(self, "_tracer")
+        tracer = resolve_tracer(object.__getattribute__(self, "_tracer"))
         function_name = object.__getattribute__(self, "_function_name")
 
         if tracer:
             with tracer.start_as_current_span(function_name) as llm_request_span:
                 _span_ctx = llm_request_span.get_span_context()
-                llm_request_span_id = hex(_span_ctx.span_id)[2:].zfill(16) if _span_ctx and _span_ctx.is_valid else None
+                llm_request_span_id = (
+                    format_otel_span_id(_span_ctx.span_id) if _span_ctx and _span_ctx.is_valid else None
+                )
                 llm_request_span.set_attribute("provider", object.__getattribute__(self, "_provider_type"))
                 llm_request_span.set_attribute("function_name", function_name)
                 llm_request_span.set_attribute("function_input", str({"args": args, "kwargs": kwargs}))

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
 
 from promptlayer.integrations.claude_agents import (
     PromptLayerClaudeAgentsConfig,
@@ -50,7 +51,7 @@ def test_get_claude_config_raises_on_windows(monkeypatch):
         get_claude_config()
 
 
-def test_get_claude_config_omits_traceparent_by_default(monkeypatch):
+def test_get_claude_config_omits_traceparent_without_active_span(monkeypatch):
     monkeypatch.setenv("PROMPTLAYER_API_KEY", "pl_env")
 
     config = get_claude_config()
@@ -67,6 +68,32 @@ def test_get_claude_config_includes_traceparent_when_provided(monkeypatch):
     config = get_claude_config(traceparent=traceparent)
 
     assert config.env["PROMPTLAYER_TRACEPARENT"] == traceparent
+
+
+def test_get_claude_config_inherits_active_span_traceparent(monkeypatch):
+    monkeypatch.setenv("PROMPTLAYER_API_KEY", "pl_env")
+    provider = TracerProvider()
+    tracer = provider.get_tracer("test")
+
+    with tracer.start_as_current_span("Eval: claude-agent") as span:
+        config = get_claude_config()
+        span_context = span.get_span_context()
+
+    assert config.env["PROMPTLAYER_TRACEPARENT"] == (
+        f"00-{span_context.trace_id:032x}-{span_context.span_id:016x}-{int(span_context.trace_flags):02x}"
+    )
+
+
+def test_get_claude_config_explicit_traceparent_precedes_active_span(monkeypatch):
+    monkeypatch.setenv("PROMPTLAYER_API_KEY", "pl_env")
+    explicit = "00-11111111111111111111111111111111-2222222222222222-01"
+    provider = TracerProvider()
+    tracer = provider.get_tracer("test")
+
+    with tracer.start_as_current_span("Eval: claude-agent"):
+        config = get_claude_config(traceparent=explicit)
+
+    assert config.env["PROMPTLAYER_TRACEPARENT"] == explicit
 
 
 def test_get_claude_config_returns_typed_config(monkeypatch):

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from promptlayer.evaluations.utils import (
     BASE_TEXT_COLUMNS,
+    DATASET_TEXT_COLUMNS,
     EXPECTED_TRACE_COLUMN,
     LEGACY_COLUMN_TITLES,
     TRACE_TEXT_COLUMNS,
@@ -346,20 +347,22 @@ def ensure_eval_scaffold_columns(
     *,
     include_trace_columns: bool = False,
     include_expected_trace: bool = False,
+    custom_field_titles: Optional[List[str]] = None,
     processing_columns: Optional[List[EvalProcessingColumn]] = None,
 ) -> List[Column]:
     """Create the full eval column scaffold in declaration order.
 
-    Order: Input/Expected/Output (+ Trace columns) → Expected Trace → supporting columns.
+    Order: input/expected → expected_trace → dataset fields → Output/Trace
+    → supporting columns.
     """
-    columns = ensure_text_columns(
+    columns = ensure_named_text_columns(
         api_key,
         base_url,
         throw_on_error,
         table_id,
         sheet_id,
         existing,
-        include_trace_columns=include_trace_columns,
+        DATASET_TEXT_COLUMNS,
     )
     if include_expected_trace:
         columns = ensure_named_text_columns(
@@ -371,6 +374,26 @@ def ensure_eval_scaffold_columns(
             columns,
             (EXPECTED_TRACE_COLUMN,),
         )
+    if custom_field_titles:
+        columns = ensure_named_text_columns(
+            api_key,
+            base_url,
+            throw_on_error,
+            table_id,
+            sheet_id,
+            columns,
+            tuple(custom_field_titles),
+        )
+    generated_titles = ("Output",) + (TRACE_TEXT_COLUMNS if include_trace_columns else ())
+    columns = ensure_named_text_columns(
+        api_key,
+        base_url,
+        throw_on_error,
+        table_id,
+        sheet_id,
+        columns,
+        generated_titles,
+    )
     if processing_columns:
         columns = ensure_processing_columns(
             api_key,
@@ -394,16 +417,17 @@ async def aensure_eval_scaffold_columns(
     *,
     include_trace_columns: bool = False,
     include_expected_trace: bool = False,
+    custom_field_titles: Optional[List[str]] = None,
     processing_columns: Optional[List[EvalProcessingColumn]] = None,
 ) -> List[Column]:
-    columns = await aensure_text_columns(
+    columns = await aensure_named_text_columns(
         api_key,
         base_url,
         throw_on_error,
         table_id,
         sheet_id,
         existing,
-        include_trace_columns=include_trace_columns,
+        DATASET_TEXT_COLUMNS,
     )
     if include_expected_trace:
         columns = await aensure_named_text_columns(
@@ -415,6 +439,26 @@ async def aensure_eval_scaffold_columns(
             columns,
             (EXPECTED_TRACE_COLUMN,),
         )
+    if custom_field_titles:
+        columns = await aensure_named_text_columns(
+            api_key,
+            base_url,
+            throw_on_error,
+            table_id,
+            sheet_id,
+            columns,
+            tuple(custom_field_titles),
+        )
+    generated_titles = ("Output",) + (TRACE_TEXT_COLUMNS if include_trace_columns else ())
+    columns = await aensure_named_text_columns(
+        api_key,
+        base_url,
+        throw_on_error,
+        table_id,
+        sheet_id,
+        columns,
+        generated_titles,
+    )
     if processing_columns:
         columns = await aensure_processing_columns(
             api_key,

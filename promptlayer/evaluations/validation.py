@@ -9,6 +9,7 @@ from promptlayer.evaluations.scores import (  # noqa: F401 - re-exported for cal
     scorer_pass_rates,
 )
 from promptlayer.evaluations.utils import (
+    EVAL_CASE_BUILTIN_KEYS,
     RESERVED_EVAL_COLUMN_TITLES,
     TRACE_TEXT_COLUMNS,
     find_column_by_title,
@@ -205,6 +206,15 @@ def assert_eval_args(
         for case in dataset:
             if not isinstance(case, dict) or "input" not in case:
                 raise validation_error("Each inline eval case must be a dict with an 'input' key.")
+            for title in case:
+                if not isinstance(title, str):
+                    raise validation_error("Each inline eval case field name must be a string.")
+                if not title.strip():
+                    raise validation_error("Each inline eval case field name must be a non-empty string.")
+                if title not in EVAL_CASE_BUILTIN_KEYS and title in RESERVED_EVAL_COLUMN_TITLES:
+                    raise validation_error(
+                        f"Inline eval case field {title!r} is reserved for generated or built-in eval columns."
+                    )
         return normalized_scorers, normalized_columns
     if isinstance(dataset, dict):
         if dataset.get("table_id") is None:

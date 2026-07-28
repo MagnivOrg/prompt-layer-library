@@ -57,6 +57,8 @@ from promptlayer.evaluations.utils import (
     build_table_dashboard_url,
     build_trace_import_body,
     columns_by_title,
+    custom_eval_field_titles,
+    custom_eval_field_values,
     extract_row_indices,
     extract_rows,
     find_last_row,
@@ -87,6 +89,7 @@ class CaseExecution:
     input: Any
     expected: Any
     expected_trace: Any
+    dataset_fields: Dict[str, Any]
     output: Any
     trace_id: str
     span_id: str
@@ -221,6 +224,7 @@ def _execute_cases_sync(
             input=input_value,
             expected=expected_value,
             expected_trace=expected_trace_value,
+            dataset_fields=custom_eval_field_values(case),
             output=output_value,
             trace_id=trace_id,
             span_id=span_id,
@@ -293,6 +297,7 @@ async def _execute_cases_async(
             input=input_value,
             expected=expected_value,
             expected_trace=expected_trace_value,
+            dataset_fields=custom_eval_field_values(case),
             output=output_value,
             trace_id=trace_id,
             span_id=span_id,
@@ -347,6 +352,7 @@ def _persist_trace_rows_sync(
     eval_name: str,
     executed: List[CaseExecution],
     by_title: Dict[str, Column],
+    custom_field_titles: List[str],
     tracer_provider: TracerProvider,
 ) -> Tuple[List[Optional[int]], List[Optional[Dict[str, Any]]], List[CaseExecution]]:
     row_indices: List[Optional[int]] = []
@@ -397,6 +403,7 @@ def _persist_trace_rows_sync(
                     "expected": case.expected,
                     "expected_trace": case.expected_trace,
                     "output": resolved_output,
+                    **{title: case.dataset_fields.get(title, "") for title in custom_field_titles},
                 },
             )
         row_indices.append(row_index)
@@ -406,6 +413,7 @@ def _persist_trace_rows_sync(
                 input=case.input,
                 expected=case.expected,
                 expected_trace=case.expected_trace,
+                dataset_fields=case.dataset_fields,
                 output=resolved_output,
                 trace_id=case.trace_id,
                 span_id=case.span_id,
@@ -424,6 +432,7 @@ async def _persist_trace_rows_async(
     eval_name: str,
     executed: List[CaseExecution],
     by_title: Dict[str, Column],
+    custom_field_titles: List[str],
     tracer_provider: TracerProvider,
 ) -> Tuple[List[Optional[int]], List[Optional[Dict[str, Any]]], List[CaseExecution]]:
     row_indices: List[Optional[int]] = []
@@ -474,6 +483,7 @@ async def _persist_trace_rows_async(
                     "expected": case.expected,
                     "expected_trace": case.expected_trace,
                     "output": resolved_output,
+                    **{title: case.dataset_fields.get(title, "") for title in custom_field_titles},
                 },
             )
         row_indices.append(row_index)
@@ -483,6 +493,7 @@ async def _persist_trace_rows_async(
                 input=case.input,
                 expected=case.expected,
                 expected_trace=case.expected_trace,
+                dataset_fields=case.dataset_fields,
                 output=resolved_output,
                 trace_id=case.trace_id,
                 span_id=case.span_id,
@@ -521,6 +532,7 @@ def _persist_batch_rows_sync(
     sheet_id: ResourceId,
     executed: List[CaseExecution],
     by_title: Dict[str, Column],
+    custom_field_titles: List[str],
 ) -> Tuple[List[Optional[int]], List[Optional[Dict[str, Any]]]]:
     values = [
         build_row_values(
@@ -529,6 +541,8 @@ def _persist_batch_rows_sync(
             expected_value=case.expected,
             expected_trace_value=case.expected_trace,
             output_value=case.output,
+            custom_values=case.dataset_fields,
+            custom_titles=custom_field_titles,
         )
         for case in executed
     ]
@@ -552,6 +566,7 @@ async def _persist_batch_rows_async(
     sheet_id: ResourceId,
     executed: List[CaseExecution],
     by_title: Dict[str, Column],
+    custom_field_titles: List[str],
 ) -> Tuple[List[Optional[int]], List[Optional[Dict[str, Any]]]]:
     values = [
         build_row_values(
@@ -560,6 +575,8 @@ async def _persist_batch_rows_async(
             expected_value=case.expected,
             expected_trace_value=case.expected_trace,
             output_value=case.output,
+            custom_values=case.dataset_fields,
+            custom_titles=custom_field_titles,
         )
         for case in executed
     ]
@@ -620,10 +637,24 @@ class _PreparedEval:
     sheet: Dict[str, Any]
     columns: List[Column]
     cases: List[EvalCase]
+    custom_field_titles: List[str]
 
 
 def _needs_trace_columns(context: _EvalRunContext) -> bool:
     return scorers_reference_trace(context.scorers) or columns_reference_trace(context.columns)
+
+
+def _validate_dataset_field_conflicts(
+    custom_field_titles: List[str],
+    processing_columns: List[EvalProcessingColumn],
+) -> None:
+    processing_titles = {column["title"] for column in processing_columns}
+    conflicts = [title for title in custom_field_titles if title in processing_titles]
+    if conflicts:
+        raise validation_error(
+            "Eval dataset field(s) conflict with supporting column title(s): "
+            + ", ".join(repr(title) for title in conflicts)
+        )
 
 
 def _processing_column_ids(
@@ -714,6 +745,8 @@ def _prepare_eval_sync(context: _EvalRunContext) -> _PreparedEval:
     cases = resolve_cases(context.api_key, context.base_url, context.throw_on_error, context.dataset)
     if not cases:
         raise validation_error("Eval dataset resolved to zero cases.")
+    custom_field_titles = custom_eval_field_titles(cases)
+    _validate_dataset_field_conflicts(custom_field_titles, context.columns)
 
     _emit_status("Setting up columns")
     columns_response = tables_api.list_smart_sheet_columns(
@@ -729,6 +762,7 @@ def _prepare_eval_sync(context: _EvalRunContext) -> _PreparedEval:
         columns,
         include_trace_columns=_needs_trace_columns(context),
         include_expected_trace=any(case.get("expected_trace") is not None for case in cases),
+        custom_field_titles=custom_field_titles,
         processing_columns=context.columns,
     )
     clear_blank_scaffold_rows(context.api_key, context.base_url, context.throw_on_error, table["id"], sheet["id"])
@@ -744,7 +778,13 @@ def _prepare_eval_sync(context: _EvalRunContext) -> _PreparedEval:
         context.scorers,
         context.name,
     )
-    return _PreparedEval(table=table, sheet=sheet, columns=columns, cases=cases)
+    return _PreparedEval(
+        table=table,
+        sheet=sheet,
+        columns=columns,
+        cases=cases,
+        custom_field_titles=custom_field_titles,
+    )
 
 
 async def _prepare_eval_async(context: _EvalRunContext) -> _PreparedEval:
@@ -771,6 +811,8 @@ async def _prepare_eval_async(context: _EvalRunContext) -> _PreparedEval:
     cases = await aresolve_cases(context.api_key, context.base_url, context.throw_on_error, context.dataset)
     if not cases:
         raise validation_error("Eval dataset resolved to zero cases.")
+    custom_field_titles = custom_eval_field_titles(cases)
+    _validate_dataset_field_conflicts(custom_field_titles, context.columns)
 
     _emit_status("Setting up columns")
     columns_response = await tables_api.alist_smart_sheet_columns(
@@ -786,6 +828,7 @@ async def _prepare_eval_async(context: _EvalRunContext) -> _PreparedEval:
         columns,
         include_trace_columns=_needs_trace_columns(context),
         include_expected_trace=any(case.get("expected_trace") is not None for case in cases),
+        custom_field_titles=custom_field_titles,
         processing_columns=context.columns,
     )
     await aclear_blank_scaffold_rows(
@@ -803,7 +846,13 @@ async def _prepare_eval_async(context: _EvalRunContext) -> _PreparedEval:
         context.scorers,
         context.name,
     )
-    return _PreparedEval(table=table, sheet=sheet, columns=columns, cases=cases)
+    return _PreparedEval(
+        table=table,
+        sheet=sheet,
+        columns=columns,
+        cases=cases,
+        custom_field_titles=custom_field_titles,
+    )
 
 
 def _score_payload_from_scorecard(scorecard_payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -913,6 +962,7 @@ def run_eval(
             eval_name=name,
             executed=executed,
             by_title=by_title,
+            custom_field_titles=prepared.custom_field_titles,
             tracer_provider=tracer_provider,
         )
     else:
@@ -925,6 +975,7 @@ def run_eval(
             sheet_id=sheet["id"],
             executed=executed,
             by_title=by_title,
+            custom_field_titles=prepared.custom_field_titles,
         )
 
     processing_ids = _processing_column_ids(columns, context.columns)
@@ -1031,6 +1082,7 @@ async def arun_eval(
             eval_name=name,
             executed=executed,
             by_title=by_title,
+            custom_field_titles=prepared.custom_field_titles,
             tracer_provider=tracer_provider,
         )
     else:
@@ -1043,6 +1095,7 @@ async def arun_eval(
             sheet_id=sheet["id"],
             executed=executed,
             by_title=by_title,
+            custom_field_titles=prepared.custom_field_titles,
         )
 
     processing_ids = _processing_column_ids(columns, context.columns)

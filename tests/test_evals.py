@@ -17,7 +17,7 @@ from promptlayer import (
     llm_assertion_scorer,
     regex_scorer,
 )
-from promptlayer.evaluations.runner import _execute_cases_sync
+from promptlayer.evaluations.runner import _execute_cases_async, _execute_cases_sync
 from promptlayer.evaluations.setup import (
     next_experiment_number_title,
     next_unique_sheet_title,
@@ -57,7 +57,7 @@ def test_single_worker_executes_inline_for_interruptibility():
     assert [result.output for result in results] == ["one", "two"]
 
 
-def test_expected_trace_round_trips_through_eval_rows():
+def test_legacy_dataset_column_titles_round_trip_through_eval_rows():
     from promptlayer.evaluations.utils import build_row_values, cases_from_rows
 
     columns = [
@@ -100,6 +100,80 @@ def test_expected_trace_round_trips_through_eval_rows():
     ]
 
 
+def test_custom_eval_fields_round_trip_with_sparse_values_and_table_column_filtering():
+    from promptlayer.evaluations.utils import build_row_values, cases_from_rows, custom_eval_field_titles
+
+    columns = [
+        {"id": "c1", "title": "input", "type": "TEXT"},
+        {"id": "c2", "title": "expected", "type": "TEXT"},
+        {"id": "c3", "title": "Output", "type": "TEXT"},
+        {"id": "c4", "title": "Exact Title", "type": "TEXT"},
+        {"id": "c5", "title": "Sparse", "type": "TEXT"},
+        {"id": "c6", "title": "Generated", "type": "JSON_PATH"},
+        {"id": "c7", "title": "Trace", "type": "TEXT"},
+    ]
+    titles = custom_eval_field_titles(
+        [
+            {"input": "first", "Exact Title": {"nested": True}},
+            {"input": "second", "Sparse": 2, "Exact Title": "later"},
+        ]
+    )
+    assert titles == ["Exact Title", "Sparse"]
+
+    values = build_row_values(
+        {column["title"]: column for column in columns},
+        input_value="first",
+        expected_value=None,
+        expected_trace_value=None,
+        output_value="done",
+        custom_values={"Exact Title": {"nested": True}},
+        custom_titles=titles,
+    )
+    assert values["c4"] == '{"nested": true}'
+    assert values["c5"] == ""
+
+    assert cases_from_rows(
+        {
+            "data": [
+                {
+                    "cells": {
+                        "c1": {"value": "first"},
+                        "c4": {"value": '{"nested": true}'},
+                        "c6": {"value": "do not copy"},
+                        "c7": {"value": "do not copy"},
+                    }
+                }
+            ]
+        },
+        columns,
+    ) == [{"input": "first", "Exact Title": {"nested": True}, "Sparse": None}]
+
+
+def test_sync_and_async_case_execution_preserve_custom_fields():
+    cases = [{"input": "one", "fields": "public", "Sparse": 1}, {"input": "two", "fields": "also public"}]
+    sync_results = _execute_cases_sync(
+        name="custom",
+        cases=cases,
+        runner=lambda value: value,
+        tracer_provider=None,
+        max_concurrency=1,
+    )
+
+    async def run_async():
+        return await _execute_cases_async(
+            name="custom",
+            cases=cases,
+            runner=lambda value: value,
+            tracer_provider=None,
+            max_concurrency=2,
+        )
+
+    async_results = asyncio.run(run_async())
+    expected = [{"fields": "public", "Sparse": 1}, {"fields": "also public"}]
+    assert [result.dataset_fields for result in sync_results] == expected
+    assert [result.dataset_fields for result in async_results] == expected
+
+
 def test_generic_column_helpers_build_backend_configs():
     code = code_execution_column("required_tools", code="result = 1")
     assert code["type"] == "CODE_EXECUTION"
@@ -131,7 +205,7 @@ def test_generic_column_helpers_build_backend_configs():
 
     compare = compare_scorer(title="exact_match")
     assert compare["type"] == "COMPARE"
-    assert compare["config"]["sources"] == ["Output", "Expected"]
+    assert compare["config"]["sources"] == ["Output", "expected"]
     assert compare["config"]["comparison_type"] == {"type": "STRING"}
 
     regex = regex_scorer(title="has_id", source="Output", regex_pattern=r"inv_\d+")
@@ -235,16 +309,32 @@ def test_generic_column_helpers_validate_required_fields():
     with pytest.raises(PromptLayerValidationError):
         contains_scorer(title="x", source="Output")
     with pytest.raises(PromptLayerValidationError):
-        compare_scorer(title="x", sources=["only_one"])
+        compare_scorer(title="x", value_source="")
     with pytest.raises(PromptLayerValidationError):
         code_execution_column("x", code=" ")
 
 
-def test_column_rejects_reserved_titles_and_text_type():
+@pytest.mark.parametrize(
+    "title",
+    [
+        "input",
+        "expected",
+        "expected_trace",
+        "Input",
+        "Expected",
+        "Expected Trace",
+        "Output",
+        "output",
+        "Trace",
+        "trace",
+    ],
+)
+def test_column_rejects_reserved_titles_and_text_type(title):
     with pytest.raises(PromptLayerValidationError, match="reserved"):
-        column("Input", "JSON_PATH", {"source": "Output", "json_path": "$"})
-    with pytest.raises(PromptLayerValidationError, match="reserved"):
-        column("output", "JSON_PATH", {"source": "Output", "json_path": "$"})
+        column(title, "JSON_PATH", {"source": "Output", "json_path": "$"})
+
+
+def test_column_rejects_text_type_and_reserved_scorer_title():
     with pytest.raises(PromptLayerValidationError, match="cannot be TEXT"):
         column("summary", "TEXT")
     with pytest.raises(PromptLayerValidationError, match="reserved"):
@@ -278,6 +368,10 @@ def tool_count_under_5(trace):
     return 1 if _count_tools(trace) < 5 else 0
 
 
+def expected_trace_present(expected_trace):
+    return 1 if expected_trace else 0
+
+
 def test_scorer_from_function_builds_code_execution_column():
     from promptlayer.evaluations.columns import scorer_from_function
     from promptlayer.evaluations.validation import normalize_scorer as _normalize_scorer
@@ -289,7 +383,7 @@ def test_scorer_from_function_builds_code_execution_column():
     code = column["config"]["code"]
     assert "def exact_match" not in code
     assert 'output = data.get("Output")' in code
-    assert 'expected = data.get("Expected")' in code
+    assert 'expected = data.get("expected")' in code
     assert "return _result" in code
     assert "_result = 1 if output == expected else 0" in code
     assert "\nresult = " not in code and not code.startswith("result = ")
@@ -299,6 +393,9 @@ def test_scorer_from_function_builds_code_execution_column():
     assert "def exact_match" not in normalized["config"]["code"]
     assert 'output = data.get("Output")' in normalized["config"]["code"]
     assert "return _result" in normalized["config"]["code"]
+
+    expected_trace_code = scorer_from_function(expected_trace_present)["config"]["code"]
+    assert 'expected_trace = data.get("expected_trace")' in expected_trace_code
 
     with pytest.raises(PromptLayerValidationError, match="Lambda"):
         scorer_from_function(lambda output: 1)
@@ -422,8 +519,8 @@ def _completed_row(row_index, cells):
 
 def _base_text_columns():
     return [
-        {"id": "c1", "title": "Input", "type": "TEXT"},
-        {"id": "c2", "title": "Expected", "type": "TEXT"},
+        {"id": "c1", "title": "input", "type": "TEXT"},
+        {"id": "c2", "title": "expected", "type": "TEXT"},
         {"id": "c3", "title": "Output", "type": "TEXT"},
     ]
 
@@ -567,10 +664,11 @@ def test_eval_runs_inline_dataset_and_writes_rows(
     mock_list_columns.return_value = {"data": []}
 
     created = {
-        "Input": {"id": "c1", "title": "Input", "type": "TEXT"},
-        "Expected": {"id": "c2", "title": "Expected", "type": "TEXT"},
+        "input": {"id": "c1", "title": "input", "type": "TEXT"},
+        "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
         "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
-        "Expected Trace": {"id": "c5", "title": "Expected Trace", "type": "TEXT"},
+        "expected_trace": {"id": "c5", "title": "expected_trace", "type": "TEXT"},
+        "Reference context": {"id": "c6", "title": "Reference context", "type": "TEXT"},
         "required_tools": _scorer_column(),
     }
 
@@ -589,6 +687,7 @@ def test_eval_runs_inline_dataset_and_writes_rows(
                     "c3": {"id": "cell-3"},
                     "c4": {"id": "cell-4", "status": "COMPLETED", "value": {"value": 1}},
                     "c5": {"id": "cell-5"},
+                    "c6": {"id": "cell-6"},
                 },
             )
         ]
@@ -603,6 +702,7 @@ def test_eval_runs_inline_dataset_and_writes_rows(
                     "c3": {"id": "cell-3"},
                     "c4": {"id": "cell-4", "status": "COMPLETED", "value": {"value": 1}},
                     "c5": {"id": "cell-5"},
+                    "c6": {"id": "cell-6"},
                 },
             )
         ]
@@ -634,6 +734,7 @@ def test_eval_runs_inline_dataset_and_writes_rows(
                 "input": {"userMessage": "refund status"},
                 "expected": "The refund status is returned.",
                 "expected_trace": {"required_tools": [{"tool": "lookup_invoice"}]},
+                "Reference context": "Refund policy v2",
             }
         ],
         runner=lambda input_data: {
@@ -641,9 +742,10 @@ def test_eval_runs_inline_dataset_and_writes_rows(
             "toolCalls": [{"name": "lookup_invoice"}],
         },
         scorers=[
-            code_execution_column(
+            compare_scorer(
                 "required_tools",
-                code="result = 1",
+                source="Output",
+                value_source="Reference context",
             )
         ],
         api_key=promptlayer_api_key,
@@ -669,21 +771,22 @@ def test_eval_runs_inline_dataset_and_writes_rows(
     mock_create_sheet.assert_called_once()
     create_sheet_body = mock_create_sheet.call_args[0][4]
     assert create_sheet_body["title"] == "Experiment #1"
-    assert mock_create_column.call_count == 4
+    assert mock_create_column.call_count == 5
     create_titles = [call[0][5]["title"] for call in mock_create_column.call_args_list]
-    assert create_titles[:3] == ["Input", "Expected", "Output"]
-    assert create_titles[3:] == ["Expected Trace"]
+    assert create_titles == ["input", "expected", "expected_trace", "Reference context", "Output"]
     add_rows_body = mock_add_rows.call_args[0][5]
     assert add_rows_body["count"] == 1
     values = add_rows_body["values"][0]
-    assert "c1" in values and "c2" in values and "c3" in values and "c5" in values
+    assert "c1" in values and "c2" in values and "c3" in values and "c5" in values and "c6" in values
     assert values["c2"] == "The refund status is returned."
     assert values["c5"] == '{"required_tools": [{"tool": "lookup_invoice"}]}'
+    assert values["c6"] == "Refund policy v2"
     mock_configure_scorecard.assert_called_once()
     score_body = mock_configure_scorecard.call_args[0][5]
     assert score_body["steps"][0]["title"] == "required_tools"
-    assert score_body["steps"][0]["primitive_type"] == "CODE_EXECUTION"
-    assert "column_ids" not in score_body
+    assert score_body["steps"][0]["primitive_type"] == "COMPARE"
+    assert score_body["steps"][0]["source_column_ids"] == ["c3", "c6"]
+    assert score_body["steps"][0]["primitive_config"]["sources"] == ["c3", "c6"]
     assert call_order == ["configure", "add_rows"]
     mock_recalculate_scorecard.assert_called_once()
     mock_get_scorecard.assert_called()
@@ -731,8 +834,8 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
     mock_list_columns.return_value = {"data": []}
 
     created = {
-        "Input": {"id": "c1", "title": "Input", "type": "TEXT"},
-        "Expected": {"id": "c2", "title": "Expected", "type": "TEXT"},
+        "input": {"id": "c1", "title": "input", "type": "TEXT"},
+        "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
         "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
         "Extracted data": {
             "id": "c-extract",
@@ -823,7 +926,7 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
 
     assert result["failed_row_indices"] == []
     create_titles = [call[0][5]["title"] for call in mock_create_column.call_args_list]
-    assert create_titles == ["Input", "Expected", "Output", "Extracted data"]
+    assert create_titles == ["input", "expected", "Output", "Extracted data"]
     extract_body = next(
         call[0][5] for call in mock_create_column.call_args_list if call[0][5]["title"] == "Extracted data"
     )
@@ -897,8 +1000,8 @@ def test_aeval_creates_supporting_columns_and_runs_operations_before_scorecard(
         mock_list_columns.return_value = {"data": []}
 
         created = {
-            "Input": {"id": "c1", "title": "Input", "type": "TEXT"},
-            "Expected": {"id": "c2", "title": "Expected", "type": "TEXT"},
+            "input": {"id": "c1", "title": "input", "type": "TEXT"},
+            "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
             "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
             "Extracted data": {
                 "id": "c-extract",
@@ -1035,6 +1138,7 @@ def test_eval_resolves_independent_output_and_dataset_tables(
     mock_ensure_sheet.return_value = {"id": "30", "title": "Sheet 1"}
 
     eval_columns = _base_text_columns() + [
+        {"id": "c5", "title": "Dataset Context", "type": "TEXT"},
         {
             "id": "c4",
             "title": "quality",
@@ -1045,6 +1149,9 @@ def test_eval_resolves_independent_output_and_dataset_tables(
     dataset_columns = [
         {"id": "d1", "title": "Input", "type": "TEXT"},
         {"id": "d2", "title": "Expected", "type": "TEXT"},
+        {"id": "d3", "title": "Dataset Context", "type": "TEXT"},
+        {"id": "d4", "title": "Computed", "type": "JSON_PATH"},
+        {"id": "d5", "title": "Output", "type": "TEXT"},
     ]
 
     def list_columns_side_effect(api_key, base_url, throw_on_error, table_id, sheet_id):
@@ -1059,6 +1166,9 @@ def test_eval_resolves_independent_output_and_dataset_tables(
                 "cells": {
                     "d1": {"value": {"value": '{"q": "hello"}'}},
                     "d2": {"value": {"value": '{"a": "world"}'}},
+                    "d3": {"value": "source context"},
+                    "d4": {"value": "computed value"},
+                    "d5": {"value": "old output"},
                 },
             }
         ]
@@ -1123,6 +1233,10 @@ def test_eval_resolves_independent_output_and_dataset_tables(
     scorecard_body = mock_configure_scorecard.call_args[0][5]
     assert scorecard_body["steps"][0]["title"] == "quality"
     assert scorecard_body["steps"][0]["primitive_type"] == "LLM_ASSERTION"
+    written_values = mock_add_rows.call_args[0][5]["values"][0]
+    assert written_values["c5"] == "source context"
+    assert "d4" not in written_values
+    assert "d5" not in written_values
     mock_recalculate_scorecard.assert_called_once()
 
 
@@ -1416,6 +1530,7 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
             {"id": "c2", "title": "Expected", "type": "TEXT"},
             {"id": "c3", "title": "Output", "type": "TEXT"},
             {"id": "c6", "title": "Trace", "type": "TRACE"},
+            {"id": "c7", "title": "Scenario", "type": "TEXT"},
             {
                 "id": "c4",
                 "title": "pass",
@@ -1435,6 +1550,7 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
                     "c3": {"id": "cell-3"},
                     "c4": {"id": "cell-4", "status": "COMPLETED"},
                     "c6": {"id": "cell-6"},
+                    "c7": {"id": "cell-7"},
                 },
             )
         ]
@@ -1450,7 +1566,7 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
 
     failing = evaluate(
         name="Traced Evals",
-        dataset=[{"input": {"q": "hi"}, "expected": {"a": "yo"}}],
+        dataset=[{"input": {"q": "hi"}, "expected": {"a": "yo"}, "Scenario": "happy path"}],
         runner=lambda input_data: {"answer": "yo"},
         scorers=[code_execution_column("pass", code='return 1 if data.get("Trace") is not None else 0')],
         api_key=promptlayer_api_key,
@@ -1468,9 +1584,11 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
     mock_add_rows.assert_not_called()
     mock_flush_traces.assert_called_once()
 
-    assert mock_update_cell.call_count == 3
+    assert mock_update_cell.call_count == 4
     updated_cell_ids = {call[0][5] for call in mock_update_cell.call_args_list}
-    assert updated_cell_ids == {"cell-1", "cell-2", "cell-3"}
+    assert updated_cell_ids == {"cell-1", "cell-2", "cell-3", "cell-7"}
+    scenario_call = next(call for call in mock_update_cell.call_args_list if call[0][5] == "cell-7")
+    assert scenario_call[0][6]["value"] == "happy path"
 
     mock_recalculate_scorecard.assert_called_once()
     mock_get_scorecard.assert_called()
@@ -1795,6 +1913,17 @@ def test_async_eval_bounded_concurrency_preserves_order(
 
 
 def test_eval_validates_definition(promptlayer_api_key, base_url):
+    for reserved_title in ("Output", "output", "Trace", "trace", "Expected", "Expected Trace", "total_price"):
+        with pytest.raises(PromptLayerValidationError, match="reserved"):
+            evaluate(
+                name="x",
+                dataset=[{"input": {}, reserved_title: "collision"}],
+                runner=lambda x: x,
+                scorers=[code_execution_column("x", code="result = 1")],
+                api_key=promptlayer_api_key,
+                base_url=base_url,
+            )
+
     with pytest.raises(PromptLayerValidationError):
         evaluate(
             name="",
@@ -2240,7 +2369,7 @@ def test_evaluate_raises_rich_trajectory_failure(
             name="Trajectory Evals",
             dataset=[{"input": {"question": "create folder"}, "expected": expected}],
             runner=lambda input_data: "ok",
-            scorers=[trajectory_scorer(expected_source="expected", title="trajectory assertions v3")],
+            scorers=[trajectory_scorer(value_source="expected", title="trajectory assertions v3")],
             api_key=promptlayer_api_key,
             base_url=base_url,
             passing_score=1.0,

@@ -102,10 +102,12 @@ response = openai.chat.completions.create(
 `PromptLayer(...)` and `AsyncPromptLayer(...)` accept these parameters:
 
 - `api_key: str | None = None`: Your PromptLayer API key. If omitted, the SDK looks for `PROMPTLAYER_API_KEY`.
-- `enable_tracing: bool = False`: Enables OpenTelemetry tracing export to PromptLayer.
+- `enable_tracing: bool = False`: Enables OpenTelemetry tracing export to PromptLayer and auto-instruments the OpenAI SDK when the tracing extra is installed.
 - `base_url: str | None = None`: Overrides the PromptLayer API base URL. If omitted, the SDK uses `PROMPTLAYER_BASE_URL` or the default API URL.
 - `throw_on_error: bool = True`: Controls whether SDK methods raise PromptLayer exceptions or return `None` for many API errors.
 - `cache_ttl_seconds: int = 0`: Enables in-memory prompt-template caching when greater than `0`.
+- `tracer_provider: TracerProvider | None = None`: Uses an application-owned OpenTelemetry SDK tracer provider instead
+  of the default PromptLayer-managed provider.
 
 ### Environment Variables
 
@@ -135,6 +137,51 @@ The main resources surfaced by `PromptLayer` and `AsyncPromptLayer` are:
 | `client.openai` and `client.anthropic` | Provider proxies that wrap those SDKs and log requests to PromptLayer. |
 
 Note: When tracing is enabled, spans are exported to PromptLayer using OpenTelemetry.
+
+### OpenAI SDK Auto-Instrumentation
+
+Install the OpenAI-only tracing extra:
+
+```bash
+pip install "promptlayer[otel-genai-instrumentation]" openai
+```
+
+Then enable tracing before making direct OpenAI SDK calls:
+
+```python
+from openai import OpenAI
+from promptlayer import PromptLayer
+
+promptlayer_client = PromptLayer(api_key="pl_xxxxx", enable_tracing=True)
+openai_client = OpenAI()
+
+response = openai_client.chat.completions.create(
+    model="gpt-4.1-mini",
+    messages=[{"role": "user", "content": "Say hello."}],
+)
+```
+
+This preserves the existing PromptLayer-managed tracing provider and additionally
+enables only the official OpenAI SDK instrumentor. It does not instrument the
+OpenAI Agents SDK or any other model provider.
+
+Applications that only use the direct OpenAI SDK can enable the same
+instrumentation without creating a PromptLayer client:
+
+```python
+from openai import OpenAI
+from promptlayer import instrument_openai
+
+tracer_provider = instrument_openai()
+openai_client = OpenAI()
+```
+
+`instrument_openai()` reads the PromptLayer API key and endpoint from the
+environment, is safe to call repeatedly with the same tracer provider, and
+returns the configured provider so short-lived processes can flush it.
+
+Applications with advanced OpenTelemetry configuration can continue to use
+`configure_tracing()` directly and pass an application-owned `tracer_provider`.
 
 ## Table Scorecards
 

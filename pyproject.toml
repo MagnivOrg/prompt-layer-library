@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "promptlayer"
-version = "1.5.1"
+version = "1.5.2"
 description = "PromptLayer is a platform for prompt engineering and tracks your LLM requests."
 authors = ["Magniv <hello@magniv.io>"]
 license = "Apache-2.0"
@@ -14,9 +14,18 @@ include = [
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
 requests = "^2.31.0"
-opentelemetry-api = "^1.26.0"
-opentelemetry-sdk = "^1.26.0"
-opentelemetry-exporter-otlp-proto-http = "^1.26.0"
+opentelemetry-api = [
+    {version = "^1.26.0", python = ">=3.9,<3.10"},
+    {version = ">=1.44,<2", python = ">=3.10,<4.0"},
+]
+opentelemetry-sdk = [
+    {version = "^1.26.0", python = ">=3.9,<3.10"},
+    {version = ">=1.44,<2", python = ">=3.10,<4.0"},
+]
+opentelemetry-exporter-otlp-proto-http = [
+    {version = "^1.26.0", python = ">=3.9,<3.10"},
+    {version = ">=1.44,<2", python = ">=3.10,<4.0"},
+]
 aiohttp = "^3.10.10"
 httpx = "^0.28.1"
 nest-asyncio = "^1.6.0"
@@ -25,6 +34,7 @@ tenacity = "^9.1.2"
 cachetools = "^5.0.0"
 openai-agents = {version = "^0.3.3", optional = true}
 claude-agent-sdk = {version = ">=0.1.45,<1.0.0", optional = true, python = ">=3.10,<4.0"}
+opentelemetry-instrumentation-openai-v2 = {version = ">=2.4b0,<2.5b0", optional = true, python = ">=3.10,<4.0"}
 eval-type-backport = {version = "^0.3.1", optional = true}
 jinja2 = "^3.1.6"
 rich = ">=13.0.0"
@@ -49,6 +59,7 @@ boto3 = "^1.35.0"
 aioboto3 = "^13.0.0"
 
 [tool.poetry.extras]
+otel-genai-instrumentation = ["opentelemetry-instrumentation-openai-v2"]
 openai-agents = ["openai-agents", "eval-type-backport"]
 claude-agents = ["claude-agent-sdk"]
 

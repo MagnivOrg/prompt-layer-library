@@ -27,6 +27,7 @@ from promptlayer.streaming import (
     openai_stream_chat,
     openai_stream_completion,
 )
+from promptlayer.tracing import _configure_openai_sdk_instrumentation, configure_tracing
 from promptlayer.tracing_context import resolve_tracer
 from promptlayer.utils import (
     aamazon_bedrock_request,
@@ -293,13 +294,37 @@ class PromptLayerMixin:
         self._tracer = value
 
     @staticmethod
-    def _initialize_tracer(api_key: str, base_url: str, throw_on_error: bool, enable_tracing: bool = False):
+    def _initialize_tracer(
+        api_key: str,
+        base_url: str,
+        throw_on_error: bool,
+        enable_tracing: bool = False,
+        tracer_provider=None,
+    ):
         del throw_on_error  # OTLP exporter does not use this flag.
-        return initialize_promptlayer_tracer(
+        if not enable_tracing:
+            return initialize_promptlayer_tracer(
+                api_key=api_key,
+                base_url=base_url,
+                enable_tracing=False,
+            )
+
+        if tracer_provider is not None:
+            provider = configure_tracing(
+                api_key=api_key,
+                base_url=base_url,
+                tracer_provider=tracer_provider,
+            )
+            return provider, provider.get_tracer(__name__)
+
+        provider, tracer = initialize_promptlayer_tracer(
             api_key=api_key,
             base_url=base_url,
-            enable_tracing=enable_tracing,
+            enable_tracing=True,
         )
+        if provider is not None:
+            _configure_openai_sdk_instrumentation(provider)
+        return provider, tracer
 
     @staticmethod
     def _prepare_get_prompt_template_params(

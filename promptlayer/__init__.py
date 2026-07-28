@@ -34,11 +34,15 @@ from .exceptions import (
     PromptLayerValidationError,
 )
 from .promptlayer import AsyncPromptLayer, PromptLayer
+from .tracing import NATIVE_OTEL_PROVIDERS, configure_tracing, instrument_openai
 
-__version__ = "1.5.1"
+__version__ = "1.5.2"
 __all__ = [
     "PromptLayer",
     "AsyncPromptLayer",
+    "configure_tracing",
+    "instrument_openai",
+    "NATIVE_OTEL_PROVIDERS",
     "evaluate",
     "aevaluate",
     "ColumnType",

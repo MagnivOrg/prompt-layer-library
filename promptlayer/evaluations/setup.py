@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from promptlayer.evaluations.utils import (
     BASE_TEXT_COLUMNS,
+    DATASET_TEXT_COLUMNS,
     EXPECTED_TRACE_COLUMN,
     LEGACY_COLUMN_TITLES,
     TRACE_TEXT_COLUMNS,
@@ -351,7 +352,7 @@ def ensure_eval_scaffold_columns(
 ) -> List[Column]:
     """Create the full eval column scaffold in declaration order.
 
-    Order: Input/Expected → Expected Trace → dataset fields → Output/Trace
+    Order: input/expected → expected_trace → dataset fields → Output/Trace
     → supporting columns.
     """
     columns = ensure_named_text_columns(
@@ -361,7 +362,7 @@ def ensure_eval_scaffold_columns(
         table_id,
         sheet_id,
         existing,
-        ("Input", "Expected"),
+        DATASET_TEXT_COLUMNS,
     )
     if include_expected_trace:
         columns = ensure_named_text_columns(
@@ -426,7 +427,7 @@ async def aensure_eval_scaffold_columns(
         table_id,
         sheet_id,
         existing,
-        ("Input", "Expected"),
+        DATASET_TEXT_COLUMNS,
     )
     if include_expected_trace:
         columns = await aensure_named_text_columns(

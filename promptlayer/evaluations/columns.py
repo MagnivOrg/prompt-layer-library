@@ -11,9 +11,10 @@ from promptlayer.types.table import ColumnType, ColumnTypeValue, EvalScorerColum
 # Scorer args mapped onto eval row column titles.
 # CODE_EXECUTION sandboxes expose row columns via the `data` object.
 _SCORER_PARAM_COLUMN_ALIASES = {
-    "input": "Input",
+    "input": "input",
     "output": "Output",
-    "expected": "Expected",
+    "expected": "expected",
+    "expected_trace": "expected_trace",
     "trace": "Trace",
 }
 

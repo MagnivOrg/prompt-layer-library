@@ -71,7 +71,7 @@ def test_predefined_scorer_payloads():
         "title": "Compare",
         "type": "COMPARE",
         "config": {
-            "sources": ["Output", "Expected"],
+            "sources": ["Output", "expected"],
             "comparison_type": {"type": "STRING"},
         },
     }

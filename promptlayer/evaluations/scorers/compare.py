@@ -18,7 +18,7 @@ def compare_scorer(
     title: str = "Compare",
     *,
     source: str = "Output",
-    value_source: str = "Expected",
+    value_source: str = "expected",
     comparison_type: Optional[Union[Dict[str, Any], str]] = None,
     **settings: Any,
 ) -> EvalScorerColumn:

@@ -57,7 +57,7 @@ def test_single_worker_executes_inline_for_interruptibility():
     assert [result.output for result in results] == ["one", "two"]
 
 
-def test_expected_trace_round_trips_through_eval_rows():
+def test_legacy_dataset_column_titles_round_trip_through_eval_rows():
     from promptlayer.evaluations.utils import build_row_values, cases_from_rows
 
     columns = [
@@ -104,8 +104,8 @@ def test_custom_eval_fields_round_trip_with_sparse_values_and_table_column_filte
     from promptlayer.evaluations.utils import build_row_values, cases_from_rows, custom_eval_field_titles
 
     columns = [
-        {"id": "c1", "title": "Input", "type": "TEXT"},
-        {"id": "c2", "title": "Expected", "type": "TEXT"},
+        {"id": "c1", "title": "input", "type": "TEXT"},
+        {"id": "c2", "title": "expected", "type": "TEXT"},
         {"id": "c3", "title": "Output", "type": "TEXT"},
         {"id": "c4", "title": "Exact Title", "type": "TEXT"},
         {"id": "c5", "title": "Sparse", "type": "TEXT"},
@@ -205,7 +205,7 @@ def test_generic_column_helpers_build_backend_configs():
 
     compare = compare_scorer(title="exact_match")
     assert compare["type"] == "COMPARE"
-    assert compare["config"]["sources"] == ["Output", "Expected"]
+    assert compare["config"]["sources"] == ["Output", "expected"]
     assert compare["config"]["comparison_type"] == {"type": "STRING"}
 
     regex = regex_scorer(title="has_id", source="Output", regex_pattern=r"inv_\d+")
@@ -314,11 +314,27 @@ def test_generic_column_helpers_validate_required_fields():
         code_execution_column("x", code=" ")
 
 
-def test_column_rejects_reserved_titles_and_text_type():
+@pytest.mark.parametrize(
+    "title",
+    [
+        "input",
+        "expected",
+        "expected_trace",
+        "Input",
+        "Expected",
+        "Expected Trace",
+        "Output",
+        "output",
+        "Trace",
+        "trace",
+    ],
+)
+def test_column_rejects_reserved_titles_and_text_type(title):
     with pytest.raises(PromptLayerValidationError, match="reserved"):
-        column("Input", "JSON_PATH", {"source": "Output", "json_path": "$"})
-    with pytest.raises(PromptLayerValidationError, match="reserved"):
-        column("output", "JSON_PATH", {"source": "Output", "json_path": "$"})
+        column(title, "JSON_PATH", {"source": "Output", "json_path": "$"})
+
+
+def test_column_rejects_text_type_and_reserved_scorer_title():
     with pytest.raises(PromptLayerValidationError, match="cannot be TEXT"):
         column("summary", "TEXT")
     with pytest.raises(PromptLayerValidationError, match="reserved"):
@@ -352,6 +368,10 @@ def tool_count_under_5(trace):
     return 1 if _count_tools(trace) < 5 else 0
 
 
+def expected_trace_present(expected_trace):
+    return 1 if expected_trace else 0
+
+
 def test_scorer_from_function_builds_code_execution_column():
     from promptlayer.evaluations.columns import scorer_from_function
     from promptlayer.evaluations.validation import normalize_scorer as _normalize_scorer
@@ -363,7 +383,7 @@ def test_scorer_from_function_builds_code_execution_column():
     code = column["config"]["code"]
     assert "def exact_match" not in code
     assert 'output = data.get("Output")' in code
-    assert 'expected = data.get("Expected")' in code
+    assert 'expected = data.get("expected")' in code
     assert "return _result" in code
     assert "_result = 1 if output == expected else 0" in code
     assert "\nresult = " not in code and not code.startswith("result = ")
@@ -373,6 +393,9 @@ def test_scorer_from_function_builds_code_execution_column():
     assert "def exact_match" not in normalized["config"]["code"]
     assert 'output = data.get("Output")' in normalized["config"]["code"]
     assert "return _result" in normalized["config"]["code"]
+
+    expected_trace_code = scorer_from_function(expected_trace_present)["config"]["code"]
+    assert 'expected_trace = data.get("expected_trace")' in expected_trace_code
 
     with pytest.raises(PromptLayerValidationError, match="Lambda"):
         scorer_from_function(lambda output: 1)
@@ -496,8 +519,8 @@ def _completed_row(row_index, cells):
 
 def _base_text_columns():
     return [
-        {"id": "c1", "title": "Input", "type": "TEXT"},
-        {"id": "c2", "title": "Expected", "type": "TEXT"},
+        {"id": "c1", "title": "input", "type": "TEXT"},
+        {"id": "c2", "title": "expected", "type": "TEXT"},
         {"id": "c3", "title": "Output", "type": "TEXT"},
     ]
 
@@ -641,10 +664,10 @@ def test_eval_runs_inline_dataset_and_writes_rows(
     mock_list_columns.return_value = {"data": []}
 
     created = {
-        "Input": {"id": "c1", "title": "Input", "type": "TEXT"},
-        "Expected": {"id": "c2", "title": "Expected", "type": "TEXT"},
+        "input": {"id": "c1", "title": "input", "type": "TEXT"},
+        "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
         "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
-        "Expected Trace": {"id": "c5", "title": "Expected Trace", "type": "TEXT"},
+        "expected_trace": {"id": "c5", "title": "expected_trace", "type": "TEXT"},
         "Reference context": {"id": "c6", "title": "Reference context", "type": "TEXT"},
         "required_tools": _scorer_column(),
     }
@@ -750,7 +773,7 @@ def test_eval_runs_inline_dataset_and_writes_rows(
     assert create_sheet_body["title"] == "Experiment #1"
     assert mock_create_column.call_count == 5
     create_titles = [call[0][5]["title"] for call in mock_create_column.call_args_list]
-    assert create_titles == ["Input", "Expected", "Expected Trace", "Reference context", "Output"]
+    assert create_titles == ["input", "expected", "expected_trace", "Reference context", "Output"]
     add_rows_body = mock_add_rows.call_args[0][5]
     assert add_rows_body["count"] == 1
     values = add_rows_body["values"][0]
@@ -811,8 +834,8 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
     mock_list_columns.return_value = {"data": []}
 
     created = {
-        "Input": {"id": "c1", "title": "Input", "type": "TEXT"},
-        "Expected": {"id": "c2", "title": "Expected", "type": "TEXT"},
+        "input": {"id": "c1", "title": "input", "type": "TEXT"},
+        "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
         "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
         "Extracted data": {
             "id": "c-extract",
@@ -903,7 +926,7 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
 
     assert result["failed_row_indices"] == []
     create_titles = [call[0][5]["title"] for call in mock_create_column.call_args_list]
-    assert create_titles == ["Input", "Expected", "Output", "Extracted data"]
+    assert create_titles == ["input", "expected", "Output", "Extracted data"]
     extract_body = next(
         call[0][5] for call in mock_create_column.call_args_list if call[0][5]["title"] == "Extracted data"
     )
@@ -977,8 +1000,8 @@ def test_aeval_creates_supporting_columns_and_runs_operations_before_scorecard(
         mock_list_columns.return_value = {"data": []}
 
         created = {
-            "Input": {"id": "c1", "title": "Input", "type": "TEXT"},
-            "Expected": {"id": "c2", "title": "Expected", "type": "TEXT"},
+            "input": {"id": "c1", "title": "input", "type": "TEXT"},
+            "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
             "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
             "Extracted data": {
                 "id": "c-extract",

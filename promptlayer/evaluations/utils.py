@@ -6,8 +6,9 @@ from urllib.parse import urlparse, urlunparse
 from promptlayer.tables.helpers import extract_list
 from promptlayer.types.table import Column
 
-BASE_TEXT_COLUMNS = ("Input", "Expected", "Output")
-EXPECTED_TRACE_COLUMN = "Expected Trace"
+DATASET_TEXT_COLUMNS = ("input", "expected")
+BASE_TEXT_COLUMNS = DATASET_TEXT_COLUMNS + ("Output",)
+EXPECTED_TRACE_COLUMN = "expected_trace"
 TRACE_TEXT_COLUMNS = ("Trace",)
 TRACE_RESERVED_COLUMN_TITLES = (
     "Trace",
@@ -17,16 +18,22 @@ TRACE_RESERVED_COLUMN_TITLES = (
     "total_trace_time",
     "total_price",
 )
-COLUMN_TITLE_ALIASES = {
+LEGACY_COLUMN_TITLES = {
     "input": "Input",
     "expected": "Expected",
+    EXPECTED_TRACE_COLUMN: "Expected Trace",
+}
+GENERATED_COLUMN_TITLE_ALIASES = {
     "output": "Output",
-    "expected_trace": EXPECTED_TRACE_COLUMN,
     "trace": "Trace",
 }
-LEGACY_COLUMN_TITLES = {canonical: alias for alias, canonical in COLUMN_TITLE_ALIASES.items()}
+LEGACY_TO_CURRENT_COLUMN_TITLES = {legacy: current for current, legacy in LEGACY_COLUMN_TITLES.items()}
 RESERVED_EVAL_COLUMN_TITLES = frozenset(
-    BASE_TEXT_COLUMNS + TRACE_RESERVED_COLUMN_TITLES + (EXPECTED_TRACE_COLUMN,) + tuple(COLUMN_TITLE_ALIASES.keys())
+    BASE_TEXT_COLUMNS
+    + TRACE_RESERVED_COLUMN_TITLES
+    + (EXPECTED_TRACE_COLUMN,)
+    + tuple(LEGACY_COLUMN_TITLES.values())
+    + tuple(GENERATED_COLUMN_TITLE_ALIASES.keys())
 )
 EVAL_CASE_BUILTIN_KEYS = frozenset({"input", "expected", "expected_trace"})
 
@@ -53,7 +60,7 @@ def custom_eval_field_values(case: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def resolve_column_title(title: str) -> str:
-    return COLUMN_TITLE_ALIASES.get(title, title)
+    return GENERATED_COLUMN_TITLE_ALIASES.get(title, LEGACY_TO_CURRENT_COLUMN_TITLES.get(title, title))
 
 
 def find_column_by_title(columns_by_title_map: dict, title: str):
@@ -62,12 +69,12 @@ def find_column_by_title(columns_by_title_map: dict, title: str):
     column = columns_by_title_map.get(title)
     if column is not None:
         return column
-    canonical = COLUMN_TITLE_ALIASES.get(title)
-    if canonical is not None:
-        column = columns_by_title_map.get(canonical)
+    current = resolve_column_title(title)
+    if current != title:
+        column = columns_by_title_map.get(current)
         if column is not None:
             return column
-    legacy = LEGACY_COLUMN_TITLES.get(title)
+    legacy = LEGACY_COLUMN_TITLES.get(current)
     if legacy is not None:
         return columns_by_title_map.get(legacy)
     return None
@@ -260,8 +267,8 @@ def build_row_values(
 ) -> Dict[str, Any]:
     values: Dict[str, Any] = {}
     for title, value in (
-        ("Input", input_value),
-        ("Expected", expected_value),
+        ("input", input_value),
+        ("expected", expected_value),
         (EXPECTED_TRACE_COLUMN, expected_trace_value),
         ("Output", output_value),
     ):
@@ -323,8 +330,8 @@ def cases_from_rows(
     columns: List[Column],
 ) -> List[Dict[str, Any]]:
     by_title = columns_by_title(columns)
-    input_col = find_column_by_title(by_title, "Input")
-    expected_col = find_column_by_title(by_title, "Expected")
+    input_col = find_column_by_title(by_title, "input")
+    expected_col = find_column_by_title(by_title, "expected")
     expected_trace_col = find_column_by_title(by_title, EXPECTED_TRACE_COLUMN)
     custom_columns = [
         column

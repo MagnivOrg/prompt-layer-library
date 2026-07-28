@@ -75,6 +75,8 @@ def test_predefined_scorer_payloads():
             "comparison_type": {"type": "STRING"},
         },
     }
+    custom_compare = compare_scorer(source="actual", value_source="reference")
+    assert custom_compare["config"]["sources"] == ["actual", "reference"]
 
     contains = contains_scorer(value="refund")
     assert contains == {
@@ -137,7 +139,7 @@ def test_predefined_scorer_payloads():
         },
     }
 
-    advanced_trajectory = trajectory_scorer(expected_source="expected", title="trajectory assertions v3")
+    advanced_trajectory = trajectory_scorer(value_source="expected", title="trajectory assertions v3")
     assert advanced_trajectory == {
         "title": "trajectory assertions v3",
         "type": "TRAJECTORY",
@@ -146,7 +148,7 @@ def test_predefined_scorer_payloads():
 
     expected_trace_trajectory = trajectory_scorer(
         title="expected trace trajectory",
-        expected_source="expected_trace",
+        value_source="expected_trace",
         mode="non_strict",
     )
     assert expected_trace_trajectory["config"] == {
@@ -154,6 +156,13 @@ def test_predefined_scorer_payloads():
         "expected_source": "expected_trace",
         "mode": "non_strict",
     }
+    custom_source_trajectory = trajectory_scorer(
+        source="Agent trace",
+        accepted_scenarios=[["search"]],
+    )
+    assert custom_source_trajectory["config"]["trace_source"] == "Agent trace"
+    custom_value_source_trajectory = trajectory_scorer(value_source="expected trajectory")
+    assert custom_value_source_trajectory["config"]["expected_source"] == "expected trajectory"
 
 
 def test_predefined_scorer_validation():
@@ -164,7 +173,7 @@ def test_predefined_scorer_validation():
     with pytest.raises(PromptLayerValidationError):
         trajectory_scorer(
             accepted_scenarios=[["search"]],
-            expected_source="expected",
+            value_source="expected",
         )
     with pytest.raises(PromptLayerValidationError):
         trajectory_scorer(
@@ -180,11 +189,11 @@ def test_predefined_scorer_validation():
     with pytest.raises(PromptLayerValidationError):
         count_scorer(min_count=10, max_count=5)
     with pytest.raises(PromptLayerValidationError):
-        compare_scorer(sources=["only_one"])
+        compare_scorer(value_source="")
     with pytest.raises(PromptLayerValidationError):
         llm_assertion_scorer()
     with pytest.raises(PromptLayerValidationError):
-        trajectory_scorer(expected_source="expected", title="")
+        trajectory_scorer(value_source="expected", title="")
 
 
 @pytest.mark.parametrize(
@@ -265,7 +274,7 @@ def test_trajectory_source_parses_accepted_scenarios():
     assert score_trajectory(matching, {"accepted_scenarios": [["create_folder"]]}) is False
     assert score_trajectory(matching, ["create_folder"]) is False
 
-    scorer = trajectory_scorer(expected_source="expected")
+    scorer = trajectory_scorer(value_source="expected")
     assert scorer["type"] == "TRAJECTORY"
     assert scorer["config"]["trace_source"] == "Trace"
     assert scorer["config"]["expected_source"] == "expected"
@@ -382,7 +391,7 @@ def test_diagnose_trajectory_failure_categories():
 
 
 def test_trajectory_spec_scorer_references_trace():
-    assert scorers_reference_trace([trajectory_scorer(expected_source="expected")])
+    assert scorers_reference_trace([trajectory_scorer(value_source="expected")])
 
 
 def test_trajectory_tool_order_uses_chronological_not_tree_order():
@@ -433,9 +442,9 @@ def test_diagnose_trajectory_failure_list_expected():
     assert "checkout" in reason
 
 
-def test_trajectory_scorer_empty_trace_source_mentions_field():
-    with pytest.raises(PromptLayerValidationError, match="trace_source"):
-        trajectory_scorer(accepted_scenarios=[["search"]], trace_source="")
+def test_trajectory_scorer_empty_source_mentions_field():
+    with pytest.raises(PromptLayerValidationError, match="source"):
+        trajectory_scorer(accepted_scenarios=[["search"]], source="")
 
 
 def test_all_predefined_scorers_are_publicly_exported():

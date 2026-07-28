@@ -154,10 +154,10 @@ def diagnose_trajectory_failure(
 def trajectory_scorer(
     *,
     accepted_scenarios: Optional[List[List[str]]] = None,
-    expected_source: Optional[str] = None,
+    value_source: Optional[str] = None,
+    source: str = "Trace",
     mode: TrajectoryMode = "strict",
     title: str = "Trajectory",
-    trace_source: str = "Trace",
     weight: Optional[float] = None,
     failure_threshold: Optional[float] = None,
     pass_threshold: Optional[float] = None,
@@ -169,14 +169,14 @@ def trajectory_scorer(
     require_non_empty_title(title, "trajectory_scorer")
     require_exactly_one_of(
         accepted_scenarios is not None,
-        expected_source is not None,
-        names=("accepted_scenarios", "expected_source"),
+        value_source is not None,
+        names=("accepted_scenarios", "value_source"),
         scorer_name="trajectory_scorer",
     )
     require_one_of_modes(mode, ("strict", "non_strict"), "trajectory_scorer")
-    require_non_empty_source(trace_source, "trajectory_scorer", field="trace_source")
+    require_non_empty_source(source, "trajectory_scorer")
 
-    config: Dict[str, Any] = {"trace_source": trace_source, **settings, "mode": mode}
+    config: Dict[str, Any] = {"trace_source": source, **settings, "mode": mode}
     if accepted_scenarios is not None:
         if not isinstance(accepted_scenarios, list) or not accepted_scenarios:
             raise validation_error("trajectory_scorer accepted_scenarios must be a non-empty list.")
@@ -186,8 +186,8 @@ def trajectory_scorer(
             normalized.append(list(scenario))
         config["accepted_scenarios"] = normalized
     else:
-        require_non_empty_source(expected_source, "trajectory_scorer", field="expected_source")
-        config["expected_source"] = expected_source
+        require_non_empty_source(value_source, "trajectory_scorer", field="value_source")
+        config["expected_source"] = value_source
 
     payload = column(
         title,

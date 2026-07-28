@@ -28,10 +28,28 @@ LEGACY_COLUMN_TITLES = {canonical: alias for alias, canonical in COLUMN_TITLE_AL
 RESERVED_EVAL_COLUMN_TITLES = frozenset(
     BASE_TEXT_COLUMNS + TRACE_RESERVED_COLUMN_TITLES + (EXPECTED_TRACE_COLUMN,) + tuple(COLUMN_TITLE_ALIASES.keys())
 )
+EVAL_CASE_BUILTIN_KEYS = frozenset({"input", "expected", "expected_trace"})
 
 
 def is_reserved_eval_column_title(title: str) -> bool:
     return title in RESERVED_EVAL_COLUMN_TITLES
+
+
+def custom_eval_field_titles(cases: List[Dict[str, Any]]) -> List[str]:
+    """Return custom case keys in stable first-seen order."""
+    seen = set()
+    titles: List[str] = []
+    for case in cases:
+        for title in case:
+            if title in EVAL_CASE_BUILTIN_KEYS or title in seen:
+                continue
+            seen.add(title)
+            titles.append(title)
+    return titles
+
+
+def custom_eval_field_values(case: Dict[str, Any]) -> Dict[str, Any]:
+    return {title: value for title, value in case.items() if title not in EVAL_CASE_BUILTIN_KEYS}
 
 
 def resolve_column_title(title: str) -> str:
@@ -237,6 +255,8 @@ def build_row_values(
     expected_value: Any,
     expected_trace_value: Any,
     output_value: Any,
+    custom_values: Optional[Dict[str, Any]] = None,
+    custom_titles: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     values: Dict[str, Any] = {}
     for title, value in (
@@ -248,6 +268,12 @@ def build_row_values(
         column = find_column_by_title(columns_by_title_map, title)
         if not column:
             continue
+        values[str(column["id"])] = serialize_cell_value(value if value is not None else "")
+    for title in custom_titles or []:
+        column = columns_by_title_map.get(title)
+        if not column:
+            continue
+        value = (custom_values or {}).get(title, "")
         values[str(column["id"])] = serialize_cell_value(value if value is not None else "")
     return values
 
@@ -300,6 +326,14 @@ def cases_from_rows(
     input_col = find_column_by_title(by_title, "Input")
     expected_col = find_column_by_title(by_title, "Expected")
     expected_trace_col = find_column_by_title(by_title, EXPECTED_TRACE_COLUMN)
+    custom_columns = [
+        column
+        for column in columns
+        if column.get("type") == "TEXT"
+        and isinstance(column.get("title"), str)
+        and column["title"].strip()
+        and not is_reserved_eval_column_title(column["title"])
+    ]
     cases: List[Dict[str, Any]] = []
     for row in extract_rows(rows_payload):
         cells = row.get("cells") or {}
@@ -325,5 +359,7 @@ def cases_from_rows(
             case["expected"] = expected_value
         if expected_trace_value is not None:
             case["expected_trace"] = expected_trace_value
+        for column in custom_columns:
+            case[column["title"]] = parse_cell_value(cells.get(str(column["id"])))
         cases.append(case)
     return cases

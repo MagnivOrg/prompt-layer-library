@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from promptlayer.evaluations.columns import column
 from promptlayer.evaluations.scorers._helpers import (
@@ -17,18 +17,16 @@ from promptlayer.types.table import EvalScorerColumn
 def compare_scorer(
     title: str = "Compare",
     *,
-    sources: Optional[List[str]] = None,
+    source: str = "Output",
+    value_source: str = "Expected",
     comparison_type: Optional[Union[Dict[str, Any], str]] = None,
     **settings: Any,
 ) -> EvalScorerColumn:
     """Build a COMPARE scorer column."""
     require_non_empty_title(title, "compare_scorer")
-    resolved_sources = ["Output", "Expected"] if sources is None else sources
-    if not isinstance(resolved_sources, list) or len(resolved_sources) != 2:
-        raise validation_error("compare_scorer requires exactly two sources.")
-    for source in resolved_sources:
-        if not isinstance(source, str) or not source.strip():
-            raise validation_error("compare_scorer sources must be non-empty strings.")
+    for field, value in (("source", source), ("value_source", value_source)):
+        if not isinstance(value, str) or not value.strip():
+            raise validation_error(f"compare_scorer {field} must be a non-empty string.")
     if comparison_type is None:
         comparison: Union[Dict[str, Any], str] = {"type": "STRING"}
     elif isinstance(comparison_type, str):
@@ -37,7 +35,7 @@ def compare_scorer(
         comparison = comparison_type
     step_options, config_settings = pop_scorecard_step_options(settings)
     config: Dict[str, Any] = {
-        "sources": list(resolved_sources),
+        "sources": [source, value_source],
         "comparison_type": comparison,
         **config_settings,
     }

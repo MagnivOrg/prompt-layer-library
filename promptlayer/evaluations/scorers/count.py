@@ -8,6 +8,7 @@ from promptlayer.evaluations.columns import column
 from promptlayer.evaluations.scorers._helpers import (
     apply_scorecard_step_options,
     pop_scorecard_step_options,
+    reject_legacy_parameters,
     require_count_bounds,
     require_non_empty_source,
     require_non_empty_string,
@@ -19,19 +20,20 @@ from promptlayer.types.table import EvalScorerColumn
 def count_scorer(
     title: str = "Count",
     *,
-    source: str = "Output",
+    source_column: str = "Output",
     type: str = "chars",
     min_count: Optional[int] = None,
     max_count: Optional[int] = None,
     **settings: Any,
 ) -> EvalScorerColumn:
     """Build a COUNT scorer column."""
+    reject_legacy_parameters(settings, names=("source",), scorer_name="count_scorer")
     require_non_empty_title(title, "count_scorer")
-    require_non_empty_source(source, "count_scorer")
+    require_non_empty_source(source_column, "count_scorer", field="source_column")
     require_non_empty_string(type, field="type", scorer_name="count_scorer")
     require_count_bounds(min_count=min_count, max_count=max_count)
     step_options, config_settings = pop_scorecard_step_options(settings)
-    config: Dict[str, Any] = {"source": source, "type": type, **config_settings}
+    config: Dict[str, Any] = {"source": source_column, "type": type, **config_settings}
     if min_count is not None:
         config["min_count"] = min_count
     if max_count is not None:

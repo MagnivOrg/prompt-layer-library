@@ -34,7 +34,9 @@ tenacity = "^9.1.2"
 cachetools = "^5.0.0"
 openai-agents = {version = "^0.3.3", optional = true}
 claude-agent-sdk = {version = ">=0.1.45,<1.0.0", optional = true, python = ">=3.10,<4.0"}
-opentelemetry-instrumentation-openai-v2 = {version = ">=2.4b0,<2.5b0", optional = true, python = ">=3.10,<4.0"}
+opentelemetry-instrumentation-genai-openai = {version = ">=1.0b0,<1.1b0", optional = true, python = ">=3.10,<4.0"}
+opentelemetry-instrumentation-genai-anthropic = {version = ">=1.0b0,<1.1b0", optional = true, python = ">=3.10,<4.0"}
+opentelemetry-instrumentation-google-genai = {version = ">=1.0b1,<1.1b0", optional = true, python = ">=3.10,<4.0"}
 eval-type-backport = {version = "^0.3.1", optional = true}
 jinja2 = "^3.1.6"
 rich = ">=13.0.0"
@@ -45,7 +47,7 @@ pytest-asyncio = "^0.23.6"
 openai = "^1.107.1"
 openai-agents = "^0.3.3"
 eval-type-backport = "^0.3.1"
-google-genai = "^1.5.0"
+google-genai = ">=1.32,<3"
 anthropic = {extras = ["vertex"], version = "^0.84.0"}
 # TODO(dmu) MEDIUM: Upgrade to vcrpy >= 7 once it supports urllib3 >= 2.2.2
 vcrpy = "<7.0.0"
@@ -59,7 +61,11 @@ boto3 = "^1.35.0"
 aioboto3 = "^13.0.0"
 
 [tool.poetry.extras]
-otel-genai-instrumentation = ["opentelemetry-instrumentation-openai-v2"]
+otel-genai-instrumentation = [
+    "opentelemetry-instrumentation-genai-openai",
+    "opentelemetry-instrumentation-genai-anthropic",
+    "opentelemetry-instrumentation-google-genai",
+]
 openai-agents = ["openai-agents", "eval-type-backport"]
 claude-agents = ["claude-agent-sdk"]
 

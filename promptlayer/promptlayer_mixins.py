@@ -2,7 +2,7 @@ import asyncio
 import datetime
 from copy import deepcopy
 from functools import wraps
-from typing import Any, Dict, Union
+from typing import Any, Dict, Iterable, Optional, Union
 
 from promptlayer.otlp import initialize_promptlayer_tracer
 from promptlayer.streaming import (
@@ -27,7 +27,7 @@ from promptlayer.streaming import (
     openai_stream_chat,
     openai_stream_completion,
 )
-from promptlayer.tracing import _configure_openai_sdk_instrumentation, configure_tracing
+from promptlayer.tracing import _configure_sdk_instrumentation, configure_tracing
 from promptlayer.tracing_context import resolve_tracer
 from promptlayer.utils import (
     aamazon_bedrock_request,
@@ -300,6 +300,7 @@ class PromptLayerMixin:
         throw_on_error: bool,
         enable_tracing: bool = False,
         tracer_provider=None,
+        tracing_providers: Optional[Iterable[str]] = None,
     ):
         del throw_on_error  # OTLP exporter does not use this flag.
         if not enable_tracing:
@@ -314,6 +315,7 @@ class PromptLayerMixin:
                 api_key=api_key,
                 base_url=base_url,
                 tracer_provider=tracer_provider,
+                providers=tracing_providers,
             )
             return provider, provider.get_tracer(__name__)
 
@@ -323,7 +325,7 @@ class PromptLayerMixin:
             enable_tracing=True,
         )
         if provider is not None:
-            _configure_openai_sdk_instrumentation(provider)
+            _configure_sdk_instrumentation(provider, providers=tracing_providers)
         return provider, tracer
 
     @staticmethod

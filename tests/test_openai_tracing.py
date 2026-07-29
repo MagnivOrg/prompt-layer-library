@@ -34,7 +34,7 @@ class _FakeTracerProvider:
 def reset_tracing_state(monkeypatch):
     monkeypatch.setattr(tracing, "_exporter_settings", WeakKeyDictionary())
     monkeypatch.setattr(tracing, "_prompt_processor_providers", WeakKeyDictionary())
-    monkeypatch.setattr(tracing, "_openai_instrumented_provider", None)
+    monkeypatch.setattr(tracing, "_instrumented_provider_owners", {})
     original_semconv = os.environ.get("OTEL_SEMCONV_STABILITY_OPT_IN")
     yield
     if original_semconv is None:
@@ -186,12 +186,13 @@ def test_instrument_openai_requires_api_key_before_creating_global_provider(monk
     get_provider.assert_not_called()
 
 
-def test_configure_tracing_rejects_non_openai_provider():
-    with pytest.raises(ValueError, match="Unknown tracing provider: anthropic"):
+@pytest.mark.parametrize("provider_name", ["unsupported", "anthropic.bedrock"])
+def test_configure_tracing_rejects_unknown_provider(provider_name):
+    with pytest.raises(ValueError, match="Unknown tracing provider"):
         tracing.configure_tracing(
             api_key="pl_test",
             tracer_provider=_FakeTracerProvider(),
-            providers=("anthropic",),
+            providers=(provider_name,),
         )
 
 
@@ -222,17 +223,19 @@ def test_openai_prompt_processor_enriches_native_genai_span():
 
 
 def test_promptlayer_recognizes_instrumented_openai_streams():
-    chat_patch = pytest.importorskip("opentelemetry.instrumentation.openai_v2.patch")
-    response_wrappers = pytest.importorskip("opentelemetry.instrumentation.openai_v2.response_wrappers")
+    chat_wrappers = pytest.importorskip("opentelemetry.instrumentation.genai.openai.chat_wrappers")
+    response_wrappers = pytest.importorskip("opentelemetry.instrumentation.genai.openai.response_wrappers")
     wrapper_classes = (
-        chat_patch.ChatStreamWrapper,
-        chat_patch.LegacyChatStreamWrapper,
+        chat_wrappers.ChatStreamWrapper,
+        chat_wrappers.AsyncChatStreamWrapper,
         response_wrappers.ResponseStreamWrapper,
         response_wrappers.AsyncResponseStreamWrapper,
+        response_wrappers.ResponseStreamManagerWrapper,
+        response_wrappers.AsyncResponseStreamManagerWrapper,
     )
 
     for wrapper_class in wrapper_classes:
-        response = object.__new__(wrapper_class)
+        response = type(wrapper_class.__name__, (), {})()
         result = promptlayer_api_handler(
             api_key="pl-test",
             base_url="https://api.promptlayer.com",
@@ -251,7 +254,7 @@ def test_promptlayer_recognizes_instrumented_openai_streams():
 
 
 def test_promptlayer_enable_tracing_auto_instruments_direct_openai(monkeypatch):
-    instrumentation = pytest.importorskip("opentelemetry.instrumentation.openai_v2")
+    instrumentation = pytest.importorskip("opentelemetry.instrumentation.genai.openai")
     instrumentor = instrumentation.OpenAIInstrumentor()
     if instrumentor.is_instrumented_by_opentelemetry:
         pytest.skip("OpenAI SDK is already instrumented by this test process")
@@ -264,6 +267,7 @@ def test_promptlayer_enable_tracing_auto_instruments_direct_openai(monkeypatch):
         "BatchSpanProcessor",
         lambda configured_exporter: SimpleSpanProcessor(configured_exporter),
     )
+    monkeypatch.setattr(tracing, "_module_available", lambda module_name: module_name == "openai")
 
     def handle_request(_request):
         return httpx.Response(
@@ -321,7 +325,7 @@ def test_promptlayer_enable_tracing_auto_instruments_direct_openai(monkeypatch):
 
 
 def test_promptlayer_default_tracing_remains_backward_compatible(monkeypatch):
-    instrumentation = pytest.importorskip("opentelemetry.instrumentation.openai_v2")
+    instrumentation = pytest.importorskip("opentelemetry.instrumentation.genai.openai")
     instrumentor = instrumentation.OpenAIInstrumentor()
     if instrumentor.is_instrumented_by_opentelemetry:
         pytest.skip("OpenAI SDK is already instrumented by this test process")
@@ -332,6 +336,7 @@ def test_promptlayer_default_tracing_remains_backward_compatible(monkeypatch):
         "promptlayer.otlp.BatchSpanProcessor",
         lambda configured_exporter: SimpleSpanProcessor(configured_exporter),
     )
+    monkeypatch.setattr(tracing, "_module_available", lambda module_name: module_name == "openai")
 
     def handle_request(_request):
         return httpx.Response(
@@ -409,7 +414,14 @@ def _promptlayer_run_blueprint():
     }
 
 
-def _configure_run_test_client(client, provider, exporter, monkeypatch, request_function):
+def _configure_run_test_client(
+    client,
+    provider,
+    exporter,
+    monkeypatch,
+    request_function,
+    provider_name="openai",
+):
     provider.add_span_processor(OpenAIPromptTemplateSpanProcessor())
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     client.tracer_provider = provider
@@ -426,8 +438,8 @@ def _configure_run_test_client(client, provider, exporter, monkeypatch, request_
         "_prepare_llm_data",
         Mock(
             return_value={
-                "provider": "openai",
-                "function_name": "openai.chat.completions.create",
+                "provider": provider_name,
+                "function_name": f"{provider_name}.chat",
                 "stream_function": None,
                 "request_function": request_function,
                 "client_kwargs": {},
@@ -438,8 +450,63 @@ def _configure_run_test_client(client, provider, exporter, monkeypatch, request_
     )
 
 
+@pytest.mark.parametrize(
+    ("promptlayer_provider", "span_provider"),
+    [
+        ("anthropic", "anthropic"),
+        ("google", "gcp.gemini"),
+        ("vertexai", "gcp.vertex_ai"),
+    ],
+)
+def test_promptlayer_run_links_managed_genai_span_to_existing_request_log(
+    monkeypatch,
+    promptlayer_provider,
+    span_provider,
+):
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    client = PromptLayer(api_key="pl-test")
+    genai_tracer = provider.get_tracer("opentelemetry.util.genai.handler")
+    response = Mock()
+    response.model_dump.return_value = {"choices": []}
+
+    def request_function(**_kwargs):
+        with genai_tracer.start_as_current_span(
+            "chat test-model",
+            attributes={
+                "gen_ai.provider.name": span_provider,
+                "gen_ai.request.model": "test-model",
+            },
+        ):
+            return response
+
+    _configure_run_test_client(
+        client,
+        provider,
+        exporter,
+        monkeypatch,
+        request_function,
+        provider_name=promptlayer_provider,
+    )
+    track_request = Mock(return_value={"request_id": 17, "prompt_blueprint": {"id": 42}})
+    monkeypatch.setattr("promptlayer.promptlayer.track_request", track_request)
+
+    try:
+        client.run("support-answer")
+
+        spans = {span.name: span for span in exporter.get_finished_spans()}
+        run_span = spans["PromptLayer Run"]
+        genai_span = spans["chat test-model"]
+        run_span_id = f"{run_span.context.span_id:016x}"
+        assert genai_span.attributes["promptlayer.request_log.managed"] is True
+        assert genai_span.attributes["promptlayer.request_log.span_id"] == run_span_id
+        assert track_request.call_args.kwargs["span_id"] == run_span_id
+    finally:
+        provider.shutdown()
+
+
 def test_promptlayer_run_links_managed_openai_span_to_existing_request_log(monkeypatch):
-    instrumentation = pytest.importorskip("opentelemetry.instrumentation.openai_v2")
+    instrumentation = pytest.importorskip("opentelemetry.instrumentation.genai.openai")
     instrumentor = instrumentation.OpenAIInstrumentor()
     if instrumentor.is_instrumented_by_opentelemetry:
         pytest.skip("OpenAI SDK is already instrumented by this test process")
@@ -452,6 +519,7 @@ def test_promptlayer_run_links_managed_openai_span_to_existing_request_log(monke
         "BatchSpanProcessor",
         lambda configured_exporter: SimpleSpanProcessor(configured_exporter),
     )
+    monkeypatch.setattr(tracing, "_module_available", lambda module_name: module_name == "openai")
     client = PromptLayer(
         api_key="pl-test",
         enable_tracing=True,
@@ -553,7 +621,7 @@ def test_promptlayer_run_links_managed_openai_error_span_to_existing_request_log
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     client = PromptLayer(api_key="pl-test")
-    openai_tracer = provider.get_tracer("opentelemetry.instrumentation.openai_v2")
+    openai_tracer = provider.get_tracer("opentelemetry.util.genai.handler")
 
     def request_function(**_kwargs):
         with openai_tracer.start_as_current_span(
@@ -587,7 +655,7 @@ async def test_async_promptlayer_run_links_managed_openai_span_to_existing_reque
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     client = AsyncPromptLayer(api_key="pl-test")
-    openai_tracer = provider.get_tracer("opentelemetry.instrumentation.openai_v2")
+    openai_tracer = provider.get_tracer("opentelemetry.util.genai.handler")
     response = Mock()
     response.model_dump.return_value = {"choices": []}
 

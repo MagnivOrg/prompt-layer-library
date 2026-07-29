@@ -1,4 +1,4 @@
-"""Trace OpenAI Chat Completions and Responses calls and export them to PromptLayer."""
+"""Configure PromptLayer auto-instrumentation for the OpenAI SDK."""
 
 import os
 
@@ -8,18 +8,15 @@ from promptlayer import configure_tracing
 
 tracer_provider = configure_tracing(providers=("openai",))
 client = OpenAI()
+model = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
+
 
 try:
-    chat_completion = client.chat.completions.create(
-        model=os.environ["OPENAI_MODEL"],
+    response = client.chat.completions.create(
+        model=model,
         messages=[{"role": "user", "content": "Explain distributed tracing in one sentence."}],
     )
-    print("Chat Completions:", chat_completion.choices[0].message.content)
-
-    response = client.responses.create(
-        model=os.environ["OPENAI_MODEL"],
-        input="Explain distributed tracing in one sentence.",
-    )
-    print("Responses:", response.output_text)
+    print(response.choices[0].message.content)
 finally:
+    client.close()
     tracer_provider.force_flush()

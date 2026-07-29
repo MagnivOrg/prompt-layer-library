@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Union
 
 import nest_asyncio
 from opentelemetry import context as otel_context, trace as otel_trace
@@ -13,7 +13,7 @@ from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
 from promptlayer.skills import AsyncSkillManager, SkillManager
-from promptlayer.span_exporter import _mark_openai_request_span
+from promptlayer.span_exporter import _mark_genai_request_span
 from promptlayer.streaming import astream_response, stream_response
 from promptlayer.tables import AsyncTableManager, TableManager
 from promptlayer.template_cache import PromptTemplateCache
@@ -39,6 +39,16 @@ from promptlayer.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+_AUTO_INSTRUMENTED_RUN_PROVIDERS = frozenset(
+    {
+        "openai",
+        "openai.azure",
+        "anthropic",
+        "google",
+        "vertexai",
+    }
+)
 
 
 def get_base_url(base_url: Union[str, None]):
@@ -75,6 +85,7 @@ class PromptLayer(PromptLayerMixin):
         throw_on_error: bool = True,
         cache_ttl_seconds: int = 0,
         tracer_provider=None,
+        tracing_providers: Optional[Iterable[str]] = None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -98,6 +109,7 @@ class PromptLayer(PromptLayerMixin):
             self.throw_on_error,
             enable_tracing,
             tracer_provider,
+            tracing_providers,
         )
         self.evals = EvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
         self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
@@ -207,8 +219,8 @@ class PromptLayer(PromptLayerMixin):
         # streaming=False > Pydantic model instance
         # streaming=True > generator that yields ChatCompletionChunk pieces as they arrive
         try:
-            with _mark_openai_request_span(
-                enabled=llm_data["provider"] in {"openai", "openai.azure"},
+            with _mark_genai_request_span(
+                enabled=llm_data["provider"] in _AUTO_INSTRUMENTED_RUN_PROVIDERS,
                 request_log_span_id=pl_run_span_id,
             ):
                 response = llm_data["request_function"](
@@ -487,6 +499,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         throw_on_error: bool = True,
         cache_ttl_seconds: int = 0,
         tracer_provider=None,
+        tracing_providers: Optional[Iterable[str]] = None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -510,6 +523,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             self.throw_on_error,
             enable_tracing,
             tracer_provider,
+            tracing_providers,
         )
         self.evals = AsyncEvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
         self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
@@ -785,8 +799,8 @@ class AsyncPromptLayer(PromptLayerMixin):
         request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
         try:
-            with _mark_openai_request_span(
-                enabled=llm_data["provider"] in {"openai", "openai.azure"},
+            with _mark_genai_request_span(
+                enabled=llm_data["provider"] in _AUTO_INSTRUMENTED_RUN_PROVIDERS,
                 request_log_span_id=pl_run_span_id,
             ):
                 response = await llm_data["request_function"](

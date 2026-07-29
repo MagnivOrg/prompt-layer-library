@@ -1916,8 +1916,6 @@ async def aazure_openai_request(
         return await client.responses.create(**function_kwargs)
 
 
-OPENROUTER_HTTP_REFERER = "https://promptlayer.com"
-OPENROUTER_X_TITLE = "PromptLayer"
 # Terminal states for an OpenRouter video generation job.
 _OPENROUTER_VIDEO_TERMINAL_STATES = {"completed", "failed", "cancelled", "expired"}
 
@@ -1973,7 +1971,7 @@ def _register_openrouter_usage_hook(client) -> None:
 
 
 def _get_openrouter_client(client_kwargs: dict, is_async: bool = False):
-    """Build (and cache) an OpenRouter SDK client with PromptLayer attribution."""
+    """Build (and cache) an OpenRouter SDK client."""
     from openrouter import OpenRouter
 
     api_key = client_kwargs.get("api_key") or os.environ.get("OPENROUTER_API_KEY")
@@ -1983,8 +1981,6 @@ def _get_openrouter_client(client_kwargs: dict, is_async: bool = False):
     def _factory():
         sdk_kwargs: dict = {
             "api_key": api_key,
-            "http_referer": OPENROUTER_HTTP_REFERER,
-            "x_open_router_title": OPENROUTER_X_TITLE,
             # Bound the request time so slow media generation surfaces as a
             # timeout instead of hanging forever. Override via OPENROUTER_TIMEOUT_MS.
             "timeout_ms": int(os.environ.get("OPENROUTER_TIMEOUT_MS", 600_000)),

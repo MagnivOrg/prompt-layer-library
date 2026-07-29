@@ -190,7 +190,7 @@ def test_generic_column_helpers_build_backend_configs():
 
     assertion = llm_assertion_scorer(
         title="quality",
-        source="Output",
+        source_column="Output",
         prompt="Is the answer helpful?",
     )
     assert assertion == {
@@ -199,7 +199,7 @@ def test_generic_column_helpers_build_backend_configs():
         "config": {"source": "Output", "prompt": "Is the answer helpful?"},
     }
 
-    contains = contains_scorer(title="final_answer", source="Output", value="refund")
+    contains = contains_scorer(title="final_answer", source_column="Output", expected="refund")
     assert contains["type"] == "CONTAINS"
     assert contains["config"] == {"source": "Output", "value": "refund"}
 
@@ -208,7 +208,7 @@ def test_generic_column_helpers_build_backend_configs():
     assert compare["config"]["sources"] == ["Output", "expected"]
     assert compare["config"]["comparison_type"] == {"type": "STRING"}
 
-    regex = regex_scorer(title="has_id", source="Output", regex_pattern=r"inv_\d+")
+    regex = regex_scorer(title="has_id", source_column="Output", regex_pattern=r"inv_\d+")
     assert regex["type"] == "REGEX"
     assert regex["config"]["regex_pattern"] == r"inv_\d+"
 
@@ -264,8 +264,8 @@ def test_scorer_dependencies_from_config_resolve_titles():
             "execution_trace": "tr-1",
         },
     }
-    assert _scorers_reference_trace([llm_assertion_scorer(title="x", source="Trace", prompt="ok")])
-    assert not _scorers_reference_trace([llm_assertion_scorer(title="x", source="Output", prompt="ok")])
+    assert _scorers_reference_trace([llm_assertion_scorer(title="x", source_column="Trace", prompt="ok")])
+    assert not _scorers_reference_trace([llm_assertion_scorer(title="x", source_column="Output", prompt="ok")])
     with pytest.raises(PromptLayerValidationError, match="not found: missing"):
         _scorer_dependencies_from_config({"source": "missing"}, columns_by_title)
 
@@ -282,7 +282,7 @@ def test_build_scorecard_steps_persist_column_ids():
         [
             llm_assertion_scorer(
                 title="Response grounded",
-                source="Output",
+                source_column="Output",
                 prompt="User: {user_request}\nTrace: {execution_trace}",
                 variable_mappings={
                     "user_request": "Input",
@@ -305,11 +305,11 @@ def test_build_scorecard_steps_persist_column_ids():
 
 def test_generic_column_helpers_validate_required_fields():
     with pytest.raises(PromptLayerValidationError):
-        llm_assertion_scorer(title="x", source="Output")
+        llm_assertion_scorer(title="x", source_column="Output")
     with pytest.raises(PromptLayerValidationError):
-        contains_scorer(title="x", source="Output")
+        contains_scorer(title="x", source_column="Output")
     with pytest.raises(PromptLayerValidationError):
-        compare_scorer(title="x", value_source="")
+        compare_scorer(title="x", expected_column="")
     with pytest.raises(PromptLayerValidationError):
         code_execution_column("x", code=" ")
 
@@ -338,7 +338,7 @@ def test_column_rejects_text_type_and_reserved_scorer_title():
     with pytest.raises(PromptLayerValidationError, match="cannot be TEXT"):
         column("summary", "TEXT")
     with pytest.raises(PromptLayerValidationError, match="reserved"):
-        contains_scorer(title="Trace", source="Output", value="x")
+        contains_scorer(title="Trace", source_column="Output", expected="x")
 
 
 def exact_match(output, expected):
@@ -744,8 +744,8 @@ def test_eval_runs_inline_dataset_and_writes_rows(
         scorers=[
             compare_scorer(
                 "required_tools",
-                source="Output",
-                value_source="Reference context",
+                source_column="Output",
+                expected_column="Reference context",
             )
         ],
         api_key=promptlayer_api_key,
@@ -916,8 +916,8 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
         scorers=[
             contains_scorer(
                 title="has_name",
-                source="Extracted data",
-                value="ada",
+                source_column="Extracted data",
+                expected="ada",
             )
         ],
         api_key=promptlayer_api_key,
@@ -1077,8 +1077,8 @@ def test_aeval_creates_supporting_columns_and_runs_operations_before_scorecard(
             scorers=[
                 contains_scorer(
                     title="has_name",
-                    source="Extracted data",
-                    value="ada",
+                    source_column="Extracted data",
+                    expected="ada",
                 )
             ],
             api_key=promptlayer_api_key,
@@ -1216,7 +1216,7 @@ def test_eval_resolves_independent_output_and_dataset_tables(
             "scorers": [
                 llm_assertion_scorer(
                     title="quality",
-                    source="Output",
+                    source_column="Output",
                     prompt="ok?",
                 )
             ],
@@ -2369,7 +2369,7 @@ def test_evaluate_raises_rich_trajectory_failure(
             name="Trajectory Evals",
             dataset=[{"input": {"question": "create folder"}, "expected": expected}],
             runner=lambda input_data: "ok",
-            scorers=[trajectory_scorer(value_source="expected", title="trajectory assertions v3")],
+            scorers=[trajectory_scorer(expected_column="expected", title="trajectory assertions v3")],
             api_key=promptlayer_api_key,
             base_url=base_url,
             passing_score=1.0,

@@ -88,6 +88,176 @@ def build_prompt_blueprint_from_openai_chunk(chunk, metadata):
     return _build_prompt_blueprint(assistant_message, metadata)
 
 
+def _openrouter_value_present(value: Any) -> bool:
+    """True when a Speakeasy/Pydantic field holds a real value (not None / UNSET / empty)."""
+    if value is None:
+        return False
+    # Speakeasy ``Unset`` / empty sentinel objects are falsy; plain empty strings skip too.
+    if isinstance(value, str):
+        return bool(value)
+    type_name = type(value).__name__
+    if type_name in ("Unset", "UNSET"):
+        return False
+    return True
+
+
+def _openrouter_detail_as_dict(detail: Any) -> Optional[Dict[str, Any]]:
+    if detail is None:
+        return None
+    if isinstance(detail, dict):
+        return detail
+    if hasattr(detail, "model_dump"):
+        return detail.model_dump(mode="json", by_alias=True)
+    return None
+
+
+def _thinking_items_from_openrouter_reasoning_details(details: Any) -> List[Dict[str, Any]]:
+    """Map OpenRouter ``reasoning_details`` unions onto blueprint ``thinking`` content."""
+    items: List[Dict[str, Any]] = []
+    for detail in details or []:
+        data = _openrouter_detail_as_dict(detail)
+        if not data:
+            continue
+        detail_type = data.get("type")
+        if detail_type == "reasoning.text":
+            text = data.get("text") or ""
+            if text:
+                items.append(
+                    _create_content_item(
+                        "thinking",
+                        item_id=data.get("id"),
+                        thinking=text,
+                        signature=data.get("signature"),
+                    )
+                )
+        elif detail_type == "reasoning.summary":
+            summary = data.get("summary") or ""
+            if summary:
+                items.append(
+                    _create_content_item(
+                        "thinking",
+                        item_id=data.get("id"),
+                        thinking=summary,
+                        signature=None,
+                    )
+                )
+        # ``reasoning.encrypted`` / ``reasoning.server_tool_call`` carry no displayable text.
+    return items
+
+
+def _openrouter_audio_to_content(audio: Any) -> List[Dict[str, Any]]:
+    """Map OpenRouter ``ChatAudioOutput`` onto ``output_media`` (+ optional transcript text)."""
+    items: List[Dict[str, Any]] = []
+    if audio is None:
+        return items
+
+    if isinstance(audio, dict):
+        data = audio.get("data")
+        transcript = audio.get("transcript")
+        audio_id = audio.get("id")
+        expires_at = audio.get("expires_at")
+    else:
+        data = getattr(audio, "data", None)
+        transcript = getattr(audio, "transcript", None)
+        audio_id = getattr(audio, "id", None)
+        expires_at = getattr(audio, "expires_at", None)
+
+    if data:
+        url = data if isinstance(data, str) and data.startswith("data:") else f"data:audio/mpeg;base64,{data}"
+        provider_metadata = {}
+        if audio_id is not None:
+            provider_metadata["id"] = audio_id
+        if expires_at is not None:
+            provider_metadata["expires_at"] = expires_at
+        if transcript is not None:
+            provider_metadata["transcript"] = transcript
+        items.append(
+            _create_content_item(
+                "output_media",
+                url=url,
+                mime_type="audio/mpeg",
+                media_type="audio",
+                provider_metadata=provider_metadata or None,
+            )
+        )
+    elif transcript:
+        items.append(_create_content_item("text", text=transcript))
+
+    return items
+
+
+def build_prompt_blueprint_from_openrouter_chunk(chunk, metadata):
+    """Build a prompt blueprint from an OpenRouter ``ChatStreamChunk``.
+
+    OpenRouter's stream shape mirrors OpenAI (``choices[].delta.content`` /
+    ``tool_calls``), and additionally carries OpenRouter-specific delta fields:
+
+    - ``reasoning`` / ``reasoning_details`` → ``thinking`` content
+    - ``refusal`` → text content
+    - ``audio`` → ``output_media`` (audio) and/or transcript text
+    """
+    assistant_content: List[Dict[str, Any]] = []
+    tool_calls: List[Dict[str, Any]] = []
+
+    choices = getattr(chunk, "choices", None)
+    if not choices and isinstance(chunk, dict):
+        choices = chunk.get("choices")
+    if not choices:
+        assistant_message = _build_assistant_message(assistant_content)
+        return _build_prompt_blueprint(assistant_message, metadata)
+
+    choice0 = choices[0]
+    delta = getattr(choice0, "delta", None)
+    if delta is None and isinstance(choice0, dict):
+        delta = choice0.get("delta") or {}
+    if delta is None:
+        assistant_message = _build_assistant_message(assistant_content)
+        return _build_prompt_blueprint(assistant_message, metadata)
+
+    def _get(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    reasoning_details = _get(delta, "reasoning_details")
+    detail_items = _thinking_items_from_openrouter_reasoning_details(reasoning_details) if reasoning_details else []
+    if detail_items:
+        # Prefer structured details when present — ``reasoning`` is often the same
+        # text duplicated on the same delta (e.g. DeepSeek R1 via OpenRouter).
+        assistant_content.extend(detail_items)
+    else:
+        reasoning = _get(delta, "reasoning")
+        if _openrouter_value_present(reasoning):
+            assistant_content.append(_create_content_item("thinking", thinking=reasoning, signature=None))
+
+    content = _get(delta, "content")
+    if _openrouter_value_present(content):
+        assistant_content.append(_create_content_item("text", text=content))
+
+    refusal = _get(delta, "refusal")
+    if _openrouter_value_present(refusal):
+        assistant_content.append(_create_content_item("text", text=refusal))
+
+    audio = _get(delta, "audio")
+    if audio:
+        assistant_content.extend(_openrouter_audio_to_content(audio))
+
+    tool_calls_delta = _get(delta, "tool_calls")
+    if tool_calls_delta:
+        for tool_call in tool_calls_delta:
+            function = _get(tool_call, "function")
+            tool_calls.append(
+                _create_tool_call(
+                    _get(tool_call, "id") or "",
+                    (_get(function, "name") or "") if function else "",
+                    (_get(function, "arguments") or "") if function else "",
+                )
+            )
+
+    assistant_message = _build_assistant_message(assistant_content, tool_calls or None)
+    return _build_prompt_blueprint(assistant_message, metadata)
+
+
 def _map_output_item_to_blueprint_content(item, assistant_content, tool_calls, metadata=None):
     """Map an OpenAI Responses output item to blueprint content items."""
     item_type = item.get("type")

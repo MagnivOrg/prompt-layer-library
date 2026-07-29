@@ -159,10 +159,16 @@ def _accumulate_openrouter_chunks(chunk_dicts: list) -> dict:
     """Fold OpenRouter ``ChatStreamChunk`` dicts into an OpenAI chat.completion dict.
 
     OpenRouter's streaming schema mirrors OpenAI (``choices[].delta`` with
-    ``content`` / ``tool_calls``), so the accumulated result is consumable by the
-    existing OpenAI request-to-internal mapper on the PromptLayer backend.
+    ``content`` / ``tool_calls``) and additionally carries ``reasoning``,
+    ``reasoning_details``, ``refusal``, and ``audio`` on the delta. Those
+    OpenRouter-specific fields are preserved on the accumulated assistant
+    message so the backend inbound mapper / final blueprint can see them.
     """
     content = ""
+    reasoning = ""
+    refusal = ""
+    reasoning_details: list = []
+    audio = None
     tool_calls: list = []
     finish_reason = "stop"
     last = chunk_dicts[-1] if chunk_dicts else {}
@@ -183,6 +189,18 @@ def _accumulate_openrouter_chunks(chunk_dicts: list) -> dict:
         delta = choice.get("delta") or {}
         if delta.get("content"):
             content = f"{content}{delta['content']}"
+        if delta.get("reasoning"):
+            reasoning = f"{reasoning}{delta['reasoning']}"
+        if delta.get("refusal"):
+            refusal = f"{refusal}{delta['refusal']}"
+        if delta.get("reasoning_details"):
+            reasoning_details.extend(delta["reasoning_details"] or [])
+        if delta.get("audio"):
+            # Audio payloads are typically complete on a single delta; keep the
+            # latest non-empty one (and prefer ones that include data).
+            next_audio = delta["audio"]
+            if audio is None or (isinstance(next_audio, dict) and next_audio.get("data")):
+                audio = next_audio
         for tool_call in delta.get("tool_calls") or []:
             function = tool_call.get("function") or {}
             if not tool_calls or tool_call.get("id"):
@@ -200,9 +218,17 @@ def _accumulate_openrouter_chunks(chunk_dicts: list) -> dict:
                 tool_calls[-1]["function"]["name"] += function.get("name") or ""
                 tool_calls[-1]["function"]["arguments"] += function.get("arguments") or ""
 
-    message = {"role": "assistant", "content": content}
+    message: dict = {"role": "assistant", "content": content}
     if tool_calls:
         message["tool_calls"] = tool_calls
+    if reasoning:
+        message["reasoning"] = reasoning
+    if reasoning_details:
+        message["reasoning_details"] = reasoning_details
+    if refusal:
+        message["refusal"] = refusal
+    if audio is not None:
+        message["audio"] = audio
 
     return {
         "id": last.get("id", ""),

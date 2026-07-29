@@ -10,6 +10,7 @@ from .blueprint_builder import (
     build_prompt_blueprint_from_google_event,
     build_prompt_blueprint_from_openai_chunk,
     build_prompt_blueprint_from_openai_responses_event,
+    build_prompt_blueprint_from_openrouter_chunk,
 )
 from .response_handlers import (
     aanthropic_stream_completion,
@@ -45,6 +46,7 @@ __all__ = [
     "build_prompt_blueprint_from_google_event",
     "build_prompt_blueprint_from_openai_chunk",
     "build_prompt_blueprint_from_openai_responses_event",
+    "build_prompt_blueprint_from_openrouter_chunk",
     "stream_response",
     "astream_response",
     "openai_stream_chat",

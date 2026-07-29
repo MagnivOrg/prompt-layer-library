@@ -468,7 +468,7 @@ class PromptLayerMixin:
 
         if stream and (
             (provider in ["openai", "openai.azure"] and api_type == "chat-completions")
-            or (provider == "openrouter" and api_type in ("chat-completions", None))
+            or (provider == "openrouter" and api_type in ("chat", "chat-completions", None))
         ):
             function_kwargs["stream_options"] = {"include_usage": True}
 

@@ -2131,7 +2131,7 @@ def openrouter_request(
     endpoints.
     """
     client = _get_openrouter_client(client_kwargs)
-    api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat-completions"
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat"
 
     if api_type == "images":
         function_kwargs.pop("stream", None)
@@ -2156,7 +2156,7 @@ async def aopenrouter_request(
     function_kwargs: dict,
 ):
     client = _get_openrouter_client(client_kwargs, is_async=True)
-    api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat-completions"
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat"
 
     if api_type == "images":
         function_kwargs.pop("stream", None)

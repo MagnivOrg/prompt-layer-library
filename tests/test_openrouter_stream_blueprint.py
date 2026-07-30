@@ -6,7 +6,6 @@ from promptlayer.streaming.blueprint_builder import (
 from promptlayer.streaming.response_handlers import _accumulate_openrouter_chunks
 from promptlayer.streaming.stream_processor import _build_stream_blueprint
 
-
 METADATA = {"model": {"provider": "openrouter", "name": "openai/gpt-4o-mini", "api_type": "chat"}}
 
 

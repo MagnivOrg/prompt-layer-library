@@ -71,16 +71,29 @@ def test_predefined_scorer_payloads():
         "title": "Compare",
         "type": "COMPARE",
         "config": {
-            "sources": ["Output", "Expected"],
+            "sources": ["Output", "expected"],
             "comparison_type": {"type": "STRING"},
         },
     }
+    custom_compare = compare_scorer(source_column="actual", expected_column="reference")
+    assert custom_compare["config"]["sources"] == ["actual", "reference"]
+    literal_compare = compare_scorer(expected=None, comparison_type="JSON")
+    assert literal_compare["config"] == {
+        "sources": ["Output"],
+        "target": None,
+        "comparison_type": {"type": "JSON"},
+    }
 
-    contains = contains_scorer(value="refund")
+    contains = contains_scorer(expected="refund")
     assert contains == {
         "title": "Contains",
         "type": "CONTAINS",
         "config": {"source": "Output", "value": "refund"},
+    }
+    contains_column = contains_scorer(expected_column="reference")
+    assert contains_column["config"] == {
+        "source": "Output",
+        "value_source": "reference",
     }
 
     regex = regex_scorer(regex_pattern=r"inv_\d+")
@@ -116,7 +129,7 @@ def test_predefined_scorer_payloads():
         "config": {"source": "Output", "type": "object"},
     }
 
-    assert_valid_custom = assert_valid_scorer(type="email", source="contact")
+    assert_valid_custom = assert_valid_scorer(type="email", source_column="contact")
     assert assert_valid_custom == {
         "title": "Assert valid",
         "type": "ASSERT_VALID",
@@ -124,7 +137,7 @@ def test_predefined_scorer_payloads():
     }
 
     trajectory = trajectory_scorer(
-        accepted_scenarios=[["search", "checkout"]],
+        expected=[["search", "checkout"]],
         mode="strict",
     )
     assert trajectory == {
@@ -137,7 +150,7 @@ def test_predefined_scorer_payloads():
         },
     }
 
-    advanced_trajectory = trajectory_scorer(expected_source="expected", title="trajectory assertions v3")
+    advanced_trajectory = trajectory_scorer(expected_column="expected", title="trajectory assertions v3")
     assert advanced_trajectory == {
         "title": "trajectory assertions v3",
         "type": "TRAJECTORY",
@@ -146,7 +159,7 @@ def test_predefined_scorer_payloads():
 
     expected_trace_trajectory = trajectory_scorer(
         title="expected trace trajectory",
-        expected_source="expected_trace",
+        expected_column="expected_trace",
         mode="non_strict",
     )
     assert expected_trace_trajectory["config"] == {
@@ -154,25 +167,34 @@ def test_predefined_scorer_payloads():
         "expected_source": "expected_trace",
         "mode": "non_strict",
     }
+    custom_source_trajectory = trajectory_scorer(
+        source_column="Agent trace",
+        expected=[["search"]],
+    )
+    assert custom_source_trajectory["config"]["trace_source"] == "Agent trace"
+    custom_value_source_trajectory = trajectory_scorer(expected_column="expected trajectory")
+    assert custom_value_source_trajectory["config"]["expected_source"] == "expected trajectory"
 
 
 def test_predefined_scorer_validation():
     with pytest.raises(PromptLayerValidationError):
-        trajectory_scorer(accepted_scenarios=[])
+        trajectory_scorer(expected=[])
     with pytest.raises(PromptLayerValidationError):
         trajectory_scorer()
     with pytest.raises(PromptLayerValidationError):
         trajectory_scorer(
-            accepted_scenarios=[["search"]],
-            expected_source="expected",
+            expected=[["search"]],
+            expected_column="expected",
         )
     with pytest.raises(PromptLayerValidationError):
         trajectory_scorer(
-            accepted_scenarios=[["search"]],
+            expected=[["search"]],
             mode="invalid",  # type: ignore[arg-type]
         )
     with pytest.raises(PromptLayerValidationError):
         contains_scorer()
+    with pytest.raises(PromptLayerValidationError, match="exactly one of expected or expected_column"):
+        contains_scorer(expected="refund", expected_column="reference")
     with pytest.raises(PromptLayerValidationError):
         regex_scorer(regex_pattern="")
     with pytest.raises(PromptLayerValidationError):
@@ -180,11 +202,54 @@ def test_predefined_scorer_validation():
     with pytest.raises(PromptLayerValidationError):
         count_scorer(min_count=10, max_count=5)
     with pytest.raises(PromptLayerValidationError):
-        compare_scorer(sources=["only_one"])
+        compare_scorer(expected_column="")
+    with pytest.raises(PromptLayerValidationError, match="only one of expected or expected_column"):
+        compare_scorer(expected="refund", expected_column="reference")
     with pytest.raises(PromptLayerValidationError):
         llm_assertion_scorer()
     with pytest.raises(PromptLayerValidationError):
-        trajectory_scorer(expected_source="expected", title="")
+        trajectory_scorer(expected_column="expected", title="")
+    with pytest.raises(PromptLayerValidationError, match="legacy parameter"):
+        contains_scorer(value="refund")
+    with pytest.raises(PromptLayerValidationError, match="legacy parameter"):
+        compare_scorer(source="Output")
+    with pytest.raises(PromptLayerValidationError, match="legacy parameter"):
+        trajectory_scorer(accepted_scenarios=[["search"]])
+
+
+def test_compare_scorer_dependencies_support_literal_and_column_targets():
+    from promptlayer.evaluations.validation import scorer_dependencies_from_config
+
+    columns_by_title = {
+        "Output": {"id": "out-1", "title": "Output"},
+        "reference": {"id": "ref-1", "title": "reference"},
+    }
+
+    literal = compare_scorer(expected=None)
+    assert scorer_dependencies_from_config(literal["config"], columns_by_title) == [
+        {
+            "column_id": "out-1",
+            "reference_type": "value",
+            "config_key": "sources",
+            "config_meta": {"position": 0},
+        }
+    ]
+
+    column_target = compare_scorer(expected_column="reference")
+    assert scorer_dependencies_from_config(column_target["config"], columns_by_title) == [
+        {
+            "column_id": "out-1",
+            "reference_type": "value",
+            "config_key": "sources",
+            "config_meta": {"position": 0},
+        },
+        {
+            "column_id": "ref-1",
+            "reference_type": "value",
+            "config_key": "sources",
+            "config_meta": {"position": 1},
+        },
+    ]
 
 
 @pytest.mark.parametrize(
@@ -243,11 +308,11 @@ def test_assert_valid_scorer_validation():
     with pytest.raises(PromptLayerValidationError):
         assert_valid_scorer(type="")
     with pytest.raises(PromptLayerValidationError):
-        assert_valid_scorer(source="")
+        assert_valid_scorer(source_column="")
 
 
 def test_trajectory_scorer_references_trace_for_dependencies():
-    scorer = trajectory_scorer(accepted_scenarios=[["search"]])
+    scorer = trajectory_scorer(expected=[["search"]])
     assert scorers_reference_trace([scorer])
 
 
@@ -265,7 +330,7 @@ def test_trajectory_source_parses_accepted_scenarios():
     assert score_trajectory(matching, {"accepted_scenarios": [["create_folder"]]}) is False
     assert score_trajectory(matching, ["create_folder"]) is False
 
-    scorer = trajectory_scorer(expected_source="expected")
+    scorer = trajectory_scorer(expected_column="expected")
     assert scorer["type"] == "TRAJECTORY"
     assert scorer["config"]["trace_source"] == "Trace"
     assert scorer["config"]["expected_source"] == "expected"
@@ -290,7 +355,7 @@ def test_trajectory_source_matches_any_scenario():
 
 def test_trajectory_scorer_accepts_config_accepted_scenarios():
     scorer = trajectory_scorer(
-        accepted_scenarios=[
+        expected=[
             ["get_model_config", "create_prompt"],
             ["list_model_configs", "create_prompt"],
         ],
@@ -304,13 +369,13 @@ def test_trajectory_scorer_accepts_config_accepted_scenarios():
         ],
         "mode": "strict",
     }
-    single = trajectory_scorer(accepted_scenarios=[["search"]], title="one path")
+    single = trajectory_scorer(expected=[["search"]], title="one path")
     assert single["config"]["accepted_scenarios"] == [["search"]]
 
 
 def test_trajectory_scorer_supports_weight_and_failure_threshold():
     scorer = trajectory_scorer(
-        accepted_scenarios=[["search"]],
+        expected=[["search"]],
         weight=2.5,
         failure_threshold=0.5,
         pass_threshold=0.9,
@@ -382,7 +447,7 @@ def test_diagnose_trajectory_failure_categories():
 
 
 def test_trajectory_spec_scorer_references_trace():
-    assert scorers_reference_trace([trajectory_scorer(expected_source="expected")])
+    assert scorers_reference_trace([trajectory_scorer(expected_column="expected")])
 
 
 def test_trajectory_tool_order_uses_chronological_not_tree_order():
@@ -433,9 +498,9 @@ def test_diagnose_trajectory_failure_list_expected():
     assert "checkout" in reason
 
 
-def test_trajectory_scorer_empty_trace_source_mentions_field():
-    with pytest.raises(PromptLayerValidationError, match="trace_source"):
-        trajectory_scorer(accepted_scenarios=[["search"]], trace_source="")
+def test_trajectory_scorer_empty_source_mentions_field():
+    with pytest.raises(PromptLayerValidationError, match="source"):
+        trajectory_scorer(expected=[["search"]], source_column="")
 
 
 def test_all_predefined_scorers_are_publicly_exported():

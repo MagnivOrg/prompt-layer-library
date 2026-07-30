@@ -316,10 +316,9 @@ class CreateSheetOperation(TypedDict, total=False):
     statuses: Optional[List[str]]
 
 
-class EvalCase(TypedDict, total=False):
-    input: Required[Any]
-    expected: Optional[Any]
-    expected_trace: Optional[Any]
+# Eval cases require ``input`` at runtime and may include arbitrary string-keyed
+# dataset fields that become exact-title TEXT columns.
+EvalCase = Dict[str, Any]
 
 
 class EvalDatasetRef(TypedDict, total=False):

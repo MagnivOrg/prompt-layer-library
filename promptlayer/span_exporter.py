@@ -36,6 +36,10 @@ _active_prompt_template: ContextVar[Optional[Dict[str, str]]] = ContextVar(
     "promptlayer_active_prompt_template",
     default=None,
 )
+_defer_prompt_span_attributes: ContextVar[bool] = ContextVar(
+    "promptlayer_defer_prompt_span_attributes",
+    default=False,
+)
 
 
 @dataclass(frozen=True)
@@ -106,6 +110,7 @@ class GenAIPromptTemplateSpanProcessor(SpanProcessor):
                 api_type = _canonical_api_type(attributes, canonical_provider)
                 if api_type:
                     span.set_attribute(_PROMPTLAYER_API_TYPE, api_type)
+        span.set_attribute("node_type", "LLM_CALL")
         prompt_attributes = _active_prompt_template.get()
         if prompt_attributes:
             span.set_attributes(prompt_attributes)
@@ -171,6 +176,83 @@ OpenAIPromptTemplateSpanProcessor = GenAIPromptTemplateSpanProcessor
 _mark_openai_request_span = _mark_genai_request_span
 
 
+def _prompt_span_attributes(
+    prompt_blueprint: Dict[str, Any],
+    prompt_name: str,
+    *,
+    label: Optional[str] = None,
+) -> Dict[str, str]:
+    entries: Dict[str, str] = {"promptlayer.prompt.name": prompt_name}
+
+    prompt_id = prompt_blueprint.get("id")
+    if prompt_id is not None:
+        entries["promptlayer.prompt.id"] = str(prompt_id)
+
+    version = prompt_blueprint.get("version")
+    if version is not None:
+        entries["promptlayer.prompt.version"] = str(version)
+
+    if label is not None:
+        entries["promptlayer.prompt.label"] = label
+
+    return entries
+
+
+@contextmanager
+def _defer_prompt_span_attribute_activation() -> Iterator[None]:
+    """Let a logical template-fetch span finish before activating prompt baggage."""
+
+    token = _defer_prompt_span_attributes.set(True)
+    try:
+        yield
+    finally:
+        _defer_prompt_span_attributes.reset(token)
+
+
+@contextmanager
+def _scope_prompt_span_attributes(
+    entries: Optional[Dict[str, str]],
+) -> Iterator[Optional[Dict[str, str]]]:
+    """Temporarily activate or clear prompt identity for child spans."""
+
+    active_prompt_token = None
+    baggage_token = None
+    try:
+        try:
+            active_prompt_token = _active_prompt_template.set(entries)
+            ctx = context.get_current()
+            for key in _BAGGAGE_KEYS:
+                if entries is not None and key in entries:
+                    ctx = baggage.set_baggage(key, entries[key], ctx)
+                else:
+                    ctx = baggage.remove_baggage(key, ctx)
+            baggage_token = context.attach(ctx)
+        except Exception:
+            logger.debug("PromptLayer could not scope prompt tracing attributes", exc_info=True)
+        yield entries
+    finally:
+        if baggage_token is not None:
+            try:
+                context.detach(baggage_token)
+            except Exception:
+                logger.debug("PromptLayer could not detach prompt tracing attributes", exc_info=True)
+        if active_prompt_token is not None:
+            _active_prompt_template.reset(active_prompt_token)
+
+
+def _set_prompt_fetch_cache_hit(cache_hit: bool) -> None:
+    """Annotate the active logical prompt fetch when SDK caching is in use."""
+
+    try:
+        if not _defer_prompt_span_attributes.get():
+            return
+        span = trace.get_current_span()
+        if span.is_recording():
+            span.set_attribute("promptlayer.prompt.cache_hit", cache_hit)
+    except Exception:
+        logger.debug("PromptLayer could not annotate prompt cache status", exc_info=True)
+
+
 def set_prompt_span_attributes(
     prompt_blueprint: Dict[str, Any],
     prompt_name: str,
@@ -186,18 +268,10 @@ def set_prompt_span_attributes(
     Also sets the attributes on the current span for direct visibility.
     """
     try:
-        entries: Dict[str, str] = {"promptlayer.prompt.name": prompt_name}
+        if _defer_prompt_span_attributes.get():
+            return
 
-        prompt_id = prompt_blueprint.get("id")
-        if prompt_id is not None:
-            entries["promptlayer.prompt.id"] = str(prompt_id)
-
-        version = prompt_blueprint.get("version")
-        if version is not None:
-            entries["promptlayer.prompt.version"] = str(version)
-
-        if label is not None:
-            entries["promptlayer.prompt.label"] = label
+        entries = _prompt_span_attributes(prompt_blueprint, prompt_name, label=label)
 
         _active_prompt_template.set(entries)
 

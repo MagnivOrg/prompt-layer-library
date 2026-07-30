@@ -34,3 +34,17 @@ for Vertex AI use `anthropic`, and Google GenAI clients created with
 Omit `providers` to auto-instrument every supported provider SDK that is
 installed. Pass an empty iterable to configure trace export without provider
 SDK auto-instrumentation.
+
+## Tracing `PromptLayer.run()`
+
+Set the registry prompt name, adjust the example input variables if needed,
+then run:
+
+```bash
+export PROMPTLAYER_PROMPT_NAME="support-answer"
+python examples/tracing/trace_promptlayer_run.py
+```
+
+The trace contains a `PromptLayer Run` parent with sibling
+`Prompt template fetch` and provider LLM-call children. Provider
+auto-instrumentation requires Python 3.10 or newer.

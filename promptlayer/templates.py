@@ -2,7 +2,7 @@ import logging
 from typing import Optional, Union
 
 from promptlayer import exceptions as _exceptions
-from promptlayer.span_exporter import set_prompt_span_attributes
+from promptlayer.span_exporter import _set_prompt_fetch_cache_hit, set_prompt_span_attributes
 from promptlayer.template_cache import (
     PromptTemplateCache,
     is_locally_renderable,
@@ -64,16 +64,19 @@ class TemplateManager:
         label = _extract_label(params)
 
         if self._cache.is_non_renderable(cache_key):
+            _set_prompt_fetch_cache_hit(False)
             return self._fetch_normal(prompt_name, params)
 
         cached, is_fresh = self._cache.get(cache_key)
 
         if cached is not None and is_fresh:
+            _set_prompt_fetch_cache_hit(True)
             result = render_response(cached, input_variables)
             set_prompt_span_attributes(result, prompt_name, label=label)
             return result
 
         stale = cached
+        _set_prompt_fetch_cache_hit(False)
 
         cache_params = make_cache_params(params)
         try:
@@ -81,6 +84,7 @@ class TemplateManager:
         except _TRANSIENT_ERRORS:
             if stale is not None:
                 logger.debug("Transient API error, serving stale cache for '%s'", prompt_name)
+                _set_prompt_fetch_cache_hit(True)
                 result = render_response(stale, input_variables)
                 set_prompt_span_attributes(result, prompt_name, label=label)
                 return result
@@ -154,16 +158,19 @@ class AsyncTemplateManager:
         label = _extract_label(params)
 
         if self._cache.is_non_renderable(cache_key):
+            _set_prompt_fetch_cache_hit(False)
             return await self._afetch_normal(prompt_name, params)
 
         cached, is_fresh = self._cache.get(cache_key)
 
         if cached is not None and is_fresh:
+            _set_prompt_fetch_cache_hit(True)
             result = render_response(cached, input_variables)
             set_prompt_span_attributes(result, prompt_name, label=label)
             return result
 
         stale = cached
+        _set_prompt_fetch_cache_hit(False)
 
         cache_params = make_cache_params(params)
         try:
@@ -171,6 +178,7 @@ class AsyncTemplateManager:
         except _TRANSIENT_ERRORS:
             if stale is not None:
                 logger.debug("Transient API error, serving stale cache for '%s'", prompt_name)
+                _set_prompt_fetch_cache_hit(True)
                 result = render_response(stale, input_variables)
                 set_prompt_span_attributes(result, prompt_name, label=label)
                 return result

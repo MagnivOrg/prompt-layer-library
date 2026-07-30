@@ -53,13 +53,9 @@ def format_run_output(result: Any) -> str:
 
 
 def wrap_stream_with_span(stream: Generator, span) -> Generator:
-    final_chunk = None
     try:
         for chunk in stream:
-            final_chunk = chunk
             yield chunk
-        if final_chunk is not None:
-            span.set_attribute("function_output", format_run_output(final_chunk))
     except Exception as exc:
         span.record_exception(exc)
         raise
@@ -68,13 +64,9 @@ def wrap_stream_with_span(stream: Generator, span) -> Generator:
 
 
 async def awrap_stream_with_span(stream: AsyncGenerator, span) -> AsyncGenerator:
-    final_chunk = None
     try:
         async for chunk in stream:
-            final_chunk = chunk
             yield chunk
-        if final_chunk is not None:
-            span.set_attribute("function_output", format_run_output(final_chunk))
     except Exception as exc:
         span.record_exception(exc)
         raise

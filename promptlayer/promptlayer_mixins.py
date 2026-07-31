@@ -127,41 +127,41 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
     },
     "openrouter:chat": {
         "chat": {
-            "function_name": "openrouter:chat.send",
+            "function_name": "openrouter.chat.send",
             "stream_function": openrouter_stream_chat,
         },
         "completion": {
-            "function_name": "openrouter:chat.send",
+            "function_name": "openrouter.chat.send",
             "stream_function": openrouter_stream_chat,
         },
     },
     "openrouter:images": {
         "chat": {
-            "function_name": "openrouter:images.generate",
+            "function_name": "openrouter.images.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter:images.generate",
+            "function_name": "openrouter.images.generate",
             "stream_function": None,
         },
     },
     "openrouter:video": {
         "chat": {
-            "function_name": "openrouter:video_generation.generate",
+            "function_name": "openrouter.video_generation.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter:video_generation.generate",
+            "function_name": "openrouter.video_generation.generate",
             "stream_function": None,
         },
     },
     "openrouter:speech": {
         "chat": {
-            "function_name": "openrouter:tts.create_speech",
+            "function_name": "openrouter.tts.create_speech",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter:tts.create_speech",
+            "function_name": "openrouter.tts.create_speech",
             "stream_function": None,
         },
     },
@@ -285,41 +285,41 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
     },
     "openrouter:chat": {
         "chat": {
-            "function_name": "openrouter:chat.send",
+            "function_name": "openrouter.chat.send",
             "stream_function": aopenrouter_stream_chat,
         },
         "completion": {
-            "function_name": "openrouter:chat.send",
+            "function_name": "openrouter.chat.send",
             "stream_function": aopenrouter_stream_chat,
         },
     },
     "openrouter:images": {
         "chat": {
-            "function_name": "openrouter:images.generate",
+            "function_name": "openrouter.images.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter:images.generate",
+            "function_name": "openrouter.images.generate",
             "stream_function": None,
         },
     },
     "openrouter:video": {
         "chat": {
-            "function_name": "openrouter:video_generation.generate",
+            "function_name": "openrouter.video_generation.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter:video_generation.generate",
+            "function_name": "openrouter.video_generation.generate",
             "stream_function": None,
         },
     },
     "openrouter:speech": {
         "chat": {
-            "function_name": "openrouter:tts.create_speech",
+            "function_name": "openrouter.tts.create_speech",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter:tts.create_speech",
+            "function_name": "openrouter.tts.create_speech",
             "stream_function": None,
         },
     },

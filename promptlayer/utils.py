@@ -1916,6 +1916,265 @@ async def aazure_openai_request(
         return await client.responses.create(**function_kwargs)
 
 
+# Terminal states for an OpenRouter video generation job.
+_OPENROUTER_VIDEO_TERMINAL_STATES = {"completed", "failed", "cancelled", "expired"}
+
+
+def _enable_openrouter_usage_accounting(request):
+    """Inject ``usage: {include: true}`` into chat-completion request bodies.
+
+    OpenRouter only returns spend (``usage.cost``) on chat responses when usage
+    accounting is requested in the body, and the SDK's typed ``ChatRequest`` model
+    exposes no such field. Adding it here (right before the request goes on the
+    wire) makes cost available inline for both streaming and non-streaming chat,
+    with no extra round-trip. Best-effort: any failure leaves the request as-is.
+    """
+    try:
+        if not request.url.path.endswith("/chat/completions"):
+            return request
+        body = request.content
+        if not body:
+            return request
+        import json
+
+        data = json.loads(body)
+        if not isinstance(data, dict) or "usage" in data:
+            return request
+
+        data["usage"] = {"include": True}
+        new_body = json.dumps(data).encode("utf-8")
+
+        from httpx._content import ByteStream
+
+        request.stream = ByteStream(new_body)
+        request._content = new_body
+        request.headers["content-length"] = str(len(new_body))
+    except Exception:
+        return request
+    return request
+
+
+def _register_openrouter_usage_hook(client) -> None:
+    """Register the usage-accounting hook on an OpenRouter SDK client."""
+    try:
+        from openrouter._hooks.types import BeforeRequestHook
+
+        class _UsageAccountingHook(BeforeRequestHook):
+            def before_request(self, hook_ctx, request):
+                return _enable_openrouter_usage_accounting(request)
+
+        hooks = client.sdk_configuration.__dict__.get("_hooks")
+        if hooks is not None:
+            hooks.register_before_request_hook(_UsageAccountingHook())
+    except Exception:
+        pass
+
+
+def _get_openrouter_client(client_kwargs: dict, is_async: bool = False):
+    """Build (and cache) an OpenRouter SDK client."""
+    from openrouter import OpenRouter
+
+    api_key = client_kwargs.get("api_key") or os.environ.get("OPENROUTER_API_KEY")
+    base_url = client_kwargs.get("base_url")
+    cache_key = f"openrouter{'_async' if is_async else ''}:{api_key or ''}:{base_url or ''}"
+
+    def _factory():
+        sdk_kwargs: dict = {
+            "api_key": api_key,
+            # Bound the request time so slow media generation surfaces as a
+            # timeout instead of hanging forever. Override via OPENROUTER_TIMEOUT_MS.
+            "timeout_ms": int(os.environ.get("OPENROUTER_TIMEOUT_MS", 600_000)),
+        }
+        if base_url:
+            sdk_kwargs["server_url"] = base_url
+        client = OpenRouter(**sdk_kwargs)
+        _register_openrouter_usage_hook(client)
+        return client
+
+    return _get_cached_client(cache_key, _factory)
+
+
+def _filter_openrouter_kwargs(method, function_kwargs: dict) -> dict:
+    """Keep only params accepted by an OpenRouter SDK method (no ``**kwargs``)."""
+    import inspect
+
+    try:
+        accepted = set(inspect.signature(method).parameters)
+    except (TypeError, ValueError):
+        return dict(function_kwargs)
+    return {k: v for k, v in function_kwargs.items() if k in accepted}
+
+
+def _openrouter_to_dict(result) -> Any:
+    if hasattr(result, "model_dump"):
+        return result.model_dump()
+    if isinstance(result, dict):
+        return result
+    return dict(result)
+
+
+def _openrouter_video_result(job_dict: dict) -> dict:
+    urls = job_dict.get("unsigned_urls") or []
+    data = [{"url": url, "media_type": "video"} for url in urls if url]
+    return {
+        "id": job_dict.get("id"),
+        "status": job_dict.get("status"),
+        "error": job_dict.get("error"),
+        "generation_id": job_dict.get("generation_id"),
+        "data": data,
+        "usage": job_dict.get("usage"),
+    }
+
+
+def _run_openrouter_video_job(client, generate_kwargs: dict, max_wait_seconds: float = 300.0) -> dict:
+    """Submit an OpenRouter video job and poll ``get_generation`` until terminal."""
+    import time
+
+    job_dict = _openrouter_to_dict(client.video_generation.generate(**generate_kwargs))
+    job_id = job_dict.get("id")
+    status = job_dict.get("status")
+
+    deadline = time.monotonic() + max_wait_seconds
+    while status not in _OPENROUTER_VIDEO_TERMINAL_STATES and job_id:
+        if time.monotonic() >= deadline:
+            job_dict["status"] = status or "pending"
+            job_dict.setdefault("error", "Video generation timed out while polling for completion")
+            break
+        time.sleep(5.0)
+        job_dict = _openrouter_to_dict(client.video_generation.get_generation(job_id=job_id))
+        status = job_dict.get("status")
+
+    return _openrouter_video_result(job_dict)
+
+
+async def _arun_openrouter_video_job(client, generate_kwargs: dict, max_wait_seconds: float = 300.0) -> dict:
+    job_dict = _openrouter_to_dict(await client.video_generation.generate_async(**generate_kwargs))
+    job_id = job_dict.get("id")
+    status = job_dict.get("status")
+
+    deadline = asyncio.get_event_loop().time() + max_wait_seconds
+    while status not in _OPENROUTER_VIDEO_TERMINAL_STATES and job_id:
+        if asyncio.get_event_loop().time() >= deadline:
+            job_dict["status"] = status or "pending"
+            job_dict.setdefault("error", "Video generation timed out while polling for completion")
+            break
+        await asyncio.sleep(5.0)
+        job_dict = _openrouter_to_dict(await client.video_generation.get_generation_async(job_id=job_id))
+        status = job_dict.get("status")
+
+    return _openrouter_video_result(job_dict)
+
+
+def _read_openrouter_speech_bytes(response) -> bytes:
+    """Buffer an OpenRouter ``tts.create_speech`` streaming ``httpx.Response``.
+
+    ``create_speech`` returns a *streaming* response: accessing ``.content``
+    before ``.read()`` raises ``ResponseNotRead``, so read (buffer) the body
+    first, then fall back to ``.content``/raw bytes for other shapes.
+    """
+    if hasattr(response, "read"):
+        data = response.read()
+    elif hasattr(response, "content"):
+        data = response.content
+    else:
+        data = response
+    return data if isinstance(data, (bytes, bytearray)) else bytes(data or b"")
+
+
+def _openrouter_speech_result(audio_bytes: bytes, response_format: str) -> dict:
+    """Normalize speech audio into an OpenAI-images-like dict.
+
+    ``create_speech`` returns raw audio (no JSON body / usage). We base64-encode
+    the bytes so PromptLayer's inbound mapper / media display treat it like the
+    other OpenRouter media endpoints::
+
+        {"data": [{"b64_json": <base64>}], "output_format": "mp3", "usage": {}}
+    """
+    import base64
+
+    b64 = base64.b64encode(audio_bytes).decode("ascii")
+    return {
+        "id": None,
+        "data": [{"b64_json": b64}],
+        "output_format": (response_format or "mp3").lower(),
+        "usage": {},
+    }
+
+
+def _run_openrouter_speech_request(client, generate_kwargs: dict) -> dict:
+    """Synthesize speech via OpenRouter ``tts.create_speech`` and normalize it."""
+    response = client.tts.create_speech(**generate_kwargs)
+    audio_bytes = _read_openrouter_speech_bytes(response)
+    return _openrouter_speech_result(audio_bytes, generate_kwargs.get("response_format"))
+
+
+async def _arun_openrouter_speech_request(client, generate_kwargs: dict) -> dict:
+    response = await client.tts.create_speech_async(**generate_kwargs)
+    if hasattr(response, "aread"):
+        data = await response.aread()
+        audio_bytes = data if isinstance(data, (bytes, bytearray)) else bytes(data or b"")
+    else:
+        audio_bytes = _read_openrouter_speech_bytes(response)
+    return _openrouter_speech_result(audio_bytes, generate_kwargs.get("response_format"))
+
+
+def openrouter_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    client_kwargs: dict,
+    function_kwargs: dict,
+):
+    """Execute a request against the official OpenRouter SDK.
+
+    Chat routes through ``chat.send`` (streaming or not); image, video and
+    speech generation route through the dedicated ``images.generate``,
+    ``video_generation.generate`` (async polling job) and ``tts.create_speech``
+    endpoints.
+    """
+    client = _get_openrouter_client(client_kwargs)
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat"
+
+    if api_type == "images":
+        function_kwargs.pop("stream", None)
+        kwargs = _filter_openrouter_kwargs(client.images.generate, function_kwargs)
+        return _openrouter_to_dict(client.images.generate(**kwargs))
+    if api_type == "video":
+        function_kwargs.pop("stream", None)
+        kwargs = _filter_openrouter_kwargs(client.video_generation.generate, function_kwargs)
+        return _run_openrouter_video_job(client, kwargs)
+    if api_type == "speech":
+        function_kwargs.pop("stream", None)
+        kwargs = _filter_openrouter_kwargs(client.tts.create_speech, function_kwargs)
+        return _run_openrouter_speech_request(client, kwargs)
+
+    kwargs = _filter_openrouter_kwargs(client.chat.send, function_kwargs)
+    return client.chat.send(**kwargs)
+
+
+async def aopenrouter_request(
+    prompt_blueprint: GetPromptTemplateResponse,
+    client_kwargs: dict,
+    function_kwargs: dict,
+):
+    client = _get_openrouter_client(client_kwargs, is_async=True)
+    api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat"
+
+    if api_type == "images":
+        function_kwargs.pop("stream", None)
+        kwargs = _filter_openrouter_kwargs(client.images.generate_async, function_kwargs)
+        return _openrouter_to_dict(await client.images.generate_async(**kwargs))
+    if api_type == "video":
+        function_kwargs.pop("stream", None)
+        kwargs = _filter_openrouter_kwargs(client.video_generation.generate_async, function_kwargs)
+        return await _arun_openrouter_video_job(client, kwargs)
+    if api_type == "speech":
+        function_kwargs.pop("stream", None)
+        kwargs = _filter_openrouter_kwargs(client.tts.create_speech_async, function_kwargs)
+        return await _arun_openrouter_speech_request(client, kwargs)
+
+    kwargs = _filter_openrouter_kwargs(client.chat.send_async, function_kwargs)
+    return await client.chat.send_async(**kwargs)
+
+
 def anthropic_chat_request(client, **kwargs):
     return client.messages.create(**kwargs)
 

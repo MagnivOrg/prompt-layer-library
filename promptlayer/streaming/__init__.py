@@ -10,6 +10,7 @@ from .blueprint_builder import (
     build_prompt_blueprint_from_google_event,
     build_prompt_blueprint_from_openai_chunk,
     build_prompt_blueprint_from_openai_responses_event,
+    build_prompt_blueprint_from_openrouter_chunk,
 )
 from .response_handlers import (
     aanthropic_stream_completion,
@@ -24,6 +25,7 @@ from .response_handlers import (
     aopenai_responses_stream_chat,
     aopenai_stream_chat,
     aopenai_stream_completion,
+    aopenrouter_stream_chat,
     bedrock_stream_message,
     google_stream_chat,
     google_stream_completion,
@@ -32,6 +34,7 @@ from .response_handlers import (
     openai_responses_stream_chat,
     openai_stream_chat,
     openai_stream_completion,
+    openrouter_stream_chat,
 )
 from .stream_processor import (
     astream_response,
@@ -43,6 +46,7 @@ __all__ = [
     "build_prompt_blueprint_from_google_event",
     "build_prompt_blueprint_from_openai_chunk",
     "build_prompt_blueprint_from_openai_responses_event",
+    "build_prompt_blueprint_from_openrouter_chunk",
     "stream_response",
     "astream_response",
     "openai_stream_chat",
@@ -65,4 +69,6 @@ __all__ = [
     "amistral_stream_chat",
     "openai_images_stream",
     "aopenai_images_stream",
+    "openrouter_stream_chat",
+    "aopenrouter_stream_chat",
 ]

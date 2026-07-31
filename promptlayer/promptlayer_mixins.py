@@ -18,6 +18,7 @@ from promptlayer.streaming import (
     aopenai_responses_stream_chat,
     aopenai_stream_chat,
     aopenai_stream_completion,
+    aopenrouter_stream_chat,
     bedrock_stream_message,
     google_stream_chat,
     google_stream_completion,
@@ -26,6 +27,7 @@ from promptlayer.streaming import (
     openai_responses_stream_chat,
     openai_stream_chat,
     openai_stream_completion,
+    openrouter_stream_chat,
 )
 from promptlayer.tracing import _configure_openai_sdk_instrumentation, configure_tracing
 from promptlayer.tracing_context import resolve_tracer
@@ -40,11 +42,13 @@ from promptlayer.utils import (
     anthropic_bedrock_request,
     anthropic_request,
     aopenai_request,
+    aopenrouter_request,
     avertexai_request,
     azure_openai_request,
     google_request,
     mistral_request,
     openai_request,
+    openrouter_request,
     vertexai_request,
 )
 
@@ -121,6 +125,46 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": None,
         },
     },
+    "openrouter:chat": {
+        "chat": {
+            "function_name": "openrouter.chat.send",
+            "stream_function": openrouter_stream_chat,
+        },
+        "completion": {
+            "function_name": "openrouter.chat.send",
+            "stream_function": openrouter_stream_chat,
+        },
+    },
+    "openrouter:images": {
+        "chat": {
+            "function_name": "openrouter.images.generate",
+            "stream_function": None,
+        },
+        "completion": {
+            "function_name": "openrouter.images.generate",
+            "stream_function": None,
+        },
+    },
+    "openrouter:video": {
+        "chat": {
+            "function_name": "openrouter.video_generation.generate",
+            "stream_function": None,
+        },
+        "completion": {
+            "function_name": "openrouter.video_generation.generate",
+            "stream_function": None,
+        },
+    },
+    "openrouter:speech": {
+        "chat": {
+            "function_name": "openrouter.tts.create_speech",
+            "stream_function": None,
+        },
+        "completion": {
+            "function_name": "openrouter.tts.create_speech",
+            "stream_function": None,
+        },
+    },
     "google": {
         "chat": {
             "function_name": "google.convo.send_message",
@@ -159,6 +203,7 @@ MAP_PROVIDER_TO_FUNCTION = {
     "google": google_request,
     "mistral": mistral_request,
     "openai": openai_request,
+    "openrouter": openrouter_request,
     "openai.azure": azure_openai_request,
     "vertexai": vertexai_request,
     "amazon.bedrock": amazon_bedrock_request,
@@ -238,6 +283,46 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": None,
         },
     },
+    "openrouter:chat": {
+        "chat": {
+            "function_name": "openrouter.chat.send",
+            "stream_function": aopenrouter_stream_chat,
+        },
+        "completion": {
+            "function_name": "openrouter.chat.send",
+            "stream_function": aopenrouter_stream_chat,
+        },
+    },
+    "openrouter:images": {
+        "chat": {
+            "function_name": "openrouter.images.generate",
+            "stream_function": None,
+        },
+        "completion": {
+            "function_name": "openrouter.images.generate",
+            "stream_function": None,
+        },
+    },
+    "openrouter:video": {
+        "chat": {
+            "function_name": "openrouter.video_generation.generate",
+            "stream_function": None,
+        },
+        "completion": {
+            "function_name": "openrouter.video_generation.generate",
+            "stream_function": None,
+        },
+    },
+    "openrouter:speech": {
+        "chat": {
+            "function_name": "openrouter.tts.create_speech",
+            "stream_function": None,
+        },
+        "completion": {
+            "function_name": "openrouter.tts.create_speech",
+            "stream_function": None,
+        },
+    },
     "google": {
         "chat": {
             "function_name": "google.convo.send_message",
@@ -276,6 +361,7 @@ AMAP_PROVIDER_TO_FUNCTION = {
     "google": agoogle_request,
     "mistral": amistral_request,
     "openai": aopenai_request,
+    "openrouter": aopenrouter_request,
     "openai.azure": aazure_openai_request,
     "vertexai": avertexai_request,
     "amazon.bedrock": aamazon_bedrock_request,
@@ -370,6 +456,8 @@ class PromptLayerMixin:
         function_kwargs["stream"] = stream
         provider = prompt_blueprint_model["provider"]
         api_type = prompt_blueprint_model.get("api_type", "chat-completions")
+        if provider == "openrouter" and api_type not in ("images", "video", "speech"):
+            api_type = "chat"
 
         if custom_provider := prompt_blueprint.get("custom_provider"):
             provider = custom_provider["client"]
@@ -380,7 +468,10 @@ class PromptLayerMixin:
         elif provider_base_url := prompt_blueprint.get("provider_base_url"):
             client_kwargs["base_url"] = provider_base_url["url"]
 
-        if stream and provider in ["openai", "openai.azure"] and api_type == "chat-completions":
+        if stream and (
+            (provider in ["openai", "openai.azure"] and api_type == "chat-completions")
+            or (provider == "openrouter" and api_type == "chat")
+        ):
             function_kwargs["stream_options"] = {"include_usage": True}
 
         provider_function_name = provider
@@ -393,6 +484,9 @@ class PromptLayerMixin:
         if provider_function_name in ("openai", "openai.azure"):
             api = api_type if api_type is not None else "chat-completions"
             provider_function_name = f"{provider_function_name}:{api}"
+
+        if provider_function_name == "openrouter" and api_type in ("chat", "images", "video", "speech"):
+            provider_function_name = f"openrouter:{api_type}"
 
         if is_async:
             config = AMAP_PROVIDER_TO_FUNCTION_NAME[provider_function_name][prompt_template["type"]]

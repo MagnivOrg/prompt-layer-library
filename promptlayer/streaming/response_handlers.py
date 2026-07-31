@@ -155,6 +155,113 @@ async def aopenai_stream_chat(generator: AsyncIterable[Any]) -> Any:
     return response
 
 
+def _accumulate_openrouter_chunks(chunk_dicts: list) -> dict:
+    """Fold OpenRouter ``ChatStreamChunk`` dicts into an OpenAI chat.completion dict.
+
+    OpenRouter's streaming schema mirrors OpenAI (``choices[].delta`` with
+    ``content`` / ``tool_calls``) and additionally carries ``reasoning``,
+    ``reasoning_details``, ``refusal``, and ``audio`` on the delta. Those
+    OpenRouter-specific fields are preserved on the accumulated assistant
+    message so the backend inbound mapper / final blueprint can see them.
+    """
+    content = ""
+    reasoning = ""
+    refusal = ""
+    reasoning_details: list = []
+    audio = None
+    tool_calls: list = []
+    finish_reason = "stop"
+    last = chunk_dicts[-1] if chunk_dicts else {}
+    usage = None
+
+    for chunk in chunk_dicts:
+        # OpenRouter always includes full usage (tokens + cost) on the final
+        # chunk, but it can ride on a chunk that also carries a choice — so scan
+        # every chunk rather than assuming it's on the very last one.
+        if chunk.get("usage") is not None:
+            usage = chunk["usage"]
+        choices = chunk.get("choices") or []
+        if not choices:
+            continue
+        choice = choices[0]
+        if choice.get("finish_reason"):
+            finish_reason = choice["finish_reason"]
+        delta = choice.get("delta") or {}
+        if delta.get("content"):
+            content = f"{content}{delta['content']}"
+        if delta.get("reasoning"):
+            reasoning = f"{reasoning}{delta['reasoning']}"
+        if delta.get("refusal"):
+            refusal = f"{refusal}{delta['refusal']}"
+        if delta.get("reasoning_details"):
+            reasoning_details.extend(delta["reasoning_details"] or [])
+        if delta.get("audio"):
+            # Audio payloads are typically complete on a single delta; keep the
+            # latest non-empty one (and prefer ones that include data).
+            next_audio = delta["audio"]
+            if audio is None or (isinstance(next_audio, dict) and next_audio.get("data")):
+                audio = next_audio
+        for tool_call in delta.get("tool_calls") or []:
+            function = tool_call.get("function") or {}
+            if not tool_calls or tool_call.get("id"):
+                tool_calls.append(
+                    {
+                        "id": tool_call.get("id") or "",
+                        "type": tool_call.get("type") or "function",
+                        "function": {
+                            "name": function.get("name") or "",
+                            "arguments": function.get("arguments") or "",
+                        },
+                    }
+                )
+            else:
+                tool_calls[-1]["function"]["name"] += function.get("name") or ""
+                tool_calls[-1]["function"]["arguments"] += function.get("arguments") or ""
+
+    message: dict = {"role": "assistant", "content": content}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
+    if reasoning:
+        message["reasoning"] = reasoning
+    if reasoning_details:
+        message["reasoning_details"] = reasoning_details
+    if refusal:
+        message["refusal"] = refusal
+    if audio is not None:
+        message["audio"] = audio
+
+    return {
+        "id": last.get("id", ""),
+        "object": "chat.completion",
+        "created": last.get("created", 0),
+        "model": last.get("model", ""),
+        "system_fingerprint": last.get("system_fingerprint"),
+        "usage": usage,
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": finish_reason,
+                "logprobs": None,
+                "message": message,
+            }
+        ],
+    }
+
+
+def openrouter_stream_chat(results: list):
+    """Process OpenRouter streaming chat chunks into an OpenAI-shaped dict."""
+    chunk_dicts = [chunk.model_dump() if hasattr(chunk, "model_dump") else chunk for chunk in results]
+    return _accumulate_openrouter_chunks(chunk_dicts)
+
+
+async def aopenrouter_stream_chat(generator: AsyncIterable[Any]) -> Any:
+    """Async version of openrouter_stream_chat."""
+    chunk_dicts = []
+    async for chunk in generator:
+        chunk_dicts.append(chunk.model_dump() if hasattr(chunk, "model_dump") else chunk)
+    return _accumulate_openrouter_chunks(chunk_dicts)
+
+
 def _initialize_openai_response_data():
     """Initialize the response data structure for OpenAI responses"""
     return {

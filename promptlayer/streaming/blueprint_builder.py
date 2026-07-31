@@ -145,6 +145,39 @@ def _thinking_items_from_openrouter_reasoning_details(details: Any) -> List[Dict
     return items
 
 
+_AUDIO_FORMAT_TO_MIME = {
+    "mp3": "audio/mpeg",
+    "mpeg": "audio/mpeg",
+    "pcm": "audio/pcm",
+    "wav": "audio/wav",
+    "opus": "audio/opus",
+    "flac": "audio/flac",
+    "aac": "audio/aac",
+}
+
+
+def _resolve_openrouter_audio_mime(audio: Any, data: Any) -> str:
+    """Resolve audio mime from a data URI or format fields (fallback: audio/mpeg)."""
+    if isinstance(data, str) and data.startswith("data:") and ";base64," in data:
+        header = data[5:].split(";base64,", 1)[0].strip()
+        if header:
+            return header
+
+    if isinstance(audio, dict):
+        fmt = audio.get("format") or audio.get("output_format") or audio.get("response_format")
+    else:
+        fmt = (
+            getattr(audio, "format", None)
+            or getattr(audio, "output_format", None)
+            or getattr(audio, "response_format", None)
+        )
+    if isinstance(fmt, str) and fmt:
+        if "/" in fmt:
+            return fmt
+        return _AUDIO_FORMAT_TO_MIME.get(fmt.lower(), "audio/mpeg")
+    return "audio/mpeg"
+
+
 def _openrouter_audio_to_content(audio: Any) -> List[Dict[str, Any]]:
     """Map OpenRouter ``ChatAudioOutput`` onto ``output_media`` (+ optional transcript text)."""
     items: List[Dict[str, Any]] = []
@@ -163,7 +196,8 @@ def _openrouter_audio_to_content(audio: Any) -> List[Dict[str, Any]]:
         expires_at = getattr(audio, "expires_at", None)
 
     if data:
-        url = data if isinstance(data, str) and data.startswith("data:") else f"data:audio/mpeg;base64,{data}"
+        mime_type = _resolve_openrouter_audio_mime(audio, data)
+        url = data if isinstance(data, str) and data.startswith("data:") else f"data:{mime_type};base64,{data}"
         provider_metadata = {}
         if audio_id is not None:
             provider_metadata["id"] = audio_id
@@ -175,7 +209,7 @@ def _openrouter_audio_to_content(audio: Any) -> List[Dict[str, Any]]:
             _create_content_item(
                 "output_media",
                 url=url,
-                mime_type="audio/mpeg",
+                mime_type=mime_type,
                 media_type="audio",
                 provider_metadata=provider_metadata or None,
             )

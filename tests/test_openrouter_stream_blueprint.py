@@ -152,6 +152,22 @@ def test_openrouter_chunk_maps_audio_to_output_media():
     assert media[0]["provider_metadata"]["transcript"] == "hello"
 
 
+def test_openrouter_chunk_audio_mime_from_format():
+    chunk = _Chunk([_Choice(_Delta(audio={"data": "QUJD", "format": "wav"}))])
+    bp = build_prompt_blueprint_from_openrouter_chunk(chunk, METADATA)
+    media = _content_of_type(bp, "output_media")
+    assert media[0]["mime_type"] == "audio/wav"
+    assert media[0]["url"].startswith("data:audio/wav;base64,")
+
+
+def test_openrouter_chunk_audio_mime_from_data_uri():
+    chunk = _Chunk([_Choice(_Delta(audio={"data": "data:audio/ogg;base64,QUJD"}))])
+    bp = build_prompt_blueprint_from_openrouter_chunk(chunk, METADATA)
+    media = _content_of_type(bp, "output_media")
+    assert media[0]["mime_type"] == "audio/ogg"
+    assert media[0]["url"] == "data:audio/ogg;base64,QUJD"
+
+
 def test_stream_processor_routes_openrouter_to_dedicated_builder():
     chunk = _Chunk([_Choice(_Delta(reasoning="think", content="answer"))])
     bp = _build_stream_blueprint(chunk, METADATA)

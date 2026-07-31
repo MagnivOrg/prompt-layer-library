@@ -125,43 +125,43 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": None,
         },
     },
-    "openrouter": {
+    "openrouter:chat": {
         "chat": {
-            "function_name": "openrouter.chat.send",
+            "function_name": "openrouter:chat.send",
             "stream_function": openrouter_stream_chat,
         },
         "completion": {
-            "function_name": "openrouter.chat.send",
+            "function_name": "openrouter:chat.send",
             "stream_function": openrouter_stream_chat,
         },
     },
     "openrouter:images": {
         "chat": {
-            "function_name": "openrouter.images.generate",
+            "function_name": "openrouter:images.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter.images.generate",
+            "function_name": "openrouter:images.generate",
             "stream_function": None,
         },
     },
     "openrouter:video": {
         "chat": {
-            "function_name": "openrouter.video_generation.generate",
+            "function_name": "openrouter:video_generation.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter.video_generation.generate",
+            "function_name": "openrouter:video_generation.generate",
             "stream_function": None,
         },
     },
     "openrouter:speech": {
         "chat": {
-            "function_name": "openrouter.tts.create_speech",
+            "function_name": "openrouter:tts.create_speech",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter.tts.create_speech",
+            "function_name": "openrouter:tts.create_speech",
             "stream_function": None,
         },
     },
@@ -283,43 +283,43 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": None,
         },
     },
-    "openrouter": {
+    "openrouter:chat": {
         "chat": {
-            "function_name": "openrouter.chat.send",
+            "function_name": "openrouter:chat.send",
             "stream_function": aopenrouter_stream_chat,
         },
         "completion": {
-            "function_name": "openrouter.chat.send",
+            "function_name": "openrouter:chat.send",
             "stream_function": aopenrouter_stream_chat,
         },
     },
     "openrouter:images": {
         "chat": {
-            "function_name": "openrouter.images.generate",
+            "function_name": "openrouter:images.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter.images.generate",
+            "function_name": "openrouter:images.generate",
             "stream_function": None,
         },
     },
     "openrouter:video": {
         "chat": {
-            "function_name": "openrouter.video_generation.generate",
+            "function_name": "openrouter:video_generation.generate",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter.video_generation.generate",
+            "function_name": "openrouter:video_generation.generate",
             "stream_function": None,
         },
     },
     "openrouter:speech": {
         "chat": {
-            "function_name": "openrouter.tts.create_speech",
+            "function_name": "openrouter:tts.create_speech",
             "stream_function": None,
         },
         "completion": {
-            "function_name": "openrouter.tts.create_speech",
+            "function_name": "openrouter:tts.create_speech",
             "stream_function": None,
         },
     },
@@ -456,6 +456,8 @@ class PromptLayerMixin:
         function_kwargs["stream"] = stream
         provider = prompt_blueprint_model["provider"]
         api_type = prompt_blueprint_model.get("api_type", "chat-completions")
+        if provider == "openrouter" and api_type not in ("images", "video", "speech"):
+            api_type = "chat"
 
         if custom_provider := prompt_blueprint.get("custom_provider"):
             provider = custom_provider["client"]
@@ -468,7 +470,7 @@ class PromptLayerMixin:
 
         if stream and (
             (provider in ["openai", "openai.azure"] and api_type == "chat-completions")
-            or (provider == "openrouter" and api_type in ("chat", "chat-completions", None))
+            or (provider == "openrouter" and api_type == "chat")
         ):
             function_kwargs["stream_options"] = {"include_usage": True}
 
@@ -483,9 +485,7 @@ class PromptLayerMixin:
             api = api_type if api_type is not None else "chat-completions"
             provider_function_name = f"{provider_function_name}:{api}"
 
-        # OpenRouter routes chat to the base key; image/video/speech generation
-        # use the dedicated OpenRouter SDK endpoints keyed by api_type.
-        if provider_function_name == "openrouter" and api_type in ("images", "video", "speech"):
+        if provider_function_name == "openrouter" and api_type in ("chat", "images", "video", "speech"):
             provider_function_name = f"openrouter:{api_type}"
 
         if is_async:

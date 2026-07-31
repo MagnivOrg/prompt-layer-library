@@ -7,6 +7,7 @@ from .blueprint_builder import (
     build_prompt_blueprint_from_openai_chunk,
     build_prompt_blueprint_from_openai_images_event,
     build_prompt_blueprint_from_openai_responses_event,
+    build_prompt_blueprint_from_openrouter_chunk,
 )
 
 
@@ -33,6 +34,10 @@ def _build_stream_blueprint(result: Any, metadata: Dict) -> Any:
 
     elif provider == "mistral":
         return build_prompt_blueprint_from_openai_chunk(result.data, metadata)
+
+    elif provider == "openrouter":
+        # OpenRouter chat stream chunks mirror OpenAI, plus reasoning / refusal / audio.
+        return build_prompt_blueprint_from_openrouter_chunk(result, metadata)
 
     elif provider == "amazon.bedrock":
         return build_prompt_blueprint_from_bedrock_event(result, metadata)

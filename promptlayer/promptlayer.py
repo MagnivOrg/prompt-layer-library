@@ -52,6 +52,7 @@ _AUTO_INSTRUMENTED_RUN_PROVIDERS = frozenset(
         "openai",
         "openai.azure",
         "anthropic",
+        "amazon.bedrock",
         "google",
         "vertexai",
     }

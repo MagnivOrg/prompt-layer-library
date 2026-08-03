@@ -6,7 +6,7 @@ with PromptLayer.
 Install the tracing extra and the provider SDKs you use:
 
 ```bash
-pip install "promptlayer[otel-genai-instrumentation]" openai anthropic google-genai
+pip install "promptlayer[otel-genai-instrumentation]" openai anthropic google-genai boto3
 ```
 
 Set `PROMPTLAYER_API_KEY` and the provider's standard API-key environment
@@ -16,6 +16,7 @@ variable, then run its example:
 python examples/tracing/trace_openai.py
 python examples/tracing/trace_anthropic.py
 python examples/tracing/trace_google_genai.py
+python examples/tracing/trace_bedrock.py
 ```
 
 Each example configures its provider before making a normal SDK request:
@@ -26,10 +27,12 @@ from promptlayer import configure_tracing
 tracer_provider = configure_tracing(providers=("openai",))
 ```
 
-Supported selectors are `openai`, `anthropic`, and `google`. The
+Supported selectors are `openai`, `anthropic`, `google`, and `bedrock`. The
 `openai.azure` alias uses the OpenAI instrumentor. Anthropic clients configured
 for Vertex AI use `anthropic`, and Google GenAI clients created with
-`vertexai=True` use `google`.
+`vertexai=True` use `google`. The `amazon.bedrock` and `aws.bedrock` aliases use
+the Botocore instrumentor, which also traces other Botocore service calls made
+by the process.
 
 Omit `providers` to auto-instrument every supported provider SDK that is
 installed. Pass an empty iterable to configure trace export without provider
@@ -48,3 +51,8 @@ python examples/tracing/trace_promptlayer_run.py
 The trace contains a `PromptLayer Run` parent with sibling
 `Prompt template fetch` and provider LLM-call children. Provider
 auto-instrumentation requires Python 3.10 or newer.
+
+OpenTelemetry excludes message bodies by default. Set
+`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY` before tracing
+when PromptLayer should receive prompt and response content. The Bedrock
+example enables this explicitly.

@@ -99,7 +99,7 @@ def test_configure_tracing_instruments_anthropic_and_google_once(monkeypatch):
 
     assert first is provider
     assert second is provider
-    assert tracing.NATIVE_OTEL_PROVIDERS == ("openai", "anthropic", "google")
+    assert tracing.NATIVE_OTEL_PROVIDERS == ("openai", "anthropic", "google", "bedrock")
     assert len(provider.processors) == 2
     assert isinstance(provider.processors[0], GenAIPromptTemplateSpanProcessor)
     assert len(exporter_calls) == 1
@@ -118,8 +118,14 @@ def test_configure_tracing_instruments_every_installed_provider_by_default(monke
     )
 
     assert configured_provider is provider
-    for instrumentor in instrumentors.values():
-        instrumentor.instrument.assert_called_once_with(tracer_provider=provider)
+    for provider_name, instrumentor in instrumentors.items():
+        expected_kwargs = {"tracer_provider": provider}
+        if provider_name == "bedrock":
+            expected_kwargs.update(
+                request_hook=tracing.bedrock_request_hook,
+                response_hook=tracing.bedrock_response_hook,
+            )
+        instrumentor.instrument.assert_called_once_with(**expected_kwargs)
 
 
 def test_configure_sdk_instrumentation_respects_provider_selection(monkeypatch):
@@ -133,6 +139,26 @@ def test_configure_sdk_instrumentation_respects_provider_selection(monkeypatch):
 
     instrumentors["anthropic"].instrument.assert_called_once_with(tracer_provider=provider)
     instrumentors["google"].instrument.assert_not_called()
+
+
+@pytest.mark.parametrize("provider_name", ["bedrock", "amazon.bedrock", "aws.bedrock"])
+def test_configure_tracing_accepts_bedrock_provider_aliases(monkeypatch, provider_name):
+    provider = _FakeTracerProvider()
+    instrumentor = _install_fake_instrumentors(monkeypatch, ("bedrock",))["bedrock"]
+    _capture_otlp_exporters(monkeypatch)
+
+    configured_provider = tracing.configure_tracing(
+        api_key="pl_test",
+        tracer_provider=provider,
+        providers=(provider_name,),
+    )
+
+    assert configured_provider is provider
+    instrumentor.instrument.assert_called_once_with(
+        tracer_provider=provider,
+        request_hook=tracing.bedrock_request_hook,
+        response_hook=tracing.bedrock_response_hook,
+    )
 
 
 def test_implicit_instrumentation_failure_does_not_break_tracing_setup(monkeypatch):
@@ -196,6 +222,7 @@ def test_responses_enrichment_failure_does_not_escape_provider_hook(monkeypatch)
     [
         ("anthropic", "Anthropic"),
         ("google", "Google GenAI"),
+        ("bedrock", "AWS Bedrock"),
     ],
 )
 def test_explicit_provider_dependency_failure_does_not_mutate_provider(
@@ -221,6 +248,7 @@ def test_explicit_provider_dependency_failure_does_not_mutate_provider(
     [
         "openai",
         "anthropic",
+        "aws.bedrock",
         "gemini",
         "vertex_ai",
         "gcp.gemini",
@@ -284,6 +312,7 @@ def test_genai_prompt_processor_enriches_supported_provider_spans(provider_name)
         ("vertex_ai", "generate_content", "aiplatform.googleapis.com", "vertexai", "generate-content"),
         ("gemini", "interactions.create", "generativelanguage.googleapis.com", "google", "interactions"),
         ("gcp.gemini", "embeddings", "generativelanguage.googleapis.com", "google", "embeddings"),
+        ("aws.bedrock", "chat", "bedrock-runtime.us-east-1.amazonaws.com", "amazon.bedrock", None),
     ],
 )
 def test_genai_prompt_processor_sets_canonical_provider_and_api(
@@ -311,7 +340,50 @@ def test_genai_prompt_processor_sets_canonical_provider_and_api(
 
     attributes = dict(exporter.get_finished_spans()[0].attributes)
     assert attributes["promptlayer.provider.type"] == expected_provider
+    if expected_api is None:
+        assert "promptlayer.api.type" not in attributes
+    else:
+        assert attributes["promptlayer.api.type"] == expected_api
+    provider.shutdown()
+
+
+@pytest.mark.parametrize(
+    ("rpc_method", "expected_api"),
+    [
+        ("Converse", "converse"),
+        ("ConverseStream", "converse"),
+        ("InvokeModel", "invoke-model"),
+        ("InvokeModelWithResponseStream", "invoke-model"),
+    ],
+)
+def test_genai_prompt_processor_enriches_botocore_bedrock_span(rpc_method, expected_api):
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(GenAIPromptTemplateSpanProcessor())
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("opentelemetry.instrumentation.botocore.bedrock-runtime")
+
+    set_prompt_span_attributes(
+        {"id": 42, "version": 3},
+        "support-answer",
+        label="production",
+    )
+    with tracer.start_as_current_span(
+        "Bedrock Runtime request",
+        attributes={
+            "gen_ai.system": "aws.bedrock",
+            "gen_ai.operation.name": "chat",
+            "rpc.method": rpc_method,
+        },
+    ):
+        pass
+
+    attributes = dict(exporter.get_finished_spans()[0].attributes)
+    assert attributes["gen_ai.provider.name"] == "aws.bedrock"
+    assert attributes["promptlayer.provider.type"] == "amazon.bedrock"
     assert attributes["promptlayer.api.type"] == expected_api
+    assert attributes["promptlayer.prompt.name"] == "support-answer"
+    assert attributes["node_type"] == "LLM_CALL"
     provider.shutdown()
 
 

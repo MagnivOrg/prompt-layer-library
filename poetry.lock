@@ -1805,6 +1805,29 @@ packaging = ">=18.0"
 wrapt = ">=1.0.0,<3.0.0"
 
 [[package]]
+name = "opentelemetry-instrumentation-botocore"
+version = "0.65b0"
+description = "OpenTelemetry Botocore instrumentation"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"otel-genai-instrumentation\" and python_version >= \"3.10\""
+files = [
+    {file = "opentelemetry_instrumentation_botocore-0.65b0-py3-none-any.whl", hash = "sha256:a5e80b9423f8369c9bbc27a64b31f02cc44218633028ad8d1ace0a2a7fc8f4cd"},
+    {file = "opentelemetry_instrumentation_botocore-0.65b0.tar.gz", hash = "sha256:64987326ac98a47a85821606a981f5058864de0e98b43c8de892eb0fe625b04e"},
+]
+
+[package.dependencies]
+opentelemetry-api = ">=1.37,<2.0"
+opentelemetry-instrumentation = "0.65b0"
+opentelemetry-propagator-aws-xray = ">=1.0,<2.0"
+opentelemetry-semantic-conventions = "0.65b0"
+wrapt = ">=1.0.0,<3.0.0"
+
+[package.extras]
+instruments-any = ["aiobotocore (>=2.0,<4.0)", "botocore (>=1.0,<2.0)"]
+
+[[package]]
 name = "opentelemetry-instrumentation-genai-anthropic"
 version = "1.0b0"
 description = "OpenTelemetry Anthropic instrumentation"
@@ -1887,6 +1910,22 @@ files = [
 opentelemetry-api = ">=1.5,<2.0"
 opentelemetry-sdk = ">=1.5,<2.0"
 wrapt = ">=1.0.0,<2.0.0"
+
+[[package]]
+name = "opentelemetry-propagator-aws-xray"
+version = "1.0.2"
+description = "AWS X-Ray Propagator for OpenTelemetry"
+optional = true
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "extra == \"otel-genai-instrumentation\" and python_version >= \"3.10\""
+files = [
+    {file = "opentelemetry_propagator_aws_xray-1.0.2-py3-none-any.whl", hash = "sha256:1c99181ee228e99bddb638a0c911a297fa21f1c3a0af951f841e79919b5f1934"},
+    {file = "opentelemetry_propagator_aws_xray-1.0.2.tar.gz", hash = "sha256:6b2cee5479d2ef0172307b66ed2ed151f598a0fd29b3c01133ac87ca06326260"},
+]
+
+[package.dependencies]
+opentelemetry-api = ">=1.12,<2.0"
 
 [[package]]
 name = "opentelemetry-proto"
@@ -3435,9 +3474,9 @@ test = ["big-O", "importlib-resources ; python_version < \"3.9\"", "jaraco.funct
 [extras]
 claude-agents = ["claude-agent-sdk"]
 openai-agents = ["eval-type-backport", "openai-agents"]
-otel-genai-instrumentation = ["opentelemetry-instrumentation-genai-anthropic", "opentelemetry-instrumentation-genai-openai", "opentelemetry-instrumentation-google-genai"]
+otel-genai-instrumentation = ["opentelemetry-instrumentation-botocore", "opentelemetry-instrumentation-genai-anthropic", "opentelemetry-instrumentation-genai-openai", "opentelemetry-instrumentation-google-genai"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "ef811114d9433e0c7b69fd271d0e287b5ec4982445ade6e05596c1094dbdbd00"
+content-hash = "38b1f69478aafea91107f4707b11af35af122db85a12b6a632f33ad43c81ba04"

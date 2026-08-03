@@ -102,7 +102,7 @@ response = openai.chat.completions.create(
 `PromptLayer(...)` and `AsyncPromptLayer(...)` accept these parameters:
 
 - `api_key: str | None = None`: Your PromptLayer API key. If omitted, the SDK looks for `PROMPTLAYER_API_KEY`.
-- `enable_tracing: bool = False`: Enables OpenTelemetry tracing export to PromptLayer and auto-instruments installed OpenAI, Anthropic, and Google GenAI SDKs when the tracing extra is installed.
+- `enable_tracing: bool = False`: Enables OpenTelemetry tracing export to PromptLayer and auto-instruments installed OpenAI, Anthropic, Google GenAI, and AWS Bedrock SDKs when the tracing extra is installed.
 - `base_url: str | None = None`: Overrides the PromptLayer API base URL. If omitted, the SDK uses `PROMPTLAYER_BASE_URL` or the default API URL.
 - `throw_on_error: bool = True`: Controls whether SDK methods raise PromptLayer exceptions or return `None` for many API errors.
 - `cache_ttl_seconds: int = 0`: Enables in-memory prompt-template caching when greater than `0`.
@@ -145,7 +145,7 @@ Note: When tracing is enabled, spans are exported to PromptLayer using OpenTelem
 Install the tracing extra and the provider SDKs used by your application:
 
 ```bash
-pip install "promptlayer[otel-genai-instrumentation]" openai anthropic google-genai
+pip install "promptlayer[otel-genai-instrumentation]" openai anthropic google-genai boto3
 ```
 
 The extra includes the official OpenTelemetry instrumentors for:
@@ -155,6 +155,7 @@ The extra includes the official OpenTelemetry instrumentors for:
 | OpenAI and Azure OpenAI | Chat Completions, structured-output parsing, Embeddings, and Responses; sync, async, and streaming |
 | Anthropic and Anthropic Vertex | Messages create, parse, and stream; sync and async |
 | Google GenAI | Generate Content, streaming Generate Content, Embeddings, and supported Interactions releases; Gemini Developer API and Vertex AI modes |
+| AWS Bedrock | Botocore Bedrock Runtime Converse and InvokeModel APIs, including streaming |
 
 `PromptLayer(enable_tracing=True)` auto-instruments every supported provider SDK
 that is installed:
@@ -181,12 +182,25 @@ created with `vertexai=True`:
 from promptlayer import configure_tracing
 
 tracer_provider = configure_tracing(
-    providers=("openai", "anthropic", "google"),
+    providers=("openai", "anthropic", "google", "bedrock"),
 )
 ```
 
 The `openai.azure` provider alias selects the underlying OpenAI SDK
-instrumentor.
+instrumentor. The `amazon.bedrock` and `aws.bedrock` aliases select the
+Botocore instrumentor. Because Botocore instrumentation operates at the AWS
+SDK layer, selecting Bedrock also traces other Botocore service calls made by
+the process.
+
+Message bodies are excluded by OpenTelemetry by default. To include prompts
+and responses on PromptLayer request logs, opt in before configuring tracing:
+
+```bash
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY
+```
+
+Only enable content capture where sending request and response bodies to your
+configured trace destination is appropriate.
 
 Applications that only use the direct OpenAI SDK can continue to use the
 OpenAI-specific convenience API:

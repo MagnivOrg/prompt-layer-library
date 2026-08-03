@@ -460,6 +460,7 @@ def _configure_run_test_client(
     ("promptlayer_provider", "span_provider"),
     [
         ("anthropic", "anthropic"),
+        ("amazon.bedrock", "aws.bedrock"),
         ("google", "gcp.gemini"),
         ("vertexai", "gcp.vertex_ai"),
     ],

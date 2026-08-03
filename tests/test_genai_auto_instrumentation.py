@@ -1,3 +1,4 @@
+import json
 import os
 from weakref import WeakKeyDictionary
 
@@ -255,6 +256,90 @@ def test_anthropic_messages_api_emits_enriched_span(monkeypatch):
         _assert_prompt_attributes(spans[0])
     finally:
         client.close()
+        instrumentor.uninstrument()
+        provider.shutdown()
+
+
+def test_bedrock_converse_emits_enriched_span(monkeypatch):
+    boto3 = pytest.importorskip("boto3")
+    botocore_stub = pytest.importorskip("botocore.stub")
+    instrumentation = pytest.importorskip("opentelemetry.instrumentation.botocore")
+    instrumentor = instrumentation.BotocoreInstrumentor()
+    if instrumentor.is_instrumented_by_opentelemetry:
+        pytest.skip("Botocore SDK is already instrumented by this test process")
+
+    monkeypatch.setenv("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "SPAN_ONLY")
+    provider, exporter = _configure_in_memory_export(monkeypatch, "bedrock")
+    client = boto3.client(
+        "bedrock-runtime",
+        region_name="us-east-1",
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
+    )
+    request = {
+        "modelId": "global.anthropic.claude-sonnet-5",
+        "messages": [
+            {
+                "role": "user",
+                "content": [{"text": "Say hello."}],
+            }
+        ],
+        "inferenceConfig": {"maxTokens": 32},
+    }
+    response = {
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"text": "Hello."}],
+            }
+        },
+        "stopReason": "end_turn",
+        "usage": {
+            "inputTokens": 2,
+            "outputTokens": 1,
+            "totalTokens": 3,
+        },
+        "metrics": {"latencyMs": 1},
+        "ResponseMetadata": {
+            "RequestId": "bedrock-test-request",
+            "HTTPStatusCode": 200,
+            "HTTPHeaders": {},
+            "RetryAttempts": 0,
+        },
+    }
+
+    try:
+        _set_test_prompt()
+        with botocore_stub.Stubber(client) as stubber:
+            stubber.add_response("converse", response, request)
+            result = client.converse(**request)
+
+        spans = exporter.get_finished_spans()
+        assert result["output"]["message"]["content"][0]["text"] == "Hello."
+        assert len(spans) == 1
+        assert spans[0].name == "chat global.anthropic.claude-sonnet-5"
+        assert spans[0].attributes["gen_ai.provider.name"] == "aws.bedrock"
+        assert spans[0].attributes["gen_ai.operation.name"] == "chat"
+        assert spans[0].attributes["gen_ai.usage.input_tokens"] == 2
+        assert spans[0].attributes["gen_ai.usage.output_tokens"] == 1
+        assert json.loads(spans[0].attributes["gen_ai.input.messages"]) == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "Say hello."}],
+            }
+        ]
+        assert json.loads(spans[0].attributes["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "Hello."}],
+                "finish_reason": "end_turn",
+            }
+        ]
+        assert spans[0].attributes["promptlayer.provider.type"] == "amazon.bedrock"
+        assert spans[0].attributes["promptlayer.api.type"] == "converse"
+        assert spans[0].attributes["node_type"] == "LLM_CALL"
+        _assert_prompt_attributes(spans[0])
+    finally:
         instrumentor.uninstrument()
         provider.shutdown()
 

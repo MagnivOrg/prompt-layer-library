@@ -17,6 +17,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
+from promptlayer.integrations.bedrock import bedrock_request_hook, bedrock_response_hook
 from promptlayer.span_exporter import (
     _PROMPTLAYER_API_TYPE,
     GenAIPromptTemplateSpanProcessor,
@@ -53,12 +54,20 @@ _PROVIDER_INSTRUMENTATIONS = {
         instrumentor_class="GoogleGenAiSdkInstrumentor",
         display_name="Google GenAI",
     ),
+    "bedrock": _ProviderInstrumentation(
+        sdk_module="boto3",
+        instrumentation_module="opentelemetry.instrumentation.botocore",
+        instrumentor_class="BotocoreInstrumentor",
+        display_name="AWS Bedrock",
+    ),
 }
 
 NATIVE_OTEL_PROVIDERS = tuple(_PROVIDER_INSTRUMENTATIONS)
 
 _PROVIDER_ALIASES = {
     "openai.azure": "openai",
+    "amazon.bedrock": "bedrock",
+    "aws.bedrock": "bedrock",
 }
 _exporter_settings: weakref.WeakKeyDictionary[Any, Tuple[str, str]] = weakref.WeakKeyDictionary()
 _prompt_processor_providers: weakref.WeakKeyDictionary[Any, GenAIPromptTemplateSpanProcessor] = (
@@ -232,7 +241,13 @@ def _instrument_provider(
     config = _PROVIDER_INSTRUMENTATIONS[provider_name]
     if not instrumentor.is_instrumented_by_opentelemetry:
         try:
-            instrumentor.instrument(tracer_provider=tracer_provider)
+            instrument_kwargs = {"tracer_provider": tracer_provider}
+            if provider_name == "bedrock":
+                instrument_kwargs.update(
+                    request_hook=bedrock_request_hook,
+                    response_hook=bedrock_response_hook,
+                )
+            instrumentor.instrument(**instrument_kwargs)
         except Exception:
             if explicit:
                 raise

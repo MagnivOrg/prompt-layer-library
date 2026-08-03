@@ -18,10 +18,12 @@ _BAGGAGE_KEYS = (
 )
 _LEGACY_OPENAI_INSTRUMENTATION_SCOPE = "opentelemetry.instrumentation.openai_v2"
 _GENAI_HANDLER_SCOPE = "opentelemetry.util.genai.handler"
+_BOTOCORE_BEDROCK_SCOPE = "opentelemetry.instrumentation.botocore.bedrock-runtime"
 _SUPPORTED_GENAI_PROVIDER_NAMES = frozenset(
     {
         "openai",
         "anthropic",
+        "aws.bedrock",
         "gemini",
         "vertex_ai",
         "gcp.gemini",
@@ -95,15 +97,22 @@ class GenAIPromptTemplateSpanProcessor(SpanProcessor):
         scope_name = getattr(instrumentation_scope, "name", "")
         attributes = getattr(span, "attributes", {}) or {}
         is_legacy_openai_span = scope_name == _LEGACY_OPENAI_INSTRUMENTATION_SCOPE
-        is_supported_genai_span = scope_name == _GENAI_HANDLER_SCOPE and (
-            attributes.get("gen_ai.provider.name") in _SUPPORTED_GENAI_PROVIDER_NAMES
+        is_botocore_bedrock_span = scope_name == _BOTOCORE_BEDROCK_SCOPE and (
+            attributes.get("gen_ai.system") == "aws.bedrock"
         )
-        if not is_legacy_openai_span and not is_supported_genai_span:
+        is_supported_genai_span = (
+            scope_name == _GENAI_HANDLER_SCOPE
+            and attributes.get("gen_ai.provider.name") in _SUPPORTED_GENAI_PROVIDER_NAMES
+        )
+        if not is_legacy_openai_span and not is_botocore_bedrock_span and not is_supported_genai_span:
             return
 
         if is_legacy_openai_span:
             span.set_attribute("gen_ai.provider.name", "openai")
         else:
+            if is_botocore_bedrock_span:
+                span.set_attribute("gen_ai.provider.name", "aws.bedrock")
+                attributes = getattr(span, "attributes", {}) or {}
             canonical_provider = _canonical_provider_type(attributes)
             if canonical_provider:
                 span.set_attribute(_PROMPTLAYER_PROVIDER_TYPE, canonical_provider)
@@ -147,6 +156,8 @@ def _canonical_provider_type(attributes: Dict[str, Any]) -> Optional[str]:
         return "google"
     if provider in {"vertex_ai", "gcp.vertex_ai"}:
         return "vertexai"
+    if provider == "aws.bedrock":
+        return "amazon.bedrock"
     return None
 
 
@@ -160,6 +171,12 @@ def _canonical_api_type(attributes: Dict[str, Any], canonical_provider: str) -> 
         return "chat-completions"
     if provider == "anthropic":
         return "messages"
+    if canonical_provider == "amazon.bedrock":
+        rpc_method = str(attributes.get("rpc.method") or "").strip().lower()
+        if rpc_method in {"converse", "conversestream"}:
+            return "converse"
+        if rpc_method in {"invokemodel", "invokemodelwithresponsestream"}:
+            return "invoke-model"
     if operation == "generate_content":
         return "generate-content"
     if operation == "interactions.create":

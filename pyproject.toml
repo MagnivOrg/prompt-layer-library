@@ -40,6 +40,7 @@ claude-agent-sdk = {version = ">=0.1.45,<1.0.0", optional = true, python = ">=3.
 opentelemetry-instrumentation-genai-openai = {version = ">=1.0b0,<1.1b0", optional = true, python = ">=3.10,<4.0"}
 opentelemetry-instrumentation-genai-anthropic = {version = ">=1.0b0,<1.1b0", optional = true, python = ">=3.10,<4.0"}
 opentelemetry-instrumentation-google-genai = {version = ">=1.0b1,<1.1b0", optional = true, python = ">=3.10,<4.0"}
+opentelemetry-instrumentation-botocore = {version = "0.65b0", optional = true, python = ">=3.10,<4.0"}
 eval-type-backport = {version = "^0.3.1", optional = true}
 jinja2 = "^3.1.6"
 rich = ">=13.0.0"
@@ -68,6 +69,7 @@ otel-genai-instrumentation = [
     "opentelemetry-instrumentation-genai-openai",
     "opentelemetry-instrumentation-genai-anthropic",
     "opentelemetry-instrumentation-google-genai",
+    "opentelemetry-instrumentation-botocore",
 ]
 openai-agents = ["openai-agents", "eval-type-backport"]
 claude-agents = ["claude-agent-sdk"]

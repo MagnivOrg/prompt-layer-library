@@ -3,8 +3,19 @@ import inspect
 import re
 
 from promptlayer import exceptions as _exceptions
+from promptlayer.span_exporter import _mark_genai_request_span
 from promptlayer.tracing_context import format_otel_span_id, resolve_tracer
 from promptlayer.utils import async_wrapper, promptlayer_api_handler
+
+_AUTO_INSTRUMENTED_PROVIDER_TYPES = frozenset(
+    {
+        "openai",
+        "openai.azure",
+        "anthropic",
+        "google",
+        "vertexai",
+    }
+)
 
 
 class PromptLayerBase(object):
@@ -93,7 +104,14 @@ class PromptLayerBase(object):
                     llm_request_span.set_attribute("function_output", str(result))
                     return result
 
-                function_response = function_object(*args, **kwargs)
+                managed_request_span = (
+                    object.__getattribute__(self, "_provider_type") in _AUTO_INSTRUMENTED_PROVIDER_TYPES
+                )
+                with _mark_genai_request_span(
+                    enabled=managed_request_span,
+                    request_log_span_id=llm_request_span_id,
+                ):
+                    function_response = function_object(*args, **kwargs)
 
                 if inspect.iscoroutinefunction(function_object) or inspect.iscoroutine(function_response):
                     return async_wrapper(
@@ -107,6 +125,7 @@ class PromptLayerBase(object):
                         tags,
                         llm_request_span_id=llm_request_span_id,
                         tracer=tracer,  # Pass the tracer to async_wrapper
+                        managed_request_span=managed_request_span,
                         *args,
                         **kwargs,
                     )

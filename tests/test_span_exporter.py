@@ -1,11 +1,16 @@
 """Tests for set_prompt_span_attributes in promptlayer.span_exporter."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 
-from promptlayer.span_exporter import set_prompt_span_attributes
+from promptlayer.span_exporter import (
+    GenAIPromptTemplateSpanProcessor,
+    _mark_genai_request_span,
+    set_prompt_span_attributes,
+)
 
 
 class TestSetPromptSpanAttributes:
@@ -127,3 +132,36 @@ class TestSetPromptSpanAttributes:
             assert "promptlayer.prompt.label" not in attrs
         finally:
             provider.shutdown()
+
+    def test_tracing_attribute_failure_is_best_effort(self):
+        with patch(
+            "promptlayer.span_exporter.trace.get_current_span",
+            side_effect=RuntimeError("broken tracing context"),
+        ):
+            set_prompt_span_attributes({"id": 1, "version": 1}, "my-prompt")
+
+
+def test_genai_span_enrichment_failure_is_best_effort():
+    span = MagicMock(
+        instrumentation_scope=SimpleNamespace(name="opentelemetry.util.genai.handler"),
+        attributes={
+            "gen_ai.provider.name": "openai",
+            "gen_ai.operation.name": "chat",
+        },
+    )
+    span.set_attribute.side_effect = RuntimeError("broken span")
+
+    GenAIPromptTemplateSpanProcessor().on_start(span)
+
+
+def test_genai_request_context_failure_does_not_skip_operation():
+    operation = MagicMock()
+
+    with patch(
+        "promptlayer.span_exporter.context.attach",
+        side_effect=RuntimeError("broken context"),
+    ):
+        with _mark_genai_request_span(enabled=True, request_log_span_id="span-id"):
+            operation()
+
+    operation.assert_called_once_with()

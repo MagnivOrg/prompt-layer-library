@@ -2,10 +2,12 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List, Literal, Optional, Union
+from contextlib import contextmanager, nullcontext
+from typing import Any, Dict, Iterable, List, Literal, Optional, Union
 
 import nest_asyncio
 from opentelemetry import context as otel_context, trace as otel_trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
 from promptlayer import exceptions as _exceptions
 from promptlayer.evaluations import AsyncEvalManager, EvalManager
@@ -13,7 +15,12 @@ from promptlayer.groups import AsyncGroupManager, GroupManager
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.promptlayer_mixins import PromptLayerMixin
 from promptlayer.skills import AsyncSkillManager, SkillManager
-from promptlayer.span_exporter import _mark_openai_request_span
+from promptlayer.span_exporter import (
+    _defer_prompt_span_attribute_activation,
+    _mark_genai_request_span,
+    _prompt_span_attributes,
+    _scope_prompt_span_attributes,
+)
 from promptlayer.streaming import astream_response, stream_response
 from promptlayer.tables import AsyncTableManager, TableManager
 from promptlayer.template_cache import PromptTemplateCache
@@ -21,7 +28,6 @@ from promptlayer.templates import AsyncTemplateManager, TemplateManager
 from promptlayer.tracing_context import (
     awrap_stream_with_span,
     format_otel_span_id,
-    format_run_output,
     is_stream_result,
     wrap_stream_with_span,
 )
@@ -30,6 +36,7 @@ from promptlayer.track.error_tracking import categorize_error
 from promptlayer.types.prompt_template import PromptTemplate
 from promptlayer.utils import (
     RERAISE_ORIGINAL_EXCEPTION,
+    SDK_VERSION,
     _get_workflow_workflow_id_or_name,
     arun_workflow_request,
     atrack_request,
@@ -39,6 +46,116 @@ from promptlayer.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+_AUTO_INSTRUMENTED_RUN_PROVIDERS = frozenset(
+    {
+        "openai",
+        "openai.azure",
+        "anthropic",
+        "amazon.bedrock",
+        "google",
+        "vertexai",
+    }
+)
+
+_OTEL_SCALAR_TYPES = (bool, int, float, str)
+
+
+def _run_span_attributes(
+    *,
+    prompt_name: str,
+    prompt_version: Union[int, None],
+    prompt_release_label: Union[str, None],
+    metadata: Union[Dict[str, str], None],
+) -> Dict[str, Any]:
+    attributes: Dict[str, Any] = {
+        "node_type": "CODE_EXECUTION",
+        "prompt_name": prompt_name,
+        "promptlayer.prompt.name": prompt_name,
+        "promptlayer.telemetry.source": "promptlayer-python",
+        "promptlayer.telemetry.source_version": SDK_VERSION,
+    }
+    if prompt_version is not None:
+        attributes["promptlayer.prompt.version"] = str(prompt_version)
+    if prompt_release_label is not None:
+        attributes["promptlayer.prompt.label"] = prompt_release_label
+
+    for key, value in (metadata or {}).items():
+        if isinstance(key, str) and key and isinstance(value, _OTEL_SCALAR_TYPES):
+            attributes[f"promptlayer.metadata.{key}"] = value
+
+    return attributes
+
+
+def _prompt_fetch_attributes(
+    *,
+    prompt_name: str,
+    prompt_version: Union[int, None],
+    prompt_release_label: Union[str, None],
+) -> Dict[str, Any]:
+    attributes: Dict[str, Any] = {
+        "node_type": "PROMPT_TEMPLATE",
+        "prompt_name": prompt_name,
+        "promptlayer.prompt.name": prompt_name,
+        "promptlayer.prompt.requested.name": prompt_name,
+    }
+    if prompt_version is not None:
+        attributes["promptlayer.prompt.requested.version"] = str(prompt_version)
+    if prompt_release_label is not None:
+        attributes["promptlayer.prompt.requested.label"] = prompt_release_label
+    return attributes
+
+
+def _record_span_error(span, error: Exception) -> None:
+    try:
+        error_type = type(error).__qualname__
+        module = type(error).__module__
+        if module and module != "builtins":
+            error_type = f"{module}.{error_type}"
+
+        span.set_attribute("error.type", error_type)
+        span.record_exception(error)
+        span.set_status(Status(status_code=StatusCode.ERROR, description=f"{error_type}: {error}"))
+    except Exception:
+        logger.debug("PromptLayer could not record a tracing error", exc_info=True)
+
+
+def _set_span_attributes(span, attributes: Dict[str, str]) -> None:
+    try:
+        span.set_attributes(attributes)
+    except Exception:
+        logger.debug("PromptLayer could not set tracing attributes", exc_info=True)
+
+
+@contextmanager
+def _prompt_fetch_span(
+    tracer,
+    run_span,
+    *,
+    prompt_name: str,
+    prompt_version: Union[int, None],
+    prompt_release_label: Union[str, None],
+):
+    if tracer is None or run_span is None:
+        yield None
+        return
+
+    with tracer.start_as_current_span(
+        "Prompt template fetch",
+        kind=SpanKind.INTERNAL,
+        attributes=_prompt_fetch_attributes(
+            prompt_name=prompt_name,
+            prompt_version=prompt_version,
+            prompt_release_label=prompt_release_label,
+        ),
+        record_exception=False,
+        set_status_on_exception=False,
+    ) as span:
+        try:
+            yield span
+        except Exception as exc:
+            _record_span_error(span, exc)
+            raise
 
 
 def get_base_url(base_url: Union[str, None]):
@@ -75,6 +192,7 @@ class PromptLayer(PromptLayerMixin):
         throw_on_error: bool = True,
         cache_ttl_seconds: int = 0,
         tracer_provider=None,
+        tracing_providers: Optional[Iterable[str]] = None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -98,6 +216,7 @@ class PromptLayer(PromptLayerMixin):
             self.throw_on_error,
             enable_tracing,
             tracer_provider,
+            tracing_providers,
         )
         self.evals = EvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
         self.group = GroupManager(api_key, self.base_url, self.throw_on_error)
@@ -169,6 +288,7 @@ class PromptLayer(PromptLayerMixin):
         group_id: Union[int, None] = None,
         stream: bool = False,
         pl_run_span_id: Union[str, None] = None,
+        pl_run_span=None,
         provider: Union[str, None] = None,
         model: Union[str, None] = None,
     ) -> Dict[str, Any]:
@@ -183,13 +303,32 @@ class PromptLayer(PromptLayerMixin):
             model=model,
             model_parameter_overrides=model_parameter_overrides,
         )
-        prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
-        if not prompt_blueprint:
-            raise _exceptions.PromptLayerNotFoundError(
-                f"Prompt template '{prompt_name}' not found.",
-                response=None,
-                body=None,
-            )
+        tracer = self.tracer
+        with _prompt_fetch_span(
+            tracer,
+            pl_run_span,
+            prompt_name=prompt_name,
+            prompt_version=prompt_version,
+            prompt_release_label=prompt_release_label,
+        ) as fetch_span:
+            fetch_context = _defer_prompt_span_attribute_activation() if fetch_span is not None else nullcontext()
+            with fetch_context:
+                prompt_blueprint = self.templates.get(prompt_name, get_prompt_template_params)
+            if not prompt_blueprint:
+                raise _exceptions.PromptLayerNotFoundError(
+                    f"Prompt template '{prompt_name}' not found.",
+                    response=None,
+                    body=None,
+                )
+            if fetch_span is not None:
+                resolved_prompt_attributes = _prompt_span_attributes(
+                    prompt_blueprint,
+                    prompt_name,
+                    label=prompt_release_label,
+                )
+                _set_span_attributes(fetch_span, resolved_prompt_attributes)
+        if fetch_span is not None:
+            _set_span_attributes(pl_run_span, resolved_prompt_attributes)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
@@ -206,10 +345,15 @@ class PromptLayer(PromptLayerMixin):
         # response is just whatever the LLM call returns
         # streaming=False > Pydantic model instance
         # streaming=True > generator that yields ChatCompletionChunk pieces as they arrive
+        traced_run = tracer is not None and pl_run_span is not None
+        prompt_context = _scope_prompt_span_attributes(resolved_prompt_attributes) if traced_run else nullcontext()
         try:
-            with _mark_openai_request_span(
-                enabled=llm_data["provider"] in {"openai", "openai.azure"},
-                request_log_span_id=pl_run_span_id,
+            with (
+                prompt_context,
+                _mark_genai_request_span(
+                    enabled=llm_data["provider"] in _AUTO_INSTRUMENTED_RUN_PROVIDERS,
+                    request_log_span_id=pl_run_span_id,
+                ),
             ):
                 response = llm_data["request_function"](
                     prompt_blueprint=llm_data["prompt_blueprint"],
@@ -328,28 +472,40 @@ class PromptLayer(PromptLayerMixin):
             "model": model,
         }
 
-        if self.tracer:
-            span = self.tracer.start_span("PromptLayer Run")
-            token = otel_context.attach(otel_trace.set_span_in_context(span))
-            try:
-                span.set_attribute("prompt_name", prompt_name)
-                span.set_attribute("function_input", str(_run_internal_kwargs))
-                span_ctx = span.get_span_context()
-                pl_run_span_id = format_otel_span_id(span_ctx.span_id) if span_ctx and span_ctx.is_valid else None
-                result = self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
-                if is_stream_result(result):
-                    # Keep the span open until the stream is fully consumed.
-                    otel_context.detach(token)
-                    return wrap_stream_with_span(result, span)
-                span.set_attribute("function_output", format_run_output(result))
-                return result
-            except Exception as exc:
-                span.record_exception(exc)
-                raise
-            finally:
-                if not is_stream_result(locals().get("result")):
-                    span.end()
-                    otel_context.detach(token)
+        tracer = self.tracer
+        if tracer:
+            with _scope_prompt_span_attributes(None):
+                span = tracer.start_span(
+                    "PromptLayer Run",
+                    kind=SpanKind.INTERNAL,
+                    attributes=_run_span_attributes(
+                        prompt_name=prompt_name,
+                        prompt_version=prompt_version,
+                        prompt_release_label=prompt_release_label,
+                        metadata=metadata,
+                    ),
+                )
+                token = otel_context.attach(otel_trace.set_span_in_context(span))
+                result = None
+                try:
+                    span_ctx = span.get_span_context()
+                    pl_run_span_id = format_otel_span_id(span_ctx.span_id) if span_ctx and span_ctx.is_valid else None
+                    result = self._run_internal(
+                        **_run_internal_kwargs,
+                        pl_run_span_id=pl_run_span_id,
+                        pl_run_span=span,
+                    )
+                    if is_stream_result(result):
+                        otel_context.detach(token)
+                        return wrap_stream_with_span(result, span)
+                    return result
+                except Exception as exc:
+                    _record_span_error(span, exc)
+                    raise
+                finally:
+                    if not is_stream_result(result):
+                        otel_context.detach(token)
+                        span.end()
         else:
             return self._run_internal(**_run_internal_kwargs)
 
@@ -487,6 +643,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         throw_on_error: bool = True,
         cache_ttl_seconds: int = 0,
         tracer_provider=None,
+        tracing_providers: Optional[Iterable[str]] = None,
     ):
         if api_key is None:
             api_key = os.environ.get("PROMPTLAYER_API_KEY")
@@ -510,6 +667,7 @@ class AsyncPromptLayer(PromptLayerMixin):
             self.throw_on_error,
             enable_tracing,
             tracer_provider,
+            tracing_providers,
         )
         self.evals = AsyncEvalManager(api_key, self.base_url, self.throw_on_error, self.tracer_provider)
         self.group = AsyncGroupManager(api_key, self.base_url, self.throw_on_error)
@@ -612,28 +770,40 @@ class AsyncPromptLayer(PromptLayerMixin):
             "model": model,
         }
 
-        if self.tracer:
-            span = self.tracer.start_span("PromptLayer Run")
-            token = otel_context.attach(otel_trace.set_span_in_context(span))
-            try:
-                span.set_attribute("prompt_name", prompt_name)
-                span.set_attribute("function_input", str(_run_internal_kwargs))
-                span_ctx = span.get_span_context()
-                pl_run_span_id = format_otel_span_id(span_ctx.span_id) if span_ctx and span_ctx.is_valid else None
-                result = await self._run_internal(**_run_internal_kwargs, pl_run_span_id=pl_run_span_id)
-                if is_stream_result(result):
-                    # Keep the span open until the stream is fully consumed.
-                    otel_context.detach(token)
-                    return awrap_stream_with_span(result, span)
-                span.set_attribute("function_output", format_run_output(result))
-                return result
-            except Exception as exc:
-                span.record_exception(exc)
-                raise
-            finally:
-                if not is_stream_result(locals().get("result")):
-                    span.end()
-                    otel_context.detach(token)
+        tracer = self.tracer
+        if tracer:
+            with _scope_prompt_span_attributes(None):
+                span = tracer.start_span(
+                    "PromptLayer Run",
+                    kind=SpanKind.INTERNAL,
+                    attributes=_run_span_attributes(
+                        prompt_name=prompt_name,
+                        prompt_version=prompt_version,
+                        prompt_release_label=prompt_release_label,
+                        metadata=metadata,
+                    ),
+                )
+                token = otel_context.attach(otel_trace.set_span_in_context(span))
+                result = None
+                try:
+                    span_ctx = span.get_span_context()
+                    pl_run_span_id = format_otel_span_id(span_ctx.span_id) if span_ctx and span_ctx.is_valid else None
+                    result = await self._run_internal(
+                        **_run_internal_kwargs,
+                        pl_run_span_id=pl_run_span_id,
+                        pl_run_span=span,
+                    )
+                    if is_stream_result(result):
+                        otel_context.detach(token)
+                        return awrap_stream_with_span(result, span)
+                    return result
+                except Exception as exc:
+                    _record_span_error(span, exc)
+                    raise
+                finally:
+                    if not is_stream_result(result):
+                        otel_context.detach(token)
+                        span.end()
         else:
             return await self._run_internal(**_run_internal_kwargs)
 
@@ -749,6 +919,7 @@ class AsyncPromptLayer(PromptLayerMixin):
         group_id: Union[int, None] = None,
         stream: bool = False,
         pl_run_span_id: Union[str, None] = None,
+        pl_run_span=None,
         provider: Union[str, None] = None,
         model: Union[str, None] = None,
     ) -> Dict[str, Any]:
@@ -763,13 +934,32 @@ class AsyncPromptLayer(PromptLayerMixin):
             model=model,
             model_parameter_overrides=model_parameter_overrides,
         )
-        prompt_blueprint = await self.templates.get(prompt_name, get_prompt_template_params)
-        if not prompt_blueprint:
-            raise _exceptions.PromptLayerNotFoundError(
-                f"Prompt template '{prompt_name}' not found.",
-                response=None,
-                body=None,
-            )
+        tracer = self.tracer
+        with _prompt_fetch_span(
+            tracer,
+            pl_run_span,
+            prompt_name=prompt_name,
+            prompt_version=prompt_version,
+            prompt_release_label=prompt_release_label,
+        ) as fetch_span:
+            fetch_context = _defer_prompt_span_attribute_activation() if fetch_span is not None else nullcontext()
+            with fetch_context:
+                prompt_blueprint = await self.templates.get(prompt_name, get_prompt_template_params)
+            if not prompt_blueprint:
+                raise _exceptions.PromptLayerNotFoundError(
+                    f"Prompt template '{prompt_name}' not found.",
+                    response=None,
+                    body=None,
+                )
+            if fetch_span is not None:
+                resolved_prompt_attributes = _prompt_span_attributes(
+                    prompt_blueprint,
+                    prompt_name,
+                    label=prompt_release_label,
+                )
+                _set_span_attributes(fetch_span, resolved_prompt_attributes)
+        if fetch_span is not None:
+            _set_span_attributes(pl_run_span, resolved_prompt_attributes)
         prompt_blueprint_model = self._validate_and_extract_model_from_prompt_blueprint(
             prompt_blueprint=prompt_blueprint, prompt_name=prompt_name
         )
@@ -784,10 +974,15 @@ class AsyncPromptLayer(PromptLayerMixin):
         # Capture start time before making the LLM request
         request_start_time = datetime.datetime.now(datetime.timezone.utc).timestamp()
 
+        traced_run = tracer is not None and pl_run_span is not None
+        prompt_context = _scope_prompt_span_attributes(resolved_prompt_attributes) if traced_run else nullcontext()
         try:
-            with _mark_openai_request_span(
-                enabled=llm_data["provider"] in {"openai", "openai.azure"},
-                request_log_span_id=pl_run_span_id,
+            with (
+                prompt_context,
+                _mark_genai_request_span(
+                    enabled=llm_data["provider"] in _AUTO_INSTRUMENTED_RUN_PROVIDERS,
+                    request_log_span_id=pl_run_span_id,
+                ),
             ):
                 response = await llm_data["request_function"](
                     prompt_blueprint=llm_data["prompt_blueprint"],

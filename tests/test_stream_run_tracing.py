@@ -1,4 +1,4 @@
-"""Regression: stream=True must not record the generator as function_output."""
+"""Regression: stream=True must not record function payload attributes."""
 
 from unittest.mock import MagicMock, patch
 
@@ -27,7 +27,7 @@ def test_format_run_output_prefers_prompt_blueprint():
 
 
 @patch("promptlayer.templates.TemplateManager.get")
-def test_sync_run_stream_sets_function_output_after_consume(mock_template_get):
+def test_sync_run_stream_does_not_set_function_output(mock_template_get):
     mock_template_get.return_value = {
         "id": 1,
         "prompt_template": {"type": "chat", "messages": []},
@@ -53,8 +53,6 @@ def test_sync_run_stream_sets_function_output_after_consume(mock_template_get):
 
     with patch.object(client, "_run_internal", return_value=fake_stream()):
         stream = client.run(prompt_name="test_prompt", stream=True)
-        # Before consume, function_output must not be set to the generator.
-        span.set_attribute.assert_any_call("prompt_name", "test_prompt")
         output_calls = [c for c in span.set_attribute.call_args_list if c[0][0] == "function_output"]
         assert output_calls == []
 
@@ -62,15 +60,13 @@ def test_sync_run_stream_sets_function_output_after_consume(mock_template_get):
 
     assert len(chunks) == 2
     output_calls = [c for c in span.set_attribute.call_args_list if c[0][0] == "function_output"]
-    assert len(output_calls) == 1
-    assert "<generator" not in output_calls[0][0][1]
-    assert "hi" in output_calls[0][0][1]
+    assert output_calls == []
     span.end.assert_called_once()
 
 
 @pytest.mark.asyncio
 @patch("promptlayer.templates.AsyncTemplateManager.get")
-async def test_async_run_stream_sets_function_output_after_consume(mock_template_get):
+async def test_async_run_stream_does_not_set_function_output(mock_template_get):
     mock_template_get.return_value = {
         "id": 1,
         "prompt_template": {"type": "chat", "messages": []},
@@ -108,7 +104,5 @@ async def test_async_run_stream_sets_function_output_after_consume(mock_template
 
     assert len(chunks) == 2
     output_calls = [c for c in span.set_attribute.call_args_list if c[0][0] == "function_output"]
-    assert len(output_calls) == 1
-    assert "<async_generator" not in output_calls[0][0][1]
-    assert "bye" in output_calls[0][0][1]
+    assert output_calls == []
     span.end.assert_called_once()

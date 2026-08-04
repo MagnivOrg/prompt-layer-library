@@ -37,6 +37,7 @@ from tenacity import (
 )
 
 from promptlayer import exceptions as _exceptions
+from promptlayer.span_exporter import _mark_genai_request_span
 from promptlayer.types import RequestLog
 from promptlayer.types.prompt_template import (
     GetPromptTemplate,
@@ -63,6 +64,14 @@ def _get_sdk_version() -> str:
 SDK_VERSION = _get_sdk_version()
 _PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 _PROMPTLAYER_USER_AGENT = f"promptlayer-python/{SDK_VERSION} (python {_PYTHON_VERSION})"
+# Providers whose PromptLayer wrappers can return an instrumented stream manager.
+_GENERATOR_PROXY_PROVIDER_TYPES = frozenset(
+    {
+        "openai",
+        "openai.azure",
+        "anthropic",
+    }
+)
 
 WORKFLOW_RUN_URL_TEMPLATE = "{base_url}/workflows/{workflow_id}/run"
 WORKFLOW_RUN_CHANNEL_NAME_TEMPLATE = "workflows:{workflow_id}:run:{channel_name_suffix}"
@@ -473,9 +482,16 @@ def promptlayer_api_handler(
             "AsyncMessageStreamManager",
             "MessageStreamManager",
             "ChatStreamWrapper",
+            "AsyncChatStreamWrapper",
             "LegacyChatStreamWrapper",
             "ResponseStreamWrapper",
             "AsyncResponseStreamWrapper",
+            "ResponseStreamManagerWrapper",
+            "AsyncResponseStreamManagerWrapper",
+            "MessagesStreamWrapper",
+            "AsyncMessagesStreamWrapper",
+            "MessagesStreamManagerWrapper",
+            "AsyncMessagesStreamManagerWrapper",
         ]
     ):
         return GeneratorProxy(
@@ -1129,30 +1145,57 @@ class GeneratorProxy:
 
     async def __aenter__(self):
         api_request_arguments = self.api_request_arugments
-        if hasattr(self.generator, "_AsyncMessageStreamManager__api_request"):
-            return GeneratorProxy(
-                await self.generator._AsyncMessageStreamManager__api_request,
-                api_request_arguments,
-                self.api_key,
-                self.base_url,
-            )
+        with _mark_genai_request_span(
+            enabled=self._should_propagate_managed_span_context(),
+            request_log_span_id=api_request_arguments.get("llm_request_span_id"),
+        ):
+            enter = getattr(self.generator, "__aenter__", None)
+            if callable(enter):
+                stream = await enter()
+            elif hasattr(self.generator, "_AsyncMessageStreamManager__api_request"):
+                stream = await self.generator._AsyncMessageStreamManager__api_request
+            else:
+                return self
+
+        return GeneratorProxy(
+            stream,
+            api_request_arguments,
+            self.api_key,
+            self.base_url,
+        )
 
     def __enter__(self):
         api_request_arguments = self.api_request_arugments
-        if hasattr(self.generator, "_MessageStreamManager__api_request"):
-            stream = self.generator.__enter__()
-            return GeneratorProxy(
-                stream,
-                api_request_arguments,
-                self.api_key,
-                self.base_url,
-            )
+        with _mark_genai_request_span(
+            enabled=self._should_propagate_managed_span_context(),
+            request_log_span_id=api_request_arguments.get("llm_request_span_id"),
+        ):
+            enter = getattr(self.generator, "__enter__", None)
+            if callable(enter):
+                stream = self.generator.__enter__()
+            elif hasattr(self.generator, "_MessageStreamManager__api_request"):
+                stream = self.generator._MessageStreamManager__api_request
+            else:
+                return self
+
+        return GeneratorProxy(
+            stream,
+            api_request_arguments,
+            self.api_key,
+            self.base_url,
+        )
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
+        exit_method = getattr(self.generator, "__exit__", None)
+        if callable(exit_method):
+            return exit_method(exc_type, exc_val, exc_tb)
+        return None
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
+        exit_method = getattr(self.generator, "__aexit__", None)
+        if callable(exit_method):
+            return await exit_method(exc_type, exc_val, exc_tb)
+        return None
 
     async def __anext__(self):
         result = await self.generator.__anext__()
@@ -1163,7 +1206,7 @@ class GeneratorProxy:
         return self._abstracted_next(result)
 
     def __getattr__(self, name):
-        if name == "text_stream":  # anthropic async stream
+        if name == "text_stream":
             return GeneratorProxy(
                 self.generator.text_stream,
                 self.api_request_arugments,
@@ -1181,13 +1224,13 @@ class GeneratorProxy:
             if hasattr(result, "stop_reason"):
                 end_anthropic = result.stop_reason
             elif hasattr(result, "message"):
-                end_anthropic = result.message.stop_reason
+                end_anthropic = getattr(result.message, "stop_reason", None)
             elif hasattr(result, "type") and result.type == "message_stop":
                 end_anthropic = True
 
-        end_openai = provider_type == "openai" and (
-            result.choices[0].finish_reason == "stop" or result.choices[0].finish_reason == "length"
-        )
+        choices = getattr(result, "choices", None) or []
+        finish_reason = getattr(choices[0], "finish_reason", None) if choices else None
+        end_openai = provider_type == "openai" and finish_reason in {"stop", "length"}
 
         if end_anthropic or end_openai:
             request_id = promptlayer_api_request(
@@ -1212,6 +1255,9 @@ class GeneratorProxy:
             return result, None
 
         return result
+
+    def _should_propagate_managed_span_context(self):
+        return self.api_request_arugments["provider_type"] in _GENERATOR_PROXY_PROVIDER_TYPES
 
     def cleaned_result(self):
         provider_type = self.api_request_arugments["provider_type"]
@@ -1349,14 +1395,23 @@ async def async_wrapper(
     tags,
     llm_request_span_id: str = None,
     tracer=None,
+    managed_request_span: bool = False,
     *args,
     **kwargs,
 ):
-    current_context = context.get_current()
-    token = context.attach(current_context)
+    token = None
+    try:
+        current_context = context.get_current()
+        token = context.attach(current_context)
+    except Exception:
+        logger.debug("PromptLayer could not attach async tracing context", exc_info=True)
 
     try:
-        response = await coroutine_obj
+        with _mark_genai_request_span(
+            enabled=managed_request_span,
+            request_log_span_id=llm_request_span_id,
+        ):
+            response = await coroutine_obj
         request_end_time = datetime.datetime.now().timestamp()
         result = await promptlayer_api_handler_async(
             api_key,
@@ -1374,13 +1429,20 @@ async def async_wrapper(
         )
 
         if tracer:
-            current_span = trace.get_current_span()
-            if current_span:
-                current_span.set_attribute("function_output", str(result))
+            try:
+                current_span = trace.get_current_span()
+                if current_span:
+                    current_span.set_attribute("function_output", str(result))
+            except Exception:
+                logger.debug("PromptLayer could not annotate an async tracing span", exc_info=True)
 
         return result
     finally:
-        context.detach(token)
+        if token is not None:
+            try:
+                context.detach(token)
+            except Exception:
+                logger.debug("PromptLayer could not detach async tracing context", exc_info=True)
 
 
 @retry_on_api_error

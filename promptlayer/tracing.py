@@ -6,7 +6,9 @@ import logging
 import os
 import threading
 import weakref
-from typing import Any, Iterable, Optional, Tuple
+from dataclasses import dataclass
+from functools import wraps
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -15,22 +17,64 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.resource import ResourceAttributes
 
-from promptlayer.span_exporter import OpenAIPromptTemplateSpanProcessor
+from promptlayer.integrations.bedrock import bedrock_request_hook, bedrock_response_hook
+from promptlayer.span_exporter import (
+    _PROMPTLAYER_API_TYPE,
+    GenAIPromptTemplateSpanProcessor,
+)
 from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 logger = logging.getLogger(__name__)
 
-NATIVE_OTEL_PROVIDERS = ("openai",)
+
+@dataclass(frozen=True)
+class _ProviderInstrumentation:
+    sdk_module: str
+    instrumentation_module: str
+    instrumentor_class: str
+    display_name: str
+
+
+_PROVIDER_INSTRUMENTATIONS = {
+    "openai": _ProviderInstrumentation(
+        sdk_module="openai",
+        instrumentation_module="opentelemetry.instrumentation.genai.openai",
+        instrumentor_class="OpenAIInstrumentor",
+        display_name="OpenAI",
+    ),
+    "anthropic": _ProviderInstrumentation(
+        sdk_module="anthropic",
+        instrumentation_module="opentelemetry.instrumentation.genai.anthropic",
+        instrumentor_class="AnthropicInstrumentor",
+        display_name="Anthropic",
+    ),
+    "google": _ProviderInstrumentation(
+        sdk_module="google.genai",
+        instrumentation_module="opentelemetry.instrumentation.google_genai",
+        instrumentor_class="GoogleGenAiSdkInstrumentor",
+        display_name="Google GenAI",
+    ),
+    "bedrock": _ProviderInstrumentation(
+        sdk_module="boto3",
+        instrumentation_module="opentelemetry.instrumentation.botocore",
+        instrumentor_class="BotocoreInstrumentor",
+        display_name="AWS Bedrock",
+    ),
+}
+
+NATIVE_OTEL_PROVIDERS = tuple(_PROVIDER_INSTRUMENTATIONS)
 
 _PROVIDER_ALIASES = {
     "openai.azure": "openai",
+    "amazon.bedrock": "bedrock",
+    "aws.bedrock": "bedrock",
 }
 _exporter_settings: weakref.WeakKeyDictionary[Any, Tuple[str, str]] = weakref.WeakKeyDictionary()
-_prompt_processor_providers: weakref.WeakKeyDictionary[Any, OpenAIPromptTemplateSpanProcessor] = (
+_prompt_processor_providers: weakref.WeakKeyDictionary[Any, GenAIPromptTemplateSpanProcessor] = (
     weakref.WeakKeyDictionary()
 )
 _configuration_lock = threading.RLock()
-_openai_instrumented_provider: Optional[Any] = None
+_instrumented_provider_owners: Dict[str, Any] = {}
 
 
 def instrument_openai(
@@ -47,18 +91,16 @@ def instrument_openai(
     advanced OpenTelemetry configuration.
     """
 
-    global _openai_instrumented_provider
-
     with _configuration_lock:
         resolved_api_key = _resolve_api_key(api_key)
-        instrumentor = _load_openai_instrumentor(explicit=True)
+        instrumentor = _load_provider_instrumentor("openai", explicit=True)
         provider = tracer_provider if tracer_provider is not None else _get_or_create_tracer_provider()
         _validate_tracer_provider(provider)
         if (
             instrumentor is not None
             and instrumentor.is_instrumented_by_opentelemetry
-            and _openai_instrumented_provider is not None
-            and _openai_instrumented_provider is not provider
+            and _instrumented_provider_owners.get("openai") is not None
+            and _instrumented_provider_owners["openai"] is not provider
         ):
             raise RuntimeError(
                 "The OpenAI SDK is already instrumented with a different tracer provider. "
@@ -75,9 +117,9 @@ def instrument_openai(
         if (
             instrumentor is not None
             and instrumentor.is_instrumented_by_opentelemetry
-            and _openai_instrumented_provider is None
+            and _instrumented_provider_owners.get("openai") is None
         ):
-            _openai_instrumented_provider = provider
+            _instrumented_provider_owners["openai"] = provider
         return configured_provider
 
 
@@ -89,20 +131,32 @@ def configure_tracing(
     tracer_provider: Optional[Any] = None,
     providers: Optional[Iterable[str]] = None,
 ) -> Any:
-    """Export spans to PromptLayer and auto-instrument the OpenAI SDK."""
+    """Export spans to PromptLayer and auto-instrument selected GenAI SDKs."""
 
-    resolved_api_key = _resolve_api_key(api_key)
+    with _configuration_lock:
+        resolved_api_key = _resolve_api_key(api_key)
+        selected_providers = _normalize_providers(providers)
+        explicit_instrumentors = {}
+        if providers is not None:
+            explicit_instrumentors = {
+                provider_name: _load_provider_instrumentor(provider_name, explicit=True)
+                for provider_name in selected_providers
+            }
 
-    provider = tracer_provider if tracer_provider is not None else _get_or_create_tracer_provider()
-    _validate_tracer_provider(provider)
-    selected_providers = _normalize_providers(providers)
-    if "openai" in selected_providers:
-        _add_openai_prompt_processor(provider)
-    _add_exporter(provider, resolved_api_key, _resolve_endpoint(endpoint, base_url))
-    _enable_latest_genai_semantic_conventions()
-    if "openai" in selected_providers:
-        _instrument_openai(provider, explicit=providers is not None)
-    return provider
+        provider = tracer_provider if tracer_provider is not None else _get_or_create_tracer_provider()
+        _validate_tracer_provider(provider)
+        if selected_providers:
+            _add_genai_prompt_processor(provider)
+        _add_exporter(provider, resolved_api_key, _resolve_endpoint(endpoint, base_url))
+        _enable_latest_genai_semantic_conventions()
+        for provider_name in selected_providers:
+            _instrument_provider(
+                provider_name,
+                provider,
+                explicit=providers is not None,
+                instrumentor=explicit_instrumentors.get(provider_name),
+            )
+        return provider
 
 
 def _resolve_api_key(api_key: Optional[str]) -> str:
@@ -141,11 +195,11 @@ def _resolve_endpoint(endpoint: Optional[str], base_url: Optional[str]) -> str:
     return f"{root}/v1/traces"
 
 
-def _add_openai_prompt_processor(provider: Any) -> None:
+def _add_genai_prompt_processor(provider: Any) -> None:
     if provider in _prompt_processor_providers:
         return
 
-    processor = OpenAIPromptTemplateSpanProcessor()
+    processor = GenAIPromptTemplateSpanProcessor()
     provider.add_span_processor(processor)
     _prompt_processor_providers[provider] = processor
 
@@ -170,61 +224,133 @@ def _add_exporter(provider: Any, api_key: str, endpoint: str) -> None:
     _exporter_settings[provider] = settings
 
 
-def _instrument_openai(tracer_provider: Any, *, explicit: bool) -> None:
-    global _openai_instrumented_provider
-
-    instrumentor = _load_openai_instrumentor(explicit=explicit)
+def _instrument_provider(
+    provider_name: str,
+    tracer_provider: Any,
+    *,
+    explicit: bool,
+    instrumentor: Optional[Any] = None,
+) -> None:
+    instrumentor = instrumentor or _load_provider_instrumentor(provider_name, explicit=explicit)
     if instrumentor is None:
         return
 
+    if provider_name == "openai":
+        _configure_openai_response_api_enrichment()
+
+    config = _PROVIDER_INSTRUMENTATIONS[provider_name]
     if not instrumentor.is_instrumented_by_opentelemetry:
-        instrumentor.instrument(tracer_provider=tracer_provider)
+        try:
+            instrument_kwargs = {"tracer_provider": tracer_provider}
+            if provider_name == "bedrock":
+                instrument_kwargs.update(
+                    request_hook=bedrock_request_hook,
+                    response_hook=bedrock_response_hook,
+                )
+            instrumentor.instrument(**instrument_kwargs)
+        except Exception:
+            if explicit:
+                raise
+            logger.warning(
+                "PromptLayer could not enable %s auto-instrumentation; provider calls will continue uninstrumented",
+                config.display_name,
+                exc_info=True,
+            )
+            return
         if instrumentor.is_instrumented_by_opentelemetry:
-            _openai_instrumented_provider = tracer_provider
+            _instrumented_provider_owners[provider_name] = tracer_provider
         elif explicit:
             raise RuntimeError(
-                "OpenTelemetry OpenAI instrumentation could not be enabled. "
-                "Check that the installed OpenAI SDK version is supported."
+                f"OpenTelemetry {config.display_name} instrumentation could not be enabled. "
+                f"Check that the installed {config.display_name} SDK version is supported."
             )
-    elif _openai_instrumented_provider is not None and _openai_instrumented_provider is not tracer_provider:
+    elif (
+        _instrumented_provider_owners.get(provider_name) is not None
+        and _instrumented_provider_owners[provider_name] is not tracer_provider
+    ):
         logger.warning(
-            "The OpenAI SDK is already instrumented with a different tracer provider; "
-            "the existing provider remains active"
+            "%s SDK is already instrumented with a different tracer provider; the existing provider remains active",
+            config.display_name,
         )
 
 
-def _load_openai_instrumentor(*, explicit: bool) -> Optional[Any]:
-    sdk_installed = _module_available("openai")
+def _configure_openai_response_api_enrichment() -> None:
+    """Tag official OpenAI Responses spans without changing their OTel operation."""
+
+    try:
+        patch_responses = importlib.import_module("opentelemetry.instrumentation.genai.openai.patch_responses")
+        current = getattr(patch_responses, "apply_request_attributes", None)
+        if current is None or getattr(current, "_promptlayer_enriched", False):
+            return
+
+        @wraps(current)
+        def apply_request_attributes(invocation, *args, **kwargs):
+            try:
+                current(invocation, *args, **kwargs)
+                invocation.attributes[_PROMPTLAYER_API_TYPE] = "responses"
+            except Exception:
+                logger.debug("PromptLayer could not classify an OpenAI Responses span", exc_info=True)
+
+        apply_request_attributes._promptlayer_enriched = True
+        patch_responses.apply_request_attributes = apply_request_attributes
+    except Exception:
+        logger.debug("OpenAI Responses enrichment is unavailable", exc_info=True)
+
+
+def _load_provider_instrumentor(provider_name: str, *, explicit: bool) -> Optional[Any]:
+    config = _PROVIDER_INSTRUMENTATIONS[provider_name]
+    sdk_installed = _module_available(config.sdk_module)
     instrumentor_class = None
     if sdk_installed:
         try:
-            module = importlib.import_module("opentelemetry.instrumentation.openai_v2")
-            instrumentor_class = getattr(module, "OpenAIInstrumentor")
+            module = importlib.import_module(config.instrumentation_module)
+            instrumentor_class = getattr(module, config.instrumentor_class)
         except (AttributeError, ImportError):
             pass
 
     if instrumentor_class is None:
         if explicit:
             raise ImportError(
-                "OpenTelemetry OpenAI instrumentation is unavailable. "
-                'Install the "promptlayer[otel-genai-instrumentation]" extra and the OpenAI SDK.'
+                f"OpenTelemetry {config.display_name} instrumentation is unavailable. "
+                f'Install the "promptlayer[otel-genai-instrumentation]" extra and the {config.display_name} SDK.'
             )
         if sdk_installed:
             logger.warning(
-                "OpenTelemetry instrumentation is unavailable for OpenAI; "
-                "install promptlayer[otel-genai-instrumentation]"
+                "OpenTelemetry instrumentation is unavailable for %s; install promptlayer[otel-genai-instrumentation]",
+                config.display_name,
             )
         return None
     return instrumentor_class()
 
 
-def _configure_openai_sdk_instrumentation(tracer_provider: Any) -> None:
-    """Add OpenAI auto-instrumentation to an already configured provider."""
+def _load_openai_instrumentor(*, explicit: bool) -> Optional[Any]:
+    """Backward-compatible internal wrapper for the OpenAI loader."""
+
+    return _load_provider_instrumentor("openai", explicit=explicit)
+
+
+def _configure_sdk_instrumentation(
+    tracer_provider: Any,
+    providers: Optional[Iterable[str]] = None,
+) -> None:
+    """Add supported GenAI SDK auto-instrumentation to a configured provider."""
 
     _validate_tracer_provider(tracer_provider)
-    _add_openai_prompt_processor(tracer_provider)
+    selected_providers = _normalize_providers(providers)
+    if selected_providers:
+        _add_genai_prompt_processor(tracer_provider)
     _enable_latest_genai_semantic_conventions()
-    _instrument_openai(tracer_provider, explicit=False)
+    for provider_name in selected_providers:
+        _instrument_provider(provider_name, tracer_provider, explicit=False)
+
+
+def _configure_openai_sdk_instrumentation(tracer_provider: Any) -> None:
+    """Backward-compatible internal helper for OpenAI-only instrumentation."""
+
+    _validate_tracer_provider(tracer_provider)
+    _add_genai_prompt_processor(tracer_provider)
+    _enable_latest_genai_semantic_conventions()
+    _instrument_provider("openai", tracer_provider, explicit=False)
 
 
 def _normalize_providers(providers: Optional[Iterable[str]]) -> Tuple[str, ...]:
@@ -234,7 +360,7 @@ def _normalize_providers(providers: Optional[Iterable[str]]) -> Tuple[str, ...]:
     normalized = []
     for provider in providers:
         provider_name = _PROVIDER_ALIASES.get(provider, provider)
-        if provider_name != "openai":
+        if provider_name not in _PROVIDER_INSTRUMENTATIONS:
             raise ValueError(f"Unknown tracing provider: {provider}")
         if provider_name not in normalized:
             normalized.append(provider_name)

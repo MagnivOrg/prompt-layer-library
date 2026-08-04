@@ -36,7 +36,7 @@ from .exceptions import (
 from .promptlayer import AsyncPromptLayer, PromptLayer
 from .tracing import NATIVE_OTEL_PROVIDERS, configure_tracing, instrument_openai
 
-__version__ = "1.5.5"
+__version__ = "1.5.6"
 __all__ = [
     "PromptLayer",
     "AsyncPromptLayer",

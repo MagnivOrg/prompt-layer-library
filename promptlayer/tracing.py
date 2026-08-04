@@ -26,6 +26,9 @@ from promptlayer.utils import _PROMPTLAYER_USER_AGENT, SDK_VERSION
 
 logger = logging.getLogger(__name__)
 
+_GENAI_CAPTURE_MESSAGE_CONTENT_ENV = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
+_DEFAULT_GENAI_CAPTURE_MESSAGE_CONTENT = "SPAN_ONLY"
+
 
 @dataclass(frozen=True)
 class _ProviderInstrumentation:
@@ -235,6 +238,8 @@ def _instrument_provider(
     if instrumentor is None:
         return
 
+    _set_default_genai_message_content_capture()
+
     if provider_name == "openai":
         _configure_openai_response_api_enrichment()
 
@@ -380,3 +385,10 @@ def _enable_latest_genai_semantic_conventions() -> None:
     configured = [item.strip() for item in os.environ.get(env_name, "").split(",") if item.strip()]
     if value not in configured:
         os.environ[env_name] = ",".join((*configured, value))
+
+
+def _set_default_genai_message_content_capture() -> None:
+    os.environ.setdefault(
+        _GENAI_CAPTURE_MESSAGE_CONTENT_ENV,
+        _DEFAULT_GENAI_CAPTURE_MESSAGE_CONTENT,
+    )

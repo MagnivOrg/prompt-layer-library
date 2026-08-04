@@ -52,7 +52,7 @@ The trace contains a `PromptLayer Run` parent with sibling
 `Prompt template fetch` and provider LLM-call children. Provider
 auto-instrumentation requires Python 3.10 or newer.
 
-OpenTelemetry excludes message bodies by default. Set
-`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY` before tracing
-when PromptLayer should receive prompt and response content. The Bedrock
-example enables this explicitly.
+PromptLayer captures message bodies on spans by default. Set
+`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=NO_CONTENT` before tracing
+to exclude prompt and response content. Explicit official OpenTelemetry values
+are preserved.

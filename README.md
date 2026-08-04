@@ -192,15 +192,19 @@ Botocore instrumentor. Because Botocore instrumentation operates at the AWS
 SDK layer, selecting Bedrock also traces other Botocore service calls made by
 the process.
 
-Message bodies are excluded by OpenTelemetry by default. To include prompts
-and responses on PromptLayer request logs, opt in before configuring tracing:
+PromptLayer defaults OpenTelemetry message-content capture to `SPAN_ONLY` when
+it enables provider instrumentation. To exclude prompts and responses from
+spans, opt out before configuring tracing:
 
 ```bash
-export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=SPAN_ONLY
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=NO_CONTENT
 ```
 
-Only enable content capture where sending request and response bodies to your
-configured trace destination is appropriate.
+PromptLayer preserves explicit official OpenTelemetry values: `NO_CONTENT`,
+`SPAN_ONLY`, `EVENT_ONLY`, and `SPAN_AND_EVENT`. Set the value before tracing
+is configured because provider instrumentors read it during initialization.
+Message content can contain sensitive data and is sent to the configured trace
+destination when capture is enabled.
 
 Applications that only use the direct OpenAI SDK can continue to use the
 OpenAI-specific convenience API:

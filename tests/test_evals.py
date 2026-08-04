@@ -36,9 +36,7 @@ def _terminal_sheet_status_counts():
     def trace_import(*args, **kwargs):
         nonlocal sync_import_count
         body = args[3]
-        payload = tables_api.list_smart_sheet_rows(
-            args[0], args[1], args[2], body["smart_table_id"], body["sheet_id"]
-        )
+        payload = tables_api.list_smart_sheet_rows(args[0], args[1], args[2], body["smart_table_id"], body["sheet_id"])
         rows = (payload or {}).get("data", [])
         row_index = rows[min(sync_import_count, len(rows) - 1)]["row_index"] if rows else sync_import_count
         sync_import_count += 1

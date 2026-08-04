@@ -27,10 +27,37 @@ from promptlayer.evaluations.setup import (
 
 @pytest.fixture(autouse=True)
 def _terminal_sheet_status_counts():
+    from promptlayer.tables import api as tables_api
+
     terminal = {"total_cells": 0, "status_counts": {}}
+    sync_import_count = 0
+    async_import_count = 0
+
+    def trace_import(*args, **kwargs):
+        nonlocal sync_import_count
+        body = args[3]
+        payload = tables_api.list_smart_sheet_rows(args[0], args[1], args[2], body["smart_table_id"], body["sheet_id"])
+        rows = (payload or {}).get("data", [])
+        row_index = rows[min(sync_import_count, len(rows) - 1)]["row_index"] if rows else sync_import_count
+        sync_import_count += 1
+        return {"row_index": row_index, "row": {"row_index": row_index, "cells": {}}}
+
+    async def atrace_import(*args, **kwargs):
+        nonlocal async_import_count
+        body = args[3]
+        payload = await tables_api.alist_smart_sheet_rows(
+            args[0], args[1], args[2], body["smart_table_id"], body["sheet_id"]
+        )
+        rows = (payload or {}).get("data", [])
+        row_index = rows[min(async_import_count, len(rows) - 1)]["row_index"] if rows else async_import_count
+        async_import_count += 1
+        return {"row_index": row_index, "row": {"row_index": row_index, "cells": {}}}
+
     with (
         patch("promptlayer.tables.api.get_sheet_status_counts", return_value=terminal),
         patch("promptlayer.tables.api.aget_sheet_status_counts", return_value=terminal),
+        patch("promptlayer.tables.api.add_trace_import", side_effect=trace_import),
+        patch("promptlayer.tables.api.aadd_trace_import", new_callable=AsyncMock, side_effect=atrace_import),
         patch("opentelemetry.sdk.trace.export.BatchSpanProcessor.on_end"),
         patch("promptlayer.evaluations.runner.wait_for_trace_request_price"),
         patch(
@@ -55,6 +82,52 @@ def test_single_worker_executes_inline_for_interruptibility():
 
     assert runner_threads == [calling_thread, calling_thread]
     assert [result.output for result in results] == ["one", "two"]
+
+
+def test_lower_level_run_without_tracer_batches_rows_instead_of_importing_empty_trace():
+    from promptlayer.evaluations import runner as eval_runner
+
+    prepared = eval_runner._PreparedEval(
+        table={"id": "table-1"},
+        sheet={"id": "sheet-1"},
+        columns=[],
+        cases=[{"input": "one"}],
+        custom_field_titles=[],
+    )
+    executed = [
+        eval_runner.CaseExecution(
+            input="one",
+            expected=None,
+            expected_trace=None,
+            dataset_fields={},
+            output="result",
+            trace_id="",
+            span_id="",
+        )
+    ]
+    with (
+        patch.object(eval_runner, "_prepare_eval_sync", return_value=prepared),
+        patch.object(eval_runner, "_execute_cases_sync", return_value=executed),
+        patch.object(eval_runner, "_persist_trace_rows_sync") as import_traces,
+        patch.object(eval_runner, "_persist_batch_rows_sync", return_value=([0], [None])) as batch_rows,
+        patch.object(eval_runner, "recalculate_and_wait_scorecard", return_value={}),
+        patch.object(eval_runner, "fetch_scorecard_row_scores", return_value={}),
+        patch.object(eval_runner, "_finalize_eval", return_value={"name": "internal"}),
+    ):
+        result = eval_runner.run_eval(
+            name="internal",
+            dataset=[{"input": "one"}],
+            runner=lambda value: value,
+            scorers=[code_execution_column("score", code="return 1")],
+            api_key="key",
+            base_url="https://api.example",
+            throw_on_error=True,
+            tracer_provider=None,
+        )
+
+    assert result == {"name": "internal"}
+    import_traces.assert_not_called()
+    batch_rows.assert_called_once()
 
 
 def test_legacy_dataset_column_titles_round_trip_through_eval_rows():
@@ -217,7 +290,6 @@ def test_scorer_dependencies_from_config_resolve_titles():
     from promptlayer.evaluations.validation import (
         resolve_config_sources_to_column_ids as _resolve_config_sources_to_column_ids,
         scorer_dependencies_from_config as _scorer_dependencies_from_config,
-        scorers_reference_trace as _scorers_reference_trace,
     )
 
     columns_by_title = {
@@ -264,8 +336,6 @@ def test_scorer_dependencies_from_config_resolve_titles():
             "execution_trace": "tr-1",
         },
     }
-    assert _scorers_reference_trace([llm_assertion_scorer(title="x", source_column="Trace", prompt="ok")])
-    assert not _scorers_reference_trace([llm_assertion_scorer(title="x", source_column="Output", prompt="ok")])
     with pytest.raises(PromptLayerValidationError, match="not found: missing"):
         _scorer_dependencies_from_config({"source": "missing"}, columns_by_title)
 
@@ -522,6 +592,7 @@ def _base_text_columns():
         {"id": "c1", "title": "input", "type": "TEXT"},
         {"id": "c2", "title": "expected", "type": "TEXT"},
         {"id": "c3", "title": "Output", "type": "TEXT"},
+        {"id": "c6", "title": "Trace", "type": "TEXT"},
     ]
 
 
@@ -667,6 +738,7 @@ def test_eval_runs_inline_dataset_and_writes_rows(
         "input": {"id": "c1", "title": "input", "type": "TEXT"},
         "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
         "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
+        "Trace": {"id": "c-trace", "title": "Trace", "type": "TEXT"},
         "expected_trace": {"id": "c5", "title": "expected_trace", "type": "TEXT"},
         "Reference context": {"id": "c6", "title": "Reference context", "type": "TEXT"},
         "required_tools": _scorer_column(),
@@ -771,27 +843,21 @@ def test_eval_runs_inline_dataset_and_writes_rows(
     mock_create_sheet.assert_called_once()
     create_sheet_body = mock_create_sheet.call_args[0][4]
     assert create_sheet_body["title"] == "Experiment #1"
-    assert mock_create_column.call_count == 5
+    assert mock_create_column.call_count == 6
     create_titles = [call[0][5]["title"] for call in mock_create_column.call_args_list]
-    assert create_titles == ["input", "expected", "expected_trace", "Reference context", "Output"]
-    add_rows_body = mock_add_rows.call_args[0][5]
-    assert add_rows_body["count"] == 1
-    values = add_rows_body["values"][0]
-    assert "c1" in values and "c2" in values and "c3" in values and "c5" in values and "c6" in values
-    assert values["c2"] == "The refund status is returned."
-    assert values["c5"] == '{"required_tools": [{"tool": "lookup_invoice"}]}'
-    assert values["c6"] == "Refund policy v2"
+    assert create_titles == ["input", "expected", "expected_trace", "Reference context", "Output", "Trace"]
+    mock_add_rows.assert_not_called()
     mock_configure_scorecard.assert_called_once()
     score_body = mock_configure_scorecard.call_args[0][5]
     assert score_body["steps"][0]["title"] == "required_tools"
     assert score_body["steps"][0]["primitive_type"] == "COMPARE"
     assert score_body["steps"][0]["source_column_ids"] == ["c3", "c6"]
     assert score_body["steps"][0]["primitive_config"]["sources"] == ["c3", "c6"]
-    assert call_order == ["configure", "add_rows"]
+    assert call_order == ["configure"]
     mock_recalculate_scorecard.assert_called_once()
     mock_get_scorecard.assert_called()
     mock_get_scorecard_row.assert_called()
-    mock_flush_traces.assert_not_called()
+    mock_flush_traces.assert_called_once()
 
 
 @patch("promptlayer.evaluations.runner.flush_traces")
@@ -837,6 +903,7 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
         "input": {"id": "c1", "title": "input", "type": "TEXT"},
         "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
         "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
+        "Trace": {"id": "c-trace", "title": "Trace", "type": "TEXT"},
         "Extracted data": {
             "id": "c-extract",
             "title": "Extracted data",
@@ -926,7 +993,7 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
 
     assert result["failed_row_indices"] == []
     create_titles = [call[0][5]["title"] for call in mock_create_column.call_args_list]
-    assert create_titles == ["input", "expected", "Output", "Extracted data"]
+    assert create_titles == ["input", "expected", "Output", "Trace", "Extracted data"]
     extract_body = next(
         call[0][5] for call in mock_create_column.call_args_list if call[0][5]["title"] == "Extracted data"
     )
@@ -953,7 +1020,6 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
     assert call_order == [
         "create_extract",
         "configure",
-        "add_rows",
         "operations",
         "recalculate",
     ]
@@ -1003,6 +1069,7 @@ def test_aeval_creates_supporting_columns_and_runs_operations_before_scorecard(
             "input": {"id": "c1", "title": "input", "type": "TEXT"},
             "expected": {"id": "c2", "title": "expected", "type": "TEXT"},
             "Output": {"id": "c3", "title": "Output", "type": "TEXT"},
+            "Trace": {"id": "c-trace", "title": "Trace", "type": "TEXT"},
             "Extracted data": {
                 "id": "c-extract",
                 "title": "Extracted data",
@@ -1092,7 +1159,6 @@ def test_aeval_creates_supporting_columns_and_runs_operations_before_scorecard(
         assert call_order == [
             "create_extract",
             "configure",
-            "add_rows",
             "operations",
             "recalculate",
         ]
@@ -1233,10 +1299,7 @@ def test_eval_resolves_independent_output_and_dataset_tables(
     scorecard_body = mock_configure_scorecard.call_args[0][5]
     assert scorecard_body["steps"][0]["title"] == "quality"
     assert scorecard_body["steps"][0]["primitive_type"] == "LLM_ASSERTION"
-    written_values = mock_add_rows.call_args[0][5]["values"][0]
-    assert written_values["c5"] == "source context"
-    assert "d4" not in written_values
-    assert "d5" not in written_values
+    mock_add_rows.assert_not_called()
     mock_recalculate_scorecard.assert_called_once()
 
 
@@ -1529,7 +1592,6 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
             {"id": "c1", "title": "Input", "type": "TEXT"},
             {"id": "c2", "title": "Expected", "type": "TEXT"},
             {"id": "c3", "title": "Output", "type": "TEXT"},
-            {"id": "c6", "title": "Trace", "type": "TRACE"},
             {"id": "c7", "title": "Scenario", "type": "TEXT"},
             {
                 "id": "c4",
@@ -1538,6 +1600,7 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
             },
         ]
     }
+    mock_create_column.return_value = {"column": {"id": "c6", "title": "Trace", "type": "TEXT"}}
     mock_add_trace.return_value = {"success": True, "rows_added": 1, "mode": "trace"}
     mock_delete_rows.return_value = {"success": True}
     mock_list_rows.return_value = {
@@ -1568,7 +1631,7 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
         name="Traced Evals",
         dataset=[{"input": {"q": "hi"}, "expected": {"a": "yo"}, "Scenario": "happy path"}],
         runner=lambda input_data: {"answer": "yo"},
-        scorers=[code_execution_column("pass", code='return 1 if data.get("Trace") is not None else 0')],
+        scorers=[code_execution_column("pass", code='return 1 if data.get("Output") is not None else 0')],
         api_key=promptlayer_api_key,
         base_url=base_url,
     )
@@ -1581,6 +1644,8 @@ def test_eval_with_tracing_creates_trace_row_and_fills_cells(
     assert trace_body["smart_table_id"] == "1"
     assert "span_id" not in trace_body
 
+    trace_column_body = mock_create_column.call_args[0][5]
+    assert trace_column_body == {"title": "Trace", "type": "TEXT"}
     mock_add_rows.assert_not_called()
     mock_flush_traces.assert_called_once()
 
@@ -1815,10 +1880,7 @@ def test_eval_bounded_concurrency_preserves_order_and_batches_rows(
     assert progress[-1] == "✓ runners 3/3"
     assert any(line.endswith("runners 1/3") for line in progress)
     assert any(line.endswith("runners 2/3") for line in progress)
-    mock_add_rows.assert_called_once()
-    add_body = mock_add_rows.call_args[0][5]
-    assert add_body["count"] == 3
-    assert len(add_body["values"]) == 3
+    mock_add_rows.assert_not_called()
     mock_recalculate_scorecard.assert_called_once()
 
 
@@ -1828,19 +1890,21 @@ def test_eval_bounded_concurrency_preserves_order_and_batches_rows(
 @patch("promptlayer.tables.api.acreate_sheet")
 @patch("promptlayer.tables.api.alist_smart_sheet_columns")
 @patch("promptlayer.tables.api.aconfigure_sheet_scorecard")
+@patch("promptlayer.tables.api.aadd_trace_import")
 @patch("promptlayer.tables.api.aadd_smart_sheet_rows")
 @patch("promptlayer.tables.api.alist_smart_sheet_rows")
 @patch("promptlayer.tables.api.adelete_sheet_rows")
 @patch("promptlayer.tables.api.arecalculate_smart_sheet_scorecard")
 @patch("promptlayer.tables.api.aget_sheet_scorecard")
 @patch("promptlayer.tables.api.aget_sheet_scorecard_row")
-def test_async_eval_bounded_concurrency_preserves_order(
+def test_async_eval_output_only_scorer_imports_each_trace(
     mock_get_scorecard_row,
     mock_get_scorecard,
     mock_recalculate_scorecard,
     mock_delete_rows,
     mock_list_rows,
     mock_add_rows,
+    mock_add_trace,
     mock_configure_scorecard,
     mock_list_columns,
     mock_create_sheet,
@@ -1856,6 +1920,13 @@ def test_async_eval_bounded_concurrency_preserves_order(
         mock_create_sheet.return_value = {"sheet": {"id": "2", "title": "Experiment #1"}}
         mock_list_columns.return_value = {"data": _base_text_columns() + [_scorer_column()]}
         mock_delete_rows.return_value = {"success": True}
+        imported_row = iter(range(3))
+
+        def add_trace(*args, **kwargs):
+            row_index = next(imported_row)
+            return {"row_index": row_index, "row": {"row_index": row_index, "cells": {}}}
+
+        mock_add_trace.side_effect = add_trace
         mock_add_rows.return_value = {
             "row_indices": [0, 1, 2],
             "rows": [
@@ -1905,9 +1976,8 @@ def test_async_eval_bounded_concurrency_preserves_order(
         )
         assert failing["failed_row_indices"] == []
         assert active["max"] == 2
-        mock_add_rows.assert_awaited_once()
-        add_body = mock_add_rows.await_args[0][5]
-        assert add_body["count"] == 3
+        assert mock_add_trace.await_count == 3
+        mock_add_rows.assert_not_awaited()
 
     asyncio.run(_run())
 

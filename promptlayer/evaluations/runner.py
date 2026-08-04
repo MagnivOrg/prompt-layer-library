@@ -66,8 +66,6 @@ from promptlayer.evaluations.utils import (
 from promptlayer.evaluations.validation import (
     assert_eval_args,
     assert_passing_score,
-    columns_reference_trace,
-    scorers_reference_trace,
     validation_error,
 )
 from promptlayer.tables import api as tables_api
@@ -640,10 +638,6 @@ class _PreparedEval:
     custom_field_titles: List[str]
 
 
-def _needs_trace_columns(context: _EvalRunContext) -> bool:
-    return scorers_reference_trace(context.scorers) or columns_reference_trace(context.columns)
-
-
 def _validate_dataset_field_conflicts(
     custom_field_titles: List[str],
     processing_columns: List[EvalProcessingColumn],
@@ -760,7 +754,7 @@ def _prepare_eval_sync(context: _EvalRunContext) -> _PreparedEval:
         table["id"],
         sheet["id"],
         columns,
-        include_trace_columns=_needs_trace_columns(context),
+        include_trace_columns=True,
         include_expected_trace=any(case.get("expected_trace") is not None for case in cases),
         custom_field_titles=custom_field_titles,
         processing_columns=context.columns,
@@ -826,7 +820,7 @@ async def _prepare_eval_async(context: _EvalRunContext) -> _PreparedEval:
         table["id"],
         sheet["id"],
         columns,
-        include_trace_columns=_needs_trace_columns(context),
+        include_trace_columns=True,
         include_expected_trace=any(case.get("expected_trace") is not None for case in cases),
         custom_field_titles=custom_field_titles,
         processing_columns=context.columns,
@@ -951,7 +945,7 @@ def run_eval(
         sheet_id=sheet["id"],
     )
 
-    if _needs_trace_columns(context):
+    if context.tracer_provider is not None:
         _emit_status("Importing traces and writing rows")
         row_indices, _rows, executed = _persist_trace_rows_sync(
             api_key=api_key,
@@ -963,7 +957,7 @@ def run_eval(
             executed=executed,
             by_title=by_title,
             custom_field_titles=prepared.custom_field_titles,
-            tracer_provider=tracer_provider,
+            tracer_provider=context.tracer_provider,
         )
     else:
         _emit_status("Writing rows")
@@ -1071,7 +1065,7 @@ async def arun_eval(
         sheet_id=sheet["id"],
     )
 
-    if _needs_trace_columns(context):
+    if context.tracer_provider is not None:
         _emit_status("Importing traces and writing rows")
         row_indices, _rows, executed = await _persist_trace_rows_async(
             api_key=api_key,
@@ -1083,7 +1077,7 @@ async def arun_eval(
             executed=executed,
             by_title=by_title,
             custom_field_titles=prepared.custom_field_titles,
-            tracer_provider=tracer_provider,
+            tracer_provider=context.tracer_provider,
         )
     else:
         _emit_status("Writing rows")

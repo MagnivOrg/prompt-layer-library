@@ -11,7 +11,6 @@ from promptlayer.evaluations.scores import (  # noqa: F401 - re-exported for cal
 from promptlayer.evaluations.utils import (
     EVAL_CASE_BUILTIN_KEYS,
     RESERVED_EVAL_COLUMN_TITLES,
-    TRACE_TEXT_COLUMNS,
     find_column_by_title,
 )
 from promptlayer.types.table import (
@@ -402,23 +401,3 @@ def resolve_config_sources_to_column_ids(
         if isinstance(mapping, dict):
             resolved[key] = {variable_name: _resolve_ref(source_ref) for variable_name, source_ref in mapping.items()}
     return resolved
-
-
-def _config_references_trace(config: Optional[Dict[str, Any]]) -> bool:
-    from promptlayer.evaluations.code_refs import config_references_titles
-
-    return config_references_titles(config, TRACE_TEXT_COLUMNS)
-
-
-def scorers_reference_trace(scorers: List[EvalScorerColumn]) -> bool:
-    """True when any scorer config references the Trace column by title."""
-    return any(
-        _config_references_trace(scorer.get("config") if isinstance(scorer, dict) else None) for scorer in scorers
-    )
-
-
-def columns_reference_trace(columns: List[EvalProcessingColumn]) -> bool:
-    """True when any supporting column config references the Trace column by title."""
-    return any(
-        _config_references_trace(column.get("config") if isinstance(column, dict) else None) for column in columns
-    )

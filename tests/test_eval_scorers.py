@@ -20,7 +20,6 @@ from promptlayer.evaluations.scorers import (
     count_scorer as package_count_scorer,
     trajectory_scorer as package_trajectory_scorer,
 )
-from promptlayer.evaluations.validation import scorers_reference_trace
 
 
 def _trace_with_tools(*tool_names: str) -> dict:
@@ -311,11 +310,6 @@ def test_assert_valid_scorer_validation():
         assert_valid_scorer(source_column="")
 
 
-def test_trajectory_scorer_references_trace_for_dependencies():
-    scorer = trajectory_scorer(expected=[["search"]])
-    assert scorers_reference_trace([scorer])
-
-
 def test_trajectory_source_parses_accepted_scenarios():
     matching = _tool_trace(("create_folder", {"success": True, "folder": {"name": "my-folder"}}))
     assert (
@@ -444,10 +438,6 @@ def test_diagnose_trajectory_failure_categories():
         )
         is None
     )
-
-
-def test_trajectory_spec_scorer_references_trace():
-    assert scorers_reference_trace([trajectory_scorer(expected_column="expected")])
 
 
 def test_trajectory_tool_order_uses_chronological_not_tree_order():

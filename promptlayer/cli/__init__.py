@@ -6,6 +6,7 @@ import argparse
 from typing import Optional, Sequence
 
 from promptlayer.cli.eval_cmd import add_eval_parser
+from promptlayer.cli.setup_cmd import add_setup_parser
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -15,6 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     add_eval_parser(subparsers)
+    add_setup_parser(subparsers)
     return parser
 
 

@@ -14,6 +14,27 @@
 
 This library provides convenient access to the PromptLayer API from applications written in python.
 
+## AI coding agents
+
+- Python SDK guide: https://docs.promptlayer.com/sdks/python
+- Curated docs index (`llms.txt`): https://docs.promptlayer.com/llms.txt
+- Full docs corpus (`llms-full.txt`): https://docs.promptlayer.com/llms-full.txt
+
+Install PromptLayer skill files and the Docs MCP server into your coding agents:
+
+```bash
+promptlayer setup
+```
+
+This writes the PromptLayer docs skill and the SDK evals skill (`sdk-eval-builder`) for Cursor and Claude Code, and adds the Docs MCP server (`https://docs.promptlayer.com/mcp`) to their project configs. Useful variants:
+
+```bash
+promptlayer setup skills
+promptlayer setup mcp
+promptlayer setup --agent cursor --agent claude
+promptlayer setup --force
+```
+
 ## Installation
 
 ```bash

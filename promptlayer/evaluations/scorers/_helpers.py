@@ -55,8 +55,8 @@ def require_one_of_modes(value: str, allowed: Iterable[str], scorer_name: str, *
 
 
 def require_non_empty_tools(expected_tools: List[str]) -> None:
-    if not isinstance(expected_tools, list) or not expected_tools:
-        raise validation_error("trajectory_scorer expected must contain non-empty scenario lists.")
+    if not isinstance(expected_tools, list):
+        raise validation_error("trajectory_scorer expected must contain scenario lists.")
     for tool in expected_tools:
         if not isinstance(tool, str) or not tool.strip():
             raise validation_error("trajectory_scorer expected tool names must be non-empty strings.")

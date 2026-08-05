@@ -254,6 +254,8 @@ def test_compare_scorer_dependencies_support_literal_and_column_targets():
 @pytest.mark.parametrize(
     ("mode", "trace_tools", "expected_tools", "expected_score"),
     [
+        ("strict", (), [], True),
+        ("strict", ("search",), [], False),
         ("strict", ("search", "checkout"), ["search", "checkout"], True),
         ("strict", ("search",), ["search", "checkout"], False),
         ("strict", ("checkout", "search"), ["search", "checkout"], False),
@@ -263,6 +265,7 @@ def test_compare_scorer_dependencies_support_literal_and_column_targets():
         ("non_strict", ("search",), ["search", "checkout"], False),
         ("non_strict", ("checkout", "search"), ["search", "checkout"], False),
         ("non_strict", ("search", "search", "checkout"), ["search", "checkout"], True),
+        ("non_strict", ("search",), [], False),
     ],
 )
 def test_trajectory_scorer_modes(
@@ -371,6 +374,8 @@ def test_trajectory_scorer_accepts_config_accepted_scenarios():
     }
     single = trajectory_scorer(expected=[["search"]], title="one path")
     assert single["config"]["accepted_scenarios"] == [["search"]]
+    no_tools = trajectory_scorer(expected=[[]], title="no tools")
+    assert no_tools["config"]["accepted_scenarios"] == [[]]
 
 
 def test_trajectory_scorer_supports_weight_and_failure_threshold():

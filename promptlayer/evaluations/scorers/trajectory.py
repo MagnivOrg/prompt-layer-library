@@ -36,6 +36,8 @@ def _is_subsequence(required: List[Any], actual: List[Any]) -> bool:
 
 def _score_tool_sequence(trace: Any, expected_tools: List[str], mode: TrajectoryMode) -> bool:
     actual = extract_trajectory_tool_names(trace)
+    if not expected_tools:
+        return not actual
     if mode == "strict":
         return actual == expected_tools
     return _is_subsequence(expected_tools, actual)
@@ -53,7 +55,7 @@ def _parse_json_value(raw: Any) -> Any:
 
 
 def _parse_tool_list(entries: Any) -> Optional[List[str]]:
-    if not isinstance(entries, list) or not entries:
+    if not isinstance(entries, list):
         return None
     tools: List[str] = []
     for entry in entries:

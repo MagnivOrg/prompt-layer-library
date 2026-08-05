@@ -319,10 +319,16 @@ def test_trajectory_source_parses_accepted_scenarios():
         )
         is True
     )
-    # Objects / legacy shapes are rejected
-    assert score_trajectory(matching, {"required_tools": ["create_folder"]}) is False
-    assert score_trajectory(matching, {"accepted_scenarios": [["create_folder"]]}) is False
-    assert score_trajectory(matching, ["create_folder"]) is False
+    assert score_trajectory(matching, [["create_folder"]]) is True
+    assert score_trajectory(matching, '[["create_folder"]]') is True
+    assert score_trajectory(matching, {"accepted_scenarios": [["create_folder"]]}) is True
+
+    with pytest.raises(PromptLayerValidationError, match="Trajectory expected value"):
+        score_trajectory(matching, {"required_tools": ["create_folder"]})
+    with pytest.raises(PromptLayerValidationError, match="Trajectory expected value"):
+        score_trajectory(matching, ["create_folder"])
+    with pytest.raises(PromptLayerValidationError, match="Trajectory expected value"):
+        score_trajectory(matching, [["create_folder"], [42]])  # type: ignore[list-item]
 
     scorer = trajectory_scorer(expected_column="expected")
     assert scorer["type"] == "TRAJECTORY"

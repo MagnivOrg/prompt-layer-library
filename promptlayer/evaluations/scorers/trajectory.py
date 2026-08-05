@@ -36,6 +36,8 @@ def _is_subsequence(required: List[Any], actual: List[Any]) -> bool:
 
 def _score_tool_sequence(trace: Any, expected_tools: List[str], mode: TrajectoryMode) -> bool:
     actual = extract_trajectory_tool_names(trace)
+    if not expected_tools:
+        return not actual
     if mode == "strict":
         return actual == expected_tools
     return _is_subsequence(expected_tools, actual)
@@ -53,7 +55,7 @@ def _parse_json_value(raw: Any) -> Any:
 
 
 def _parse_tool_list(entries: Any) -> Optional[List[str]]:
-    if not isinstance(entries, list) or not entries:
+    if not isinstance(entries, list):
         return None
     tools: List[str] = []
     for entry in entries:
@@ -69,27 +71,28 @@ def _parse_tool_list(entries: Any) -> Optional[List[str]]:
 def parse_expected_tool_lists_from_source(raw: Any) -> Optional[List[List[str]]]:
     """Parse expected tool-name sequences from a column cell.
 
-    Accepts only:
-    {
-      "accepted_scenarios": [
-        {"required_tools": ["search", "checkout"]},
-        ...
-      ]
-    }
+    Accepts a list of tool-name lists, or an ``accepted_scenarios`` object
+    containing tool-name lists or objects with ``required_tools`` lists.
     """
     parsed = _parse_json_value(raw)
-    if not isinstance(parsed, dict):
-        return None
-
-    scenarios = parsed.get("accepted_scenarios")
+    if isinstance(parsed, list):
+        scenarios = parsed
+    elif isinstance(parsed, dict):
+        scenarios = parsed.get("accepted_scenarios")
+    else:
+        scenarios = None
     if not isinstance(scenarios, list) or not scenarios:
         return None
 
     tool_lists: List[List[str]] = []
     for scenario in scenarios:
-        if not isinstance(scenario, dict):
-            return None
-        tool_list = _parse_tool_list(scenario.get("required_tools"))
+        tool_list = (
+            _parse_tool_list(scenario)
+            if isinstance(scenario, list)
+            else _parse_tool_list(scenario.get("required_tools"))
+            if isinstance(scenario, dict)
+            else None
+        )
         if tool_list is None:
             return None
         tool_lists.append(tool_list)
@@ -105,13 +108,16 @@ def parse_expected_tools_from_source(raw: Any) -> Optional[List[str]]:
 
 def score_trajectory(
     trace: Any,
-    expected: Union[Dict[str, Any], str],
+    expected: Union[Dict[str, Any], List[List[str]], str],
     mode: TrajectoryMode = "strict",
 ) -> bool:
     """Score a trace against accepted scenarios from a column cell value."""
     expected_lists = parse_expected_tool_lists_from_source(expected)
     if not expected_lists:
-        return False
+        raise validation_error(
+            "Trajectory expected value must be a non-empty list of tool-name lists, "
+            "or a dict with accepted_scenarios containing required_tools lists."
+        )
     return any(_score_tool_sequence(trace, expected_tools, mode) for expected_tools in expected_lists)
 
 

@@ -63,6 +63,7 @@ from promptlayer.evaluations.utils import (
     extract_row_indices,
     extract_rows,
     find_last_row,
+    parse_cell_value,
 )
 from promptlayer.evaluations.validation import (
     assert_eval_args,
@@ -594,6 +595,7 @@ def _build_results(
     executed: List[CaseExecution],
     row_indices: List[Optional[int]],
     scores_by_row: Dict[int, Dict[str, Any]],
+    metadata_by_row: Dict[int, Dict[str, Optional[float]]],
 ) -> List[EvalCaseResult]:
     results: List[EvalCaseResult] = []
     for case, row_index in zip(executed, row_indices):
@@ -603,12 +605,97 @@ def _build_results(
                 expected_value=case.expected,
                 output_value=case.output,
                 scores=scores_by_row.get(row_index, {}) if row_index is not None else {},
+                price=metadata_by_row.get(row_index, {}).get("price") if row_index is not None else None,
+                latency=metadata_by_row.get(row_index, {}).get("latency") if row_index is not None else None,
                 trace_id=case.trace_id,
                 span_id=case.span_id,
                 row_index=row_index,
             )
         )
     return results
+
+
+def _metric_value(value: Any) -> Optional[float]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
+def _execution_metadata_from_rows(
+    rows_payload: Optional[Dict[str, Any]],
+    columns: List[Column],
+) -> Dict[int, Dict[str, Optional[float]]]:
+    payload_columns = rows_payload.get("columns", []) if isinstance(rows_payload, dict) else []
+    by_title = columns_by_title([*columns, *payload_columns])
+    price_column = by_title.get("Trace.price")
+    latency_column = by_title.get("Trace.latency")
+    result: Dict[int, Dict[str, Optional[float]]] = {}
+    for row in extract_rows(rows_payload):
+        row_index = row.get("row_index")
+        if row_index is None:
+            continue
+        cells = row.get("cells") or {}
+
+        def parse_metric(column: Optional[Column]) -> Optional[float]:
+            if column is None:
+                return None
+            cell = cells.get(str(column["id"]))
+            return _metric_value(parse_cell_value(cell if isinstance(cell, dict) else None))
+
+        result[int(row_index)] = {
+            "price": parse_metric(price_column),
+            "latency": parse_metric(latency_column),
+        }
+    return result
+
+
+def _fetch_execution_metadata_by_row(
+    context: "_EvalRunContext",
+    prepared: "_PreparedEval",
+) -> Dict[int, Dict[str, Optional[float]]]:
+    if context.tracer_provider is None:
+        return {}
+    payload = tables_api.list_all_smart_sheet_rows(
+        context.api_key,
+        context.base_url,
+        context.throw_on_error,
+        prepared.table["id"],
+        prepared.sheet["id"],
+        params={
+            **EVAL_TABLE_LIST_PARAMS,
+            "include_execution_metadata_aggregates": True,
+            "include_columns": True,
+        },
+    )
+    return _execution_metadata_from_rows(payload, prepared.columns)
+
+
+async def _afetch_execution_metadata_by_row(
+    context: "_EvalRunContext",
+    prepared: "_PreparedEval",
+) -> Dict[int, Dict[str, Optional[float]]]:
+    if context.tracer_provider is None:
+        return {}
+    payload = await tables_api.alist_all_smart_sheet_rows(
+        context.api_key,
+        context.base_url,
+        context.throw_on_error,
+        prepared.table["id"],
+        prepared.sheet["id"],
+        params={
+            **EVAL_TABLE_LIST_PARAMS,
+            "include_execution_metadata_aggregates": True,
+            "include_columns": True,
+        },
+    )
+    return _execution_metadata_from_rows(payload, prepared.columns)
 
 
 @dataclass(frozen=True)
@@ -875,9 +962,10 @@ def _finalize_eval(
     executed: List[CaseExecution],
     row_indices: List[Optional[int]],
     scores_by_row: Dict[int, Dict[str, Any]],
+    metadata_by_row: Dict[int, Dict[str, Optional[float]]],
     score: Any,
 ) -> EvalResult:
-    case_results = _build_results(executed, row_indices, scores_by_row)
+    case_results = _build_results(executed, row_indices, scores_by_row, metadata_by_row)
     failed_indices = collect_failing_row_indices(case_results)
     score_cards = scorer_pass_rates(case_results)
     _emit_score(score, context.passing_score)
@@ -1013,12 +1101,14 @@ def run_eval(
         row_indices,
         scorecard_payload,
     )
+    metadata_by_row = _fetch_execution_metadata_by_row(context, prepared)
     return _finalize_eval(
         context,
         prepared,
         executed,
         row_indices,
         scores_by_row,
+        metadata_by_row,
         _score_payload_from_scorecard(scorecard_payload),
     )
 
@@ -1133,12 +1223,14 @@ async def arun_eval(
         row_indices,
         scorecard_payload,
     )
+    metadata_by_row = await _afetch_execution_metadata_by_row(context, prepared)
     return _finalize_eval(
         context,
         prepared,
         executed,
         row_indices,
         scores_by_row,
+        metadata_by_row,
         _score_payload_from_scorecard(scorecard_payload),
     )
 

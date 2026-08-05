@@ -9,8 +9,6 @@ include = [
     { path = "promptlayer/integrations/claude_agents/vendor/vendor_metadata.json", format = ["sdist", "wheel"] },
     { path = "promptlayer/integrations/claude_agents/vendor/**/*", format = ["sdist", "wheel"] },
     { path = "promptlayer/integrations/claude_agents/vendor/trace/.claude-plugin/plugin.json", format = ["sdist", "wheel"] },
-    { path = "promptlayer/agent/skills/promptlayer/SKILL.md", format = ["sdist", "wheel"] },
-    { path = "promptlayer/agent/skills/promptlayer/references/**/*", format = ["sdist", "wheel"] },
 ]
 
 [tool.poetry.urls]

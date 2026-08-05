@@ -6,8 +6,10 @@ import io
 import json
 import zipfile
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
+import requests
 
 from promptlayer.cli import main
 from promptlayer.cli.setup.agents import resolve_setup_agents
@@ -19,7 +21,10 @@ from promptlayer.cli.setup.constants import (
 from promptlayer.cli.setup.mcp import install_docs_mcp_for_agents
 from promptlayer.cli.setup.run import run_setup_command
 from promptlayer.cli.setup.skills import (
+    default_fetch_binary,
+    default_fetch_text,
     ensure_python_sdk_appendix,
+    fetch_promptlayer_skill,
     install_skill_entries_for_agents,
     install_skill_for_agents,
     read_zip_entries,
@@ -76,6 +81,25 @@ def test_ensure_python_sdk_appendix_once():
     twice = ensure_python_sdk_appendix(once)
     assert "Python SDK guidance" in once
     assert twice == (once if once.endswith("\n") else f"{once}\n")
+
+
+def test_default_fetchers_use_requests(monkeypatch: pytest.MonkeyPatch):
+    response = Mock(text="skill text", content=b"skill bytes")
+    monkeypatch.setattr(requests, "get", Mock(return_value=response))
+
+    assert default_fetch_text("https://example.com/skill.md") == "skill text"
+    assert default_fetch_binary("https://example.com/skills.zip") == b"skill bytes"
+    assert requests.get.call_count == 2
+    response.raise_for_status.assert_called()
+
+
+def test_fetch_promptlayer_skill_falls_back_after_request_error():
+    fetch_text = Mock(side_effect=[requests.ConnectionError("TLS failure"), SKILL_FIXTURE])
+
+    skill = fetch_promptlayer_skill(fetch_text)
+
+    assert "# PromptLayer Skill" in skill
+    assert fetch_text.call_count == 2
 
 
 def test_read_zip_entries():

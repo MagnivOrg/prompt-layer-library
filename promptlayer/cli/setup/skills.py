@@ -6,7 +6,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Sequence
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+
+import requests
 
 from promptlayer.cli.setup.agents import SetupAgent, skill_package_path
 from promptlayer.cli.setup.constants import (
@@ -30,15 +31,15 @@ class SkillInstallResult:
 
 
 def default_fetch_text(url: str) -> str:
-    request = Request(url, headers={"User-Agent": "promptlayer-cli"})
-    with urlopen(request, timeout=60) as response:  # noqa: S310
-        return response.read().decode("utf-8")
+    response = requests.get(url, headers={"User-Agent": "promptlayer-cli"}, timeout=60)
+    response.raise_for_status()
+    return response.text
 
 
 def default_fetch_binary(url: str) -> bytes:
-    request = Request(url, headers={"User-Agent": "promptlayer-cli"})
-    with urlopen(request, timeout=60) as response:  # noqa: S310
-        return response.read()
+    response = requests.get(url, headers={"User-Agent": "promptlayer-cli"}, timeout=60)
+    response.raise_for_status()
+    return response.content
 
 
 def fetch_promptlayer_skill(fetch_text: FetchText = default_fetch_text) -> str:
@@ -50,7 +51,7 @@ def fetch_promptlayer_skill(fetch_text: FetchText = default_fetch_text) -> str:
                 errors.append(f"{url}: empty response")
                 continue
             return ensure_python_sdk_appendix(content)
-        except (HTTPError, URLError, OSError, UnicodeError) as exc:
+        except (requests.RequestException, HTTPError, URLError, OSError, UnicodeError) as exc:
             errors.append(f"{url}: {exc}")
     raise RuntimeError("Could not download the PromptLayer skill.\n" + "\n".join(errors))
 

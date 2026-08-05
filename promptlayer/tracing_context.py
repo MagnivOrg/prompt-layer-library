@@ -6,7 +6,7 @@ import inspect
 from contextvars import ContextVar
 from typing import Any, AsyncGenerator, Generator, Optional
 
-from opentelemetry import trace
+from opentelemetry import context, trace
 from opentelemetry.trace import Tracer
 
 # Set by Eval while a case runner executes. PromptLayer clients resolve this
@@ -53,6 +53,7 @@ def format_run_output(result: Any) -> str:
 
 
 def wrap_stream_with_span(stream: Generator, span) -> Generator:
+    token = context.attach(context.get_current())
     try:
         for chunk in stream:
             yield chunk
@@ -60,10 +61,14 @@ def wrap_stream_with_span(stream: Generator, span) -> Generator:
         span.record_exception(exc)
         raise
     finally:
-        span.end()
+        try:
+            span.end()
+        finally:
+            context.detach(token)
 
 
 async def awrap_stream_with_span(stream: AsyncGenerator, span) -> AsyncGenerator:
+    token = context.attach(context.get_current())
     try:
         async for chunk in stream:
             yield chunk
@@ -71,4 +76,7 @@ async def awrap_stream_with_span(stream: AsyncGenerator, span) -> AsyncGenerator
         span.record_exception(exc)
         raise
     finally:
-        span.end()
+        try:
+            span.end()
+        finally:
+            context.detach(token)

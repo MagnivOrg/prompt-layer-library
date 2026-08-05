@@ -9,6 +9,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from promptlayer import tracing
+from promptlayer.integrations import bedrock as bedrock_integration
 from promptlayer.promptlayer_base import PromptLayerBase
 from promptlayer.span_exporter import (
     GenAIPromptTemplateSpanProcessor,
@@ -108,6 +109,7 @@ def test_configure_tracing_instruments_anthropic_and_google_once(monkeypatch):
 
 
 def test_configure_tracing_instruments_every_installed_provider_by_default(monkeypatch):
+    monkeypatch.delenv(tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV, raising=False)
     provider = _FakeTracerProvider()
     instrumentors = _install_fake_instrumentors(monkeypatch, tracing.NATIVE_OTEL_PROVIDERS)
     _capture_otlp_exporters(monkeypatch)
@@ -118,6 +120,7 @@ def test_configure_tracing_instruments_every_installed_provider_by_default(monke
     )
 
     assert configured_provider is provider
+    assert os.environ[tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV] == tracing._DEFAULT_GENAI_CAPTURE_MESSAGE_CONTENT
     for provider_name, instrumentor in instrumentors.items():
         expected_kwargs = {"tracer_provider": provider}
         if provider_name == "bedrock":
@@ -126,6 +129,40 @@ def test_configure_tracing_instruments_every_installed_provider_by_default(monke
                 response_hook=tracing.bedrock_response_hook,
             )
         instrumentor.instrument.assert_called_once_with(**expected_kwargs)
+
+
+@pytest.mark.parametrize(
+    "capture_mode",
+    ("NO_CONTENT", "SPAN_ONLY", "EVENT_ONLY", "SPAN_AND_EVENT"),
+)
+def test_configure_tracing_preserves_official_message_content_capture_mode(monkeypatch, capture_mode):
+    monkeypatch.setenv(tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV, capture_mode)
+    provider = _FakeTracerProvider()
+    _install_fake_instrumentors(monkeypatch, ("anthropic",))
+    _capture_otlp_exporters(monkeypatch)
+
+    tracing.configure_tracing(
+        api_key="pl_test",
+        tracer_provider=provider,
+        providers=("anthropic",),
+    )
+
+    assert os.environ[tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV] == capture_mode
+
+
+@pytest.mark.parametrize(
+    ("capture_mode", "expected"),
+    (
+        ("NO_CONTENT", False),
+        ("SPAN_ONLY", True),
+        ("EVENT_ONLY", False),
+        ("SPAN_AND_EVENT", True),
+    ),
+)
+def test_bedrock_span_capture_uses_official_message_content_modes(monkeypatch, capture_mode, expected):
+    monkeypatch.setenv(tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV, capture_mode)
+
+    assert bedrock_integration._capture_message_content_enabled() is expected
 
 
 def test_configure_sdk_instrumentation_respects_provider_selection(monkeypatch):
@@ -186,12 +223,14 @@ def test_explicit_instrumentation_failure_is_still_reported(monkeypatch):
         )
 
 
-def test_configure_sdk_instrumentation_accepts_empty_provider_selection():
+def test_configure_sdk_instrumentation_accepts_empty_provider_selection(monkeypatch):
+    monkeypatch.delenv(tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV, raising=False)
     provider = _FakeTracerProvider()
 
     tracing._configure_sdk_instrumentation(provider, providers=())
 
     assert provider.processors == []
+    assert tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV not in os.environ
 
 
 def test_responses_enrichment_failure_does_not_escape_provider_hook(monkeypatch):

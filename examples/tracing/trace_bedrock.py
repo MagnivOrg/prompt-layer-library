@@ -6,7 +6,6 @@ import boto3
 
 from promptlayer import configure_tracing
 
-os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "SPAN_ONLY")
 tracer_provider = configure_tracing(providers=("bedrock",))
 client = boto3.client(
     "bedrock-runtime",

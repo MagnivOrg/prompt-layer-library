@@ -37,11 +37,17 @@ def reset_tracing_state(monkeypatch):
     monkeypatch.setattr(tracing, "_prompt_processor_providers", WeakKeyDictionary())
     monkeypatch.setattr(tracing, "_instrumented_provider_owners", {})
     original_semconv = os.environ.get("OTEL_SEMCONV_STABILITY_OPT_IN")
+    original_capture_mode = os.environ.get(tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV)
+    os.environ.pop(tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV, None)
     yield
     if original_semconv is None:
         os.environ.pop("OTEL_SEMCONV_STABILITY_OPT_IN", None)
     else:
         os.environ["OTEL_SEMCONV_STABILITY_OPT_IN"] = original_semconv
+    if original_capture_mode is None:
+        os.environ.pop(tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV, None)
+    else:
+        os.environ[tracing._GENAI_CAPTURE_MESSAGE_CONTENT_ENV] = original_capture_mode
 
 
 def _install_fake_openai_instrumentor(monkeypatch):

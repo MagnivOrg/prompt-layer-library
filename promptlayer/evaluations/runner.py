@@ -27,6 +27,7 @@ from promptlayer.evaluations.scores import (
     scorer_pass_rates,
 )
 from promptlayer.evaluations.setup import (
+    EVAL_TABLE_LIST_PARAMS,
     aclear_blank_scaffold_rows,
     aensure_eval_scaffold_columns,
     aresolve_cases,
@@ -378,7 +379,7 @@ def _persist_trace_rows_sync(
                 throw_on_error,
                 table_id,
                 sheet_id,
-                params={"order": "desc", "limit": 1, "include_columns": False},
+                params={**EVAL_TABLE_LIST_PARAMS, "order": "desc", "limit": 1, "include_columns": False},
             )
             fallback_row = find_last_row(rows_payload)
         row_index, trace_row, resolved_output = _postprocess_trace_import(
@@ -458,7 +459,7 @@ async def _persist_trace_rows_async(
                 throw_on_error,
                 table_id,
                 sheet_id,
-                params={"order": "desc", "limit": 1, "include_columns": False},
+                params={**EVAL_TABLE_LIST_PARAMS, "order": "desc", "limit": 1, "include_columns": False},
             )
             fallback_row = find_last_row(rows_payload)
         row_index, trace_row, resolved_output = _postprocess_trace_import(
@@ -744,7 +745,12 @@ def _prepare_eval_sync(context: _EvalRunContext) -> _PreparedEval:
 
     _emit_status("Setting up columns")
     columns_response = tables_api.list_smart_sheet_columns(
-        context.api_key, context.base_url, context.throw_on_error, table["id"], sheet["id"]
+        context.api_key,
+        context.base_url,
+        context.throw_on_error,
+        table["id"],
+        sheet["id"],
+        params=EVAL_TABLE_LIST_PARAMS,
     )
     columns = extract_columns(columns_response or {})
     columns = ensure_eval_scaffold_columns(
@@ -810,7 +816,12 @@ async def _prepare_eval_async(context: _EvalRunContext) -> _PreparedEval:
 
     _emit_status("Setting up columns")
     columns_response = await tables_api.alist_smart_sheet_columns(
-        context.api_key, context.base_url, context.throw_on_error, table["id"], sheet["id"]
+        context.api_key,
+        context.base_url,
+        context.throw_on_error,
+        table["id"],
+        sheet["id"],
+        params=EVAL_TABLE_LIST_PARAMS,
     )
     columns = extract_columns(columns_response or {})
     columns = await aensure_eval_scaffold_columns(

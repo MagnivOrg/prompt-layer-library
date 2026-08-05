@@ -1220,7 +1220,8 @@ def test_eval_resolves_independent_output_and_dataset_tables(
         {"id": "d5", "title": "Output", "type": "TEXT"},
     ]
 
-    def list_columns_side_effect(api_key, base_url, throw_on_error, table_id, sheet_id):
+    def list_columns_side_effect(api_key, base_url, throw_on_error, table_id, sheet_id, params=None):
+        assert params == {"include_system_columns": True}
         if str(table_id) == "10":
             return {"data": eval_columns}
         return {"data": dataset_columns}
@@ -1254,6 +1255,9 @@ def test_eval_resolves_independent_output_and_dataset_tables(
     }
 
     def list_rows_side_effect(api_key, base_url, throw_on_error, table_id, sheet_id, params=None):
+        # The trace-import test fixture performs one synthetic read without eval params.
+        if params is not None:
+            assert params["include_system_columns"] is True
         if str(table_id) == "10":
             return eval_rows
         return dataset_rows

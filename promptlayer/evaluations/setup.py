@@ -31,6 +31,8 @@ from promptlayer.types.table import (
     Table,
 )
 
+EVAL_TABLE_LIST_PARAMS = {"include_system_columns": True}
+
 
 def clear_blank_scaffold_rows(
     api_key: str,
@@ -46,7 +48,7 @@ def clear_blank_scaffold_rows(
         throw_on_error,
         table_id,
         sheet_id,
-        params={"order": "asc", "limit": 20, "include_columns": False},
+        params={**EVAL_TABLE_LIST_PARAMS, "order": "asc", "limit": 20, "include_columns": False},
     )
     blank_indices = blank_row_indices(rows_payload)
     if not blank_indices:
@@ -74,7 +76,7 @@ async def aclear_blank_scaffold_rows(
         throw_on_error,
         table_id,
         sheet_id,
-        params={"order": "asc", "limit": 20, "include_columns": False},
+        params={**EVAL_TABLE_LIST_PARAMS, "order": "asc", "limit": 20, "include_columns": False},
     )
     blank_indices = blank_row_indices(rows_payload)
     if not blank_indices:
@@ -693,9 +695,23 @@ def resolve_cases(
             raise api_error("Failed to resolve sheet for dataset table reference.")
         sheet_id = sheet["id"]
 
-    columns_response = tables_api.list_smart_sheet_columns(api_key, base_url, throw_on_error, table_id, sheet_id)
+    columns_response = tables_api.list_smart_sheet_columns(
+        api_key,
+        base_url,
+        throw_on_error,
+        table_id,
+        sheet_id,
+        params=EVAL_TABLE_LIST_PARAMS,
+    )
     source_columns = extract_columns(columns_response or {})
-    rows_payload = tables_api.list_all_smart_sheet_rows(api_key, base_url, throw_on_error, table_id, sheet_id)
+    rows_payload = tables_api.list_all_smart_sheet_rows(
+        api_key,
+        base_url,
+        throw_on_error,
+        table_id,
+        sheet_id,
+        params=EVAL_TABLE_LIST_PARAMS,
+    )
     return cases_from_rows(rows_payload, source_columns)  # type: ignore[return-value]
 
 
@@ -718,7 +734,21 @@ async def aresolve_cases(
             raise api_error("Failed to resolve sheet for dataset table reference.")
         sheet_id = sheet["id"]
 
-    columns_response = await tables_api.alist_smart_sheet_columns(api_key, base_url, throw_on_error, table_id, sheet_id)
+    columns_response = await tables_api.alist_smart_sheet_columns(
+        api_key,
+        base_url,
+        throw_on_error,
+        table_id,
+        sheet_id,
+        params=EVAL_TABLE_LIST_PARAMS,
+    )
     source_columns = extract_columns(columns_response or {})
-    rows_payload = await tables_api.alist_all_smart_sheet_rows(api_key, base_url, throw_on_error, table_id, sheet_id)
+    rows_payload = await tables_api.alist_all_smart_sheet_rows(
+        api_key,
+        base_url,
+        throw_on_error,
+        table_id,
+        sheet_id,
+        params=EVAL_TABLE_LIST_PARAMS,
+    )
     return cases_from_rows(rows_payload, source_columns)  # type: ignore[return-value]

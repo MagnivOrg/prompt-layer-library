@@ -1072,6 +1072,7 @@ def list_smart_sheet_columns(
     throw_on_error: bool,
     table_id: ResourceId,
     sheet_id: ResourceId,
+    params: Optional[Dict[str, Any]] = None,
 ) -> Union[ColumnListResponse, None]:
     return _request(
         method="GET",
@@ -1079,6 +1080,7 @@ def list_smart_sheet_columns(
         api_key=api_key,
         throw_on_error=throw_on_error,
         action="listing your sheet columns",
+        params=params or {},
     )
 
 
@@ -1089,6 +1091,7 @@ async def alist_smart_sheet_columns(
     throw_on_error: bool,
     table_id: ResourceId,
     sheet_id: ResourceId,
+    params: Optional[Dict[str, Any]] = None,
 ) -> Union[ColumnListResponse, None]:
     return await _arequest(
         method="GET",
@@ -1096,6 +1099,7 @@ async def alist_smart_sheet_columns(
         api_key=api_key,
         throw_on_error=throw_on_error,
         action="listing your sheet columns",
+        params=params or {},
     )
 
 

@@ -364,6 +364,8 @@ class EvalCaseResult(TypedDict, total=False):
     expected: Any
     output: Any
     scores: Dict[str, Any]
+    price: Optional[float]
+    latency: Optional[float]
     trace_id: Optional[str]
     span_id: Optional[str]
     row_index: Optional[int]

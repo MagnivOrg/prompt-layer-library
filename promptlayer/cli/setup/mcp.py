@@ -38,9 +38,7 @@ def install_docs_mcp_for_agents(
         absolute_path = (cwd / agent.mcp_path).resolve()
         absolute_key = str(absolute_path)
         if absolute_key in written:
-            results.append(
-                McpInstallResult(agent=agent, path=agent.mcp_path, status=written[absolute_key])
-            )
+            results.append(McpInstallResult(agent=agent, path=agent.mcp_path, status=written[absolute_key]))
             continue
 
         existing_raw = absolute_path.read_text(encoding="utf-8") if absolute_path.exists() else None
@@ -91,14 +89,10 @@ def _merge_json_mcp_config(
 ) -> Dict[str, str]:
     existing = _parse_json_object(existing_raw, file_path) if existing_raw else {}
     servers_value = existing.get("mcpServers")
-    servers = (
-        dict(servers_value)
-        if isinstance(servers_value, dict)
-        else {}
-    )
+    servers = dict(servers_value) if isinstance(servers_value, dict) else {}
     current = servers.get(DOCS_MCP_SERVER_NAME)
-    already_matches = (
-        isinstance(current, dict) and json.dumps(current, sort_keys=True) == json.dumps(dict(server_entry), sort_keys=True)
+    already_matches = isinstance(current, dict) and json.dumps(current, sort_keys=True) == json.dumps(
+        dict(server_entry), sort_keys=True
     )
     if already_matches and not force:
         return {"next": json.dumps(existing, indent=2) + "\n", "status": "skipped"}

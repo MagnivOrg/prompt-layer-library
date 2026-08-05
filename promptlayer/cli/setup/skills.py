@@ -91,11 +91,7 @@ def install_skill_entries_for_agents(
     force: bool = False,
 ) -> List[SkillInstallResult]:
     skill_names = sorted(
-        {
-            entry.split("/", 1)[0]
-            for entry in files
-            if entry and "/" in entry and not entry.endswith("/")
-        }
+        {entry.split("/", 1)[0] for entry in files if entry and "/" in entry and not entry.endswith("/")}
     )
     results: List[SkillInstallResult] = []
     handled: set[str] = set()

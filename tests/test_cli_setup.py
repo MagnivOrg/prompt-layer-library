@@ -25,7 +25,6 @@ from promptlayer.cli.setup.skills import (
     read_zip_entries,
 )
 
-
 SKILL_FIXTURE = """---
 name: Promptlayer
 description: Test skill
@@ -117,9 +116,7 @@ def test_install_zip_skill_trees(tmp_path: Path):
     )
     assert any(result.status == "written" for result in results)
     assert (tmp_path / ".agents/skills/sdk-eval-builder/SKILL.md").is_file()
-    assert (
-        tmp_path / ".agents/skills/sdk-eval-builder/references/model-comparison-eval.md"
-    ).is_file()
+    assert (tmp_path / ".agents/skills/sdk-eval-builder/references/model-comparison-eval.md").is_file()
     assert (tmp_path / ".claude/skills/sdk-eval-builder/SKILL.md").is_file()
 
 

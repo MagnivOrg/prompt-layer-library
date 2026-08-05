@@ -19,7 +19,7 @@ You are integrating the installed `promptlayer` package. Prefer the public API,
 package metadata, docstrings, and PromptLayer documentation over reading
 implementation source under `site-packages`.
 
-Documentation index: https://docs.promptlayer.com/llms.txt  
+Documentation index: https://docs.promptlayer.com/llms.txt
 Python SDK docs: https://docs.promptlayer.com/sdks/python.md
 
 ## Before you start

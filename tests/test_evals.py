@@ -2900,6 +2900,28 @@ def test_extract_last_assistant_message_backend_normalized_providers(request_res
     assert extract_last_assistant_message(trace) == expected
 
 
+def test_extract_last_assistant_message_ignores_google_user_content():
+    from promptlayer.evaluations.trace_output import extract_last_assistant_message
+
+    trace = {
+        "name": "root",
+        "request_log": {
+            "request_response": {
+                "candidates": [
+                    {
+                        "content": {
+                            "role": "user",
+                            "parts": [{"text": "not an assistant response"}],
+                        }
+                    }
+                ]
+            }
+        },
+        "children": [],
+    }
+    assert extract_last_assistant_message(trace) is None
+
+
 def test_resolve_output_prefers_non_null_runner_output_and_uses_trace_for_none():
     from promptlayer.evaluations.trace_output import resolve_output_from_trace_row
 

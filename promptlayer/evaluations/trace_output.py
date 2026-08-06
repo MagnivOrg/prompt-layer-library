@@ -257,6 +257,8 @@ def _normalize_anthropic_response(response: Dict[str, Any]) -> Any:
 def _normalize_google_content(content: Any) -> Any:
     if not isinstance(content, dict):
         return None
+    if content.get("role") != "model":
+        return None
     parts = content.get("parts")
     if not isinstance(parts, list):
         return None

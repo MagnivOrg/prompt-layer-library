@@ -75,10 +75,11 @@ def resolve_output_from_trace_row(
     *,
     fallback: Any = None,
 ) -> Any:
-    """Prefer Trace-derived last assistant message; else ``fallback``."""
+    """Use a non-null runner output; otherwise derive the assistant output from Trace."""
+    if fallback is not None:
+        return fallback
     trace = _trace_cell_value(row, columns_by_title_map)
-    derived = extract_last_assistant_message(trace)
-    return fallback if derived is None else derived
+    return extract_last_assistant_message(trace)
 
 
 def _trace_cell_value(
@@ -151,11 +152,25 @@ def _assistant_from_request_response(response: Any) -> Any:
                 if role == "assistant":
                     return _normalize_assistant_message(message)
 
-    # Anthropic Messages API
-    if response.get("type") == "message" or "stop_reason" in response:
-        role = response.get("role")
-        if role in (None, "assistant"):
-            return _normalize_anthropic_response(response)
+    # Anthropic Messages API. Backend-normalized responses intentionally omit
+    # ``type`` and may omit ``stop_reason``, so role + content is the stable shape.
+    role = response.get("role")
+    if role in (None, "assistant") and isinstance(response.get("content"), (str, list)):
+        return _normalize_anthropic_response(response)
+
+    # Legacy Anthropic Completions API.
+    completion = response.get("completion")
+    if isinstance(completion, str):
+        return _maybe_parse_json(completion)
+
+    # Google Gemini / Vertex generate-content.
+    candidates = response.get("candidates")
+    if isinstance(candidates, list) and candidates:
+        candidate = candidates[0]
+        if isinstance(candidate, dict):
+            message = _normalize_google_content(candidate.get("content"))
+            if message is not None:
+                return message
 
     # OpenAI Responses API
     output_list = response.get("output")
@@ -179,6 +194,14 @@ def _assistant_from_request_response(response: Any) -> Any:
                         }
                     ],
                 }
+
+    # Amazon Bedrock Converse.
+    if isinstance(response.get("output"), dict):
+        output = response["output"]
+        message = output.get("message")
+        normalized = _normalize_bedrock_message(message)
+        if normalized is not None:
+            return normalized
 
     return None
 
@@ -229,6 +252,73 @@ def _normalize_anthropic_response(response: Dict[str, Any]) -> Any:
     if text is not None:
         return _maybe_parse_json(text)
     return None
+
+
+def _normalize_google_content(content: Any) -> Any:
+    if not isinstance(content, dict):
+        return None
+    parts = content.get("parts")
+    if not isinstance(parts, list):
+        return None
+
+    text_parts: List[str] = []
+    tool_calls: List[Dict[str, Any]] = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        if isinstance(part.get("text"), str) and not part.get("thought"):
+            text_parts.append(part["text"])
+        function_call = part.get("function_call")
+        if isinstance(function_call, dict):
+            arguments = function_call.get("args") or {}
+            tool_calls.append(
+                {
+                    "id": function_call.get("id"),
+                    "type": "function",
+                    "function": {
+                        "name": function_call.get("name"),
+                        "arguments": arguments if isinstance(arguments, str) else json.dumps(arguments),
+                    },
+                }
+            )
+
+    text = "\n".join(text_parts) if text_parts else None
+    if tool_calls:
+        return {"content": text, "tool_calls": tool_calls}
+    return _maybe_parse_json(text) if text is not None else None
+
+
+def _normalize_bedrock_message(message: Any) -> Any:
+    if not isinstance(message, dict) or message.get("role", "assistant") != "assistant":
+        return None
+    content = message.get("content")
+    if not isinstance(content, list):
+        return None
+
+    text_parts: List[str] = []
+    tool_calls: List[Dict[str, Any]] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if isinstance(block.get("text"), str):
+            text_parts.append(block["text"])
+        tool_use = block.get("toolUse")
+        if isinstance(tool_use, dict):
+            tool_calls.append(
+                {
+                    "id": tool_use.get("toolUseId"),
+                    "type": "function",
+                    "function": {
+                        "name": tool_use.get("name"),
+                        "arguments": json.dumps(tool_use.get("input") or {}),
+                    },
+                }
+            )
+
+    text = "\n".join(text_parts) if text_parts else None
+    if tool_calls:
+        return {"content": text, "tool_calls": tool_calls}
+    return _maybe_parse_json(text) if text is not None else None
 
 
 def _normalize_responses_message(item: Dict[str, Any]) -> Any:

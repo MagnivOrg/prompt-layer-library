@@ -1,7 +1,9 @@
 import asyncio
+import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
 
+from promptlayer.evaluations.live_progress import await_sheet_execution_progress
 from promptlayer.evaluations.terminal import get_terminal
 from promptlayer.evaluations.utils import (
     _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
@@ -12,6 +14,8 @@ from promptlayer.evaluations.utils import (
 from promptlayer.evaluations.validation import api_error, timeout_error
 from promptlayer.tables import api as tables_api
 from promptlayer.types.table import Column, ResourceId
+
+logger = logging.getLogger(__name__)
 
 _TERMINAL_OPERATION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
@@ -345,98 +349,27 @@ def _report_terminal_operation_progress(
     get_terminal().cell_progress(completed, total, failed, status=status)
 
 
-def wait_for_sheet_operations(
-    api_key: str,
-    base_url: str,
-    throw_on_error: bool,
-    table_id: ResourceId,
-    sheet_id: ResourceId,
-    *,
-    column_ids: List[str],
-    row_ids: Optional[List[int]] = None,
-    timeout_seconds: float = _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
-    poll_interval_seconds: float = _DEFAULT_POLL_INTERVAL_SECONDS,
-) -> Optional[Dict[str, Any]]:
-    """Start a scoped recalculate operation and poll until each operation finishes."""
-    if not column_ids:
-        return None
-    create_response = tables_api.create_sheet_operation(
-        api_key,
-        base_url,
-        throw_on_error,
-        table_id,
-        sheet_id,
-        {
-            "operation": "recalculate",
-            "column_ids": column_ids,
-            "row_ids": row_ids,
-        },
-    )
-    _report_operation_cell_progress(create_response, _report_terminal_operation_progress)
-    operation_ids = _operation_ids_from_create_response(create_response if isinstance(create_response, dict) else None)
-    if not operation_ids:
-        if isinstance(create_response, dict):
-            cell_count = _non_negative_int(create_response.get("cell_count")) or 0
-            get_terminal().cell_progress(cell_count, cell_count, 0, status="completed")
-        return create_response if isinstance(create_response, dict) else None
-
-    last: Optional[Dict[str, Any]] = None
-    for operation_id in operation_ids:
-        last = _poll_until(
-            fetch=lambda operation_id=operation_id: _normalize_operation_status_payload(
-                tables_api.get_sheet_operation(api_key, base_url, throw_on_error, table_id, sheet_id, operation_id)
-            ),
-            is_done=_operation_is_terminal,
-            timeout_seconds=timeout_seconds,
-            poll_interval_seconds=poll_interval_seconds,
-            timeout_message="Timed out waiting for supporting column computation to finish.",
-            backoff=True,
-            on_update=lambda payload: _report_operation_cell_progress(payload, _report_terminal_operation_progress),
+def _raise_if_operation_failed(operation_id: str, payload: Optional[Dict[str, Any]]) -> None:
+    status = str((payload or {}).get("status") or "").lower()
+    if status == "failed":
+        raise api_error(f"Supporting column operation {operation_id} failed while computing preprocessing columns.")
+    if status == "cancelled":
+        raise api_error(
+            f"Supporting column operation {operation_id} was cancelled while computing preprocessing columns."
         )
-        status = str((last or {}).get("status") or "").lower()
-        if status == "failed":
-            raise api_error(f"Supporting column operation {operation_id} failed while computing preprocessing columns.")
-        if status == "cancelled":
-            raise api_error(
-                f"Supporting column operation {operation_id} was cancelled while computing preprocessing columns."
-            )
-    return last
 
 
-async def await_for_sheet_operations(
+async def _apoll_sheet_operations(
     api_key: str,
     base_url: str,
     throw_on_error: bool,
     table_id: ResourceId,
     sheet_id: ResourceId,
+    operation_ids: List[str],
     *,
-    column_ids: List[str],
-    row_ids: Optional[List[int]] = None,
-    timeout_seconds: float = _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
-    poll_interval_seconds: float = _DEFAULT_POLL_INTERVAL_SECONDS,
+    timeout_seconds: float,
+    poll_interval_seconds: float,
 ) -> Optional[Dict[str, Any]]:
-    if not column_ids:
-        return None
-    create_response = await tables_api.acreate_sheet_operation(
-        api_key,
-        base_url,
-        throw_on_error,
-        table_id,
-        sheet_id,
-        {
-            "operation": "recalculate",
-            "column_ids": column_ids,
-            "row_ids": row_ids,
-        },
-    )
-    _report_operation_cell_progress(create_response, _report_terminal_operation_progress)
-    operation_ids = _operation_ids_from_create_response(create_response if isinstance(create_response, dict) else None)
-    if not operation_ids:
-        if isinstance(create_response, dict):
-            cell_count = _non_negative_int(create_response.get("cell_count")) or 0
-            get_terminal().cell_progress(cell_count, cell_count, 0, status="completed")
-        return create_response if isinstance(create_response, dict) else None
-
     last: Optional[Dict[str, Any]] = None
     for operation_id in operation_ids:
 
@@ -456,11 +389,190 @@ async def await_for_sheet_operations(
             backoff=True,
             on_update=lambda payload: _report_operation_cell_progress(payload, _report_terminal_operation_progress),
         )
-        status = str((last or {}).get("status") or "").lower()
-        if status == "failed":
-            raise api_error(f"Supporting column operation {operation_id} failed while computing preprocessing columns.")
-        if status == "cancelled":
-            raise api_error(
-                f"Supporting column operation {operation_id} was cancelled while computing preprocessing columns."
-            )
+        _raise_if_operation_failed(operation_id, last)
     return last
+
+
+async def _listen_sheet_operations_live_progress(
+    api_key: str,
+    base_url: str,
+    throw_on_error: bool,
+    table_id: ResourceId,
+    sheet_id: ResourceId,
+    operation_ids: List[str],
+    *,
+    timeout_seconds: float,
+) -> Dict[str, Dict[str, Any]]:
+    latest_by_id: Dict[str, Dict[str, Any]] = {}
+
+    def _on_execution_update(payload: Dict[str, Any]) -> None:
+        operation_id = str(payload.get("operation_id") or payload.get("execution_id") or "")
+        if operation_id:
+            latest_by_id[operation_id] = payload
+        _report_operation_cell_progress(payload, _report_terminal_operation_progress)
+
+    async def _safety_poll() -> Optional[Dict[str, Dict[str, Any]]]:
+        updates: Dict[str, Dict[str, Any]] = {}
+        for operation_id in operation_ids:
+            payload = _normalize_operation_status_payload(
+                await tables_api.aget_sheet_operation(
+                    api_key, base_url, throw_on_error, table_id, sheet_id, operation_id
+                )
+            )
+            if isinstance(payload, dict):
+                updates[operation_id] = payload
+        return updates or None
+
+    states = await await_sheet_execution_progress(
+        api_key=api_key,
+        base_url=base_url,
+        sheet_id=sheet_id,
+        execution_ids=operation_ids,
+        on_execution_update=_on_execution_update,
+        safety_poll=_safety_poll,
+        timeout_seconds=timeout_seconds,
+    )
+    merged = {operation_id: dict(states.get(operation_id) or {}) for operation_id in operation_ids}
+    for operation_id, payload in latest_by_id.items():
+        if operation_id in merged and payload:
+            merged[operation_id] = payload
+    return merged
+
+
+def _finalize_live_operation_states(
+    states: Dict[str, Dict[str, Any]],
+    operation_ids: List[str],
+) -> Dict[str, Any]:
+    """Validate terminal outcomes without re-reporting progress.
+
+    Live WS / safety-poll updates already call ``_report_operation_cell_progress``.
+    Re-reporting a terminal payload here would print the completed checkmark twice
+    once the spinner has been cleared.
+    """
+    last: Dict[str, Any] = {}
+    for operation_id in operation_ids:
+        payload = states.get(operation_id) or {}
+        if isinstance(payload, dict) and payload:
+            last = payload
+            _raise_if_operation_failed(operation_id, payload)
+    return last
+
+
+def wait_for_sheet_operations(
+    api_key: str,
+    base_url: str,
+    throw_on_error: bool,
+    table_id: ResourceId,
+    sheet_id: ResourceId,
+    *,
+    column_ids: List[str],
+    row_ids: Optional[List[int]] = None,
+    statuses: Optional[List[str]] = None,
+    timeout_seconds: float = _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
+    poll_interval_seconds: float = _DEFAULT_POLL_INTERVAL_SECONDS,
+) -> Optional[Dict[str, Any]]:
+    """Start a scoped recalculate operation and wait until each operation finishes.
+
+    Uses Centrifugo execution-status updates when available, with REST polling fallback.
+
+    ``statuses`` mirrors the public operations API:
+    - omitted / ``None`` → only ``STALE`` cells (API default)
+    - ``[]`` → no status filter (recalculate all matching cells)
+    - explicit list → only those cell statuses
+    """
+    return asyncio.run(
+        await_for_sheet_operations(
+            api_key,
+            base_url,
+            throw_on_error,
+            table_id,
+            sheet_id,
+            column_ids=column_ids,
+            row_ids=row_ids,
+            statuses=statuses,
+            timeout_seconds=timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
+    )
+
+
+async def await_for_sheet_operations(
+    api_key: str,
+    base_url: str,
+    throw_on_error: bool,
+    table_id: ResourceId,
+    sheet_id: ResourceId,
+    *,
+    column_ids: List[str],
+    row_ids: Optional[List[int]] = None,
+    statuses: Optional[List[str]] = None,
+    timeout_seconds: float = _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
+    poll_interval_seconds: float = _DEFAULT_POLL_INTERVAL_SECONDS,
+) -> Optional[Dict[str, Any]]:
+    if not column_ids:
+        return None
+    create_body: Dict[str, Any] = {
+        "operation": "recalculate",
+        "column_ids": column_ids,
+        "row_ids": row_ids,
+    }
+    if statuses is not None:
+        create_body["statuses"] = statuses
+    create_response = await tables_api.acreate_sheet_operation(
+        api_key,
+        base_url,
+        throw_on_error,
+        table_id,
+        sheet_id,
+        create_body,
+    )
+    _report_operation_cell_progress(create_response, _report_terminal_operation_progress)
+    operation_ids = _operation_ids_from_create_response(create_response if isinstance(create_response, dict) else None)
+    if not operation_ids:
+        if isinstance(create_response, dict):
+            cell_count = _non_negative_int(create_response.get("cell_count")) or 0
+            get_terminal().cell_progress(cell_count, cell_count, 0, status="completed")
+        return create_response if isinstance(create_response, dict) else None
+
+    try:
+        states = await _listen_sheet_operations_live_progress(
+            api_key,
+            base_url,
+            throw_on_error,
+            table_id,
+            sheet_id,
+            operation_ids,
+            timeout_seconds=timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise timeout_error("Timed out waiting for supporting column computation to finish.") from exc
+    except Exception as exc:
+        logger.warning(
+            "Live sheet execution progress unavailable; falling back to REST polling: %s",
+            exc,
+        )
+        return await _apoll_sheet_operations(
+            api_key,
+            base_url,
+            throw_on_error,
+            table_id,
+            sheet_id,
+            operation_ids,
+            timeout_seconds=timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
+
+    # Refresh any non-terminal leftovers via REST before finalizing.
+    # These refreshes were not seen by the live listener, so report progress here.
+    for operation_id in operation_ids:
+        payload = states.get(operation_id) or {}
+        if isinstance(payload, dict) and _operation_is_terminal(payload):
+            continue
+        refreshed = _normalize_operation_status_payload(
+            await tables_api.aget_sheet_operation(api_key, base_url, throw_on_error, table_id, sheet_id, operation_id)
+        )
+        if isinstance(refreshed, dict):
+            states[operation_id] = refreshed
+            _report_operation_cell_progress(refreshed, _report_terminal_operation_progress)
+
+    return _finalize_live_operation_states(states, operation_ids)

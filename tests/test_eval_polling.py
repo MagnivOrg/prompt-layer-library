@@ -229,7 +229,8 @@ async def test_live_progress_advances_cell_progress_for_matching_execution_id():
     assert result["status"] == "completed"
     assert progress[0] == (0, 4, 0, None)  # create response reports total only
     assert (1, 4, 0, "running") in progress
-    assert (4, 4, 0, "completed") in progress
+    # Terminal status must be reported once (listener), not again in finalize.
+    assert progress.count((4, 4, 0, "completed")) == 1
 
 
 @pytest.mark.asyncio

@@ -443,12 +443,17 @@ def _finalize_live_operation_states(
     states: Dict[str, Dict[str, Any]],
     operation_ids: List[str],
 ) -> Dict[str, Any]:
+    """Validate terminal outcomes without re-reporting progress.
+
+    Live WS / safety-poll updates already call ``_report_operation_cell_progress``.
+    Re-reporting a terminal payload here would print the completed checkmark twice
+    once the spinner has been cleared.
+    """
     last: Dict[str, Any] = {}
     for operation_id in operation_ids:
         payload = states.get(operation_id) or {}
         if isinstance(payload, dict) and payload:
             last = payload
-            _report_operation_cell_progress(payload, _report_terminal_operation_progress)
             _raise_if_operation_failed(operation_id, payload)
     return last
 
@@ -558,6 +563,7 @@ async def await_for_sheet_operations(
         )
 
     # Refresh any non-terminal leftovers via REST before finalizing.
+    # These refreshes were not seen by the live listener, so report progress here.
     for operation_id in operation_ids:
         payload = states.get(operation_id) or {}
         if isinstance(payload, dict) and _operation_is_terminal(payload):
@@ -567,5 +573,6 @@ async def await_for_sheet_operations(
         )
         if isinstance(refreshed, dict):
             states[operation_id] = refreshed
+            _report_operation_cell_progress(refreshed, _report_terminal_operation_progress)
 
     return _finalize_live_operation_states(states, operation_ids)

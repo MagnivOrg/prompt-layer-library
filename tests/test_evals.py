@@ -866,8 +866,8 @@ def test_eval_runs_inline_dataset_and_writes_rows(
 @patch("promptlayer.tables.api.create_sheet")
 @patch("promptlayer.tables.api.list_smart_sheet_columns")
 @patch("promptlayer.tables.api.create_sheet_column")
-@patch("promptlayer.tables.api.create_sheet_operation")
-@patch("promptlayer.tables.api.get_sheet_operation")
+@patch("promptlayer.tables.api.acreate_sheet_operation")
+@patch("promptlayer.tables.api.aget_sheet_operation")
 @patch("promptlayer.tables.api.configure_sheet_scorecard")
 @patch("promptlayer.tables.api.add_smart_sheet_rows")
 @patch("promptlayer.tables.api.list_smart_sheet_rows")
@@ -1007,11 +1007,11 @@ def test_eval_creates_supporting_columns_and_runs_operations_before_scorecard(
     ]
     assert not any(call[0][5].get("type") == "CODE_EXECUTION" for call in mock_create_column.call_args_list)
 
-    mock_create_operation.assert_called_once()
-    operation_body = mock_create_operation.call_args[0][5]
+    mock_create_operation.assert_awaited_once()
+    operation_body = mock_create_operation.await_args[0][5]
     assert operation_body["column_ids"] == ["c-extract"]
     assert operation_body["row_ids"] == [0]
-    mock_get_operation.assert_called()
+    mock_get_operation.assert_awaited()
 
     scorecard_body = mock_configure_scorecard.call_args[0][5]
     assert scorecard_body["steps"][0]["title"] == "has_name"

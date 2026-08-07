@@ -1,9 +1,15 @@
 from contextlib import asynccontextmanager
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from promptlayer import PromptLayerValidationError
+from promptlayer.evaluations.live_progress import (
+    SMART_TABLE_EXECUTION_STATUS_UPDATE,
+    await_sheet_execution_progress,
+    execution_update_to_operation_payload,
+    smart_sheet_channel,
+)
 from promptlayer.evaluations.polling import (
     _status_counts_are_terminal,
     _wait_for_sheet_cells,
@@ -92,15 +98,18 @@ def test_preprocessing_operation_polls_operation_status():
     }
     with (
         patch(
-            "promptlayer.tables.api.create_sheet_operation",
-            return_value={"cell_count": 4, "operation_id": "operation-1", "operation": "recalculate"},
+            "promptlayer.tables.api.acreate_sheet_operation",
+            new=AsyncMock(return_value={"cell_count": 4, "operation_id": "operation-1", "operation": "recalculate"}),
         ),
         patch(
-            "promptlayer.tables.api.get_sheet_operation",
-            # Public API nests status under "operation".
-            return_value={"success": True, "operation": terminal},
+            "promptlayer.evaluations.polling._listen_sheet_operations_live_progress",
+            new=AsyncMock(side_effect=RuntimeError("ws unavailable")),
+        ),
+        patch(
+            "promptlayer.tables.api.aget_sheet_operation",
+            new=AsyncMock(return_value={"success": True, "operation": terminal}),
         ) as get_operation,
-        patch("promptlayer.tables.api.get_sheet_status_counts") as get_counts,
+        patch("promptlayer.tables.api.aget_sheet_status_counts") as get_counts,
     ):
         result = wait_for_sheet_operations(
             "key",
@@ -112,7 +121,7 @@ def test_preprocessing_operation_polls_operation_status():
         )
 
     assert result == terminal
-    get_operation.assert_called_once()
+    get_operation.assert_awaited_once()
     get_counts.assert_not_called()
 
 
@@ -129,11 +138,15 @@ async def test_async_preprocessing_operation_polls_operation_status():
     with (
         patch(
             "promptlayer.tables.api.acreate_sheet_operation",
-            return_value={"cell_count": 4, "operation_id": "operation-1", "operation": "recalculate"},
+            new=AsyncMock(return_value={"cell_count": 4, "operation_id": "operation-1", "operation": "recalculate"}),
+        ),
+        patch(
+            "promptlayer.evaluations.polling._listen_sheet_operations_live_progress",
+            new=AsyncMock(side_effect=RuntimeError("ws unavailable")),
         ),
         patch(
             "promptlayer.tables.api.aget_sheet_operation",
-            return_value={"success": True, "operation": terminal},
+            new=AsyncMock(return_value={"success": True, "operation": terminal}),
         ) as get_operation,
         patch("promptlayer.tables.api.aget_sheet_status_counts") as get_counts,
     ):
@@ -149,6 +162,171 @@ async def test_async_preprocessing_operation_polls_operation_status():
     assert result == terminal
     get_operation.assert_awaited_once()
     get_counts.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_live_progress_advances_cell_progress_for_matching_execution_id():
+    progress = []
+
+    @asynccontextmanager
+    async def fake_client(*_args, **_kwargs):
+        yield object()
+
+    @asynccontextmanager
+    async def fake_subscription(_client, _topic, message_listener):
+        await message_listener(
+            SMART_TABLE_EXECUTION_STATUS_UPDATE,
+            '{"execution_id":"exec-1","status":"running","total":4,"completed":1,"failed":0}',
+        )
+        await message_listener(
+            SMART_TABLE_EXECUTION_STATUS_UPDATE,
+            '{"execution_id":"exec-1","status":"completed","total":4,"completed":4,"failed":0}',
+        )
+        yield
+
+    with (
+        patch(
+            "promptlayer.evaluations.live_progress._get_websocket_token",
+            new=AsyncMock(return_value={"token_details": {"token": "tok"}}),
+        ),
+        patch("promptlayer.evaluations.live_progress.centrifugo_client", side_effect=fake_client),
+        patch("promptlayer.evaluations.live_progress.centrifugo_subscription", side_effect=fake_subscription),
+        patch("promptlayer.evaluations.polling.get_terminal") as terminal,
+    ):
+        terminal.return_value.cell_progress.side_effect = (
+            lambda completed, total, failed=0, status=None: progress.append((completed, total, failed, status))
+        )
+        with (
+            patch(
+                "promptlayer.tables.api.acreate_sheet_operation",
+                new=AsyncMock(return_value={"cell_count": 4, "operation_id": "exec-1", "operation": "recalculate"}),
+            ),
+            patch(
+                "promptlayer.tables.api.aget_sheet_operation",
+                new=AsyncMock(
+                    return_value={
+                        "success": True,
+                        "operation": {
+                            "operation_id": "exec-1",
+                            "status": "completed",
+                            "completed_count": 4,
+                            "failed_count": 0,
+                            "cell_count": 4,
+                        },
+                    }
+                ),
+            ),
+        ):
+            result = await await_for_sheet_operations(
+                "key",
+                "http://localhost:8000",
+                True,
+                "table",
+                "sheet-1",
+                column_ids=["column"],
+            )
+
+    assert result["status"] == "completed"
+    assert progress[0] == (0, 4, 0, None)  # create response reports total only
+    assert (1, 4, 0, "running") in progress
+    assert (4, 4, 0, "completed") in progress
+
+
+@pytest.mark.asyncio
+async def test_live_progress_ignores_unrelated_execution_ids():
+    updates = []
+
+    @asynccontextmanager
+    async def fake_client(*_args, **_kwargs):
+        yield object()
+
+    @asynccontextmanager
+    async def fake_subscription(_client, _topic, message_listener):
+        await message_listener(
+            SMART_TABLE_EXECUTION_STATUS_UPDATE,
+            '{"execution_id":"other-exec","status":"completed","total":9,"completed":9,"failed":0}',
+        )
+        await message_listener(
+            SMART_TABLE_EXECUTION_STATUS_UPDATE,
+            '{"execution_id":"exec-1","status":"completed","total":2,"completed":2,"failed":0}',
+        )
+        yield
+
+    def on_update(payload):
+        updates.append(payload)
+
+    with (
+        patch(
+            "promptlayer.evaluations.live_progress._get_websocket_token",
+            new=AsyncMock(return_value={"token_details": {"token": "tok"}}),
+        ),
+        patch("promptlayer.evaluations.live_progress.centrifugo_client", side_effect=fake_client),
+        patch("promptlayer.evaluations.live_progress.centrifugo_subscription", side_effect=fake_subscription),
+    ):
+        states = await await_sheet_execution_progress(
+            api_key="key",
+            base_url="http://localhost:8000",
+            sheet_id="sheet-1",
+            execution_ids=["exec-1"],
+            on_execution_update=on_update,
+            timeout_seconds=2.0,
+        )
+
+    assert list(states.keys()) == ["exec-1"]
+    assert states["exec-1"]["cell_count"] == 2
+    assert len(updates) == 1
+    assert updates[0]["execution_id"] == "exec-1"
+
+
+@pytest.mark.asyncio
+async def test_live_progress_ws_failure_falls_back_to_rest_polling():
+    terminal = {
+        "operation_id": "operation-1",
+        "status": "completed",
+        "completed_count": 3,
+        "failed_count": 0,
+        "pending_count": 0,
+        "cell_count": 3,
+    }
+    with (
+        patch(
+            "promptlayer.tables.api.acreate_sheet_operation",
+            new=AsyncMock(return_value={"cell_count": 3, "operation_id": "operation-1", "operation": "recalculate"}),
+        ),
+        patch(
+            "promptlayer.evaluations.polling.await_sheet_execution_progress",
+            new=AsyncMock(side_effect=RuntimeError("centrifugo down")),
+        ),
+        patch(
+            "promptlayer.tables.api.aget_sheet_operation",
+            new=AsyncMock(return_value={"success": True, "operation": terminal}),
+        ) as get_operation,
+    ):
+        result = await await_for_sheet_operations(
+            "key",
+            "url",
+            True,
+            "table",
+            "sheet",
+            column_ids=["column"],
+        )
+
+    assert result == terminal
+    get_operation.assert_awaited()
+
+
+def test_smart_sheet_channel_and_payload_mapping():
+    assert smart_sheet_channel("abc") == "smart_sheets:smart_sheet#abc"
+    assert execution_update_to_operation_payload(
+        {"execution_id": "e1", "status": "running", "completed": 2, "failed": 1, "total": 5}
+    ) == {
+        "operation_id": "e1",
+        "execution_id": "e1",
+        "status": "running",
+        "completed_count": 2,
+        "failed_count": 1,
+        "cell_count": 5,
+    }
 
 
 def test_operation_is_terminal_when_cell_counts_finish_without_status():

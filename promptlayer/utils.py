@@ -35,6 +35,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from urllib3.util.retry import Retry
 
 from promptlayer import exceptions as _exceptions
 from promptlayer.span_exporter import _mark_genai_request_span
@@ -109,10 +110,24 @@ def _get_requests_session() -> requests.Session:
                 # Connection pool configuration - can be tuned via environment variables
                 pool_connections = int(os.getenv("PROMPTLAYER_POOL_CONNECTIONS", 100))
                 pool_maxsize = int(os.getenv("PROMPTLAYER_POOL_MAXSIZE", 100))
+                # Retry dropped connections, e.g. stale keep-alive sockets the server
+                # already closed. urllib3 raises these as a ProtocolError, which it counts
+                # as a read error, so `read` must be set for the retry to fire. POST is
+                # included because both PromptLayer API calls use POST.
+                connection_retries = Retry(
+                    total=2,
+                    connect=2,
+                    read=2,
+                    redirect=0,
+                    status=0,
+                    allowed_methods=frozenset({"GET", "POST"}),
+                    raise_on_status=False,
+                    backoff_factor=0.25,
+                )
                 adapter = requests.adapters.HTTPAdapter(
                     pool_connections=pool_connections,
                     pool_maxsize=pool_maxsize,
-                    max_retries=0,  # We handle retries at application level via should_retry_error()
+                    max_retries=connection_retries,
                 )
                 session.mount("https://", adapter)
                 session.mount("http://", adapter)

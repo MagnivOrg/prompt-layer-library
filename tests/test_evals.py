@@ -58,6 +58,15 @@ def _terminal_sheet_status_counts():
         patch("promptlayer.tables.api.aget_sheet_status_counts", return_value=terminal),
         patch("promptlayer.tables.api.add_trace_import", side_effect=trace_import),
         patch("promptlayer.tables.api.aadd_trace_import", new_callable=AsyncMock, side_effect=atrace_import),
+        patch(
+            "promptlayer.tables.api.update_sheet",
+            return_value={"sheet": {"id": "sheet-1", "title": "Experiment #1"}},
+        ),
+        patch(
+            "promptlayer.tables.api.aupdate_sheet",
+            new_callable=AsyncMock,
+            return_value={"sheet": {"id": "sheet-1", "title": "Experiment #1"}},
+        ),
         patch("opentelemetry.sdk.trace.export.BatchSpanProcessor.on_end"),
         patch("promptlayer.evaluations.runner.wait_for_trace_request_price"),
         patch(

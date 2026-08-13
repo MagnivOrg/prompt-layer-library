@@ -106,7 +106,7 @@ def empty_sheet_create_body(title: str) -> CreateSheet:
 
 
 def build_update_sheet_body(body: UpdateSheet) -> Dict[str, Any]:
-    return _defined_fields(body, "title", "expected_row_count")
+    return _defined_fields(body, "title", "expected_row_count", "eval_run_status")
 
 
 def build_add_rows_body(body: AddTableRows) -> Dict[str, Any]:

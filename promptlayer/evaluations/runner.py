@@ -1,10 +1,48 @@
 import asyncio
+import json
+import signal
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from opentelemetry.sdk.trace import TracerProvider
+
+# #region agent log
+_DEBUG_LOG_PATH = "/Users/hasaanmajeed/Documents/promptlayer/prompt-layer-library/.cursor/debug-d605b0.log"
+
+
+def _debug_log(
+    *,
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: Optional[Dict[str, Any]] = None,
+    run_id: str = "pre-fix",
+) -> None:
+    try:
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as log_file:
+            log_file.write(
+                json.dumps(
+                    {
+                        "sessionId": "d605b0",
+                        "runId": run_id,
+                        "hypothesisId": hypothesis_id,
+                        "location": location,
+                        "message": message,
+                        "data": data or {},
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except Exception:
+        pass
+
+
+# #endregion
 
 from promptlayer.evaluations.polling import (
     afill_row_cells,
@@ -277,6 +315,7 @@ def _execute_and_persist_cases_sync(
     eval_name: str,
     by_title: Dict[str, Column],
     custom_field_titles: List[str],
+    written_counter: Optional[List[int]] = None,
 ) -> Tuple[List[CaseExecution], List[Optional[int]]]:
     """Run cases and write each row as soon as the case finishes.
 
@@ -322,6 +361,8 @@ def _execute_and_persist_cases_sync(
                 custom_field_titles=custom_field_titles,
                 tracer_provider=tracer_provider,
             )
+            if written_counter is not None and indices:
+                written_counter[0] += 1
         return index, updated[0], indices[0] if indices else None
 
     workers = max(1, min(max_concurrency, total or 1))
@@ -377,6 +418,7 @@ async def _execute_and_persist_cases_async(
     eval_name: str,
     by_title: Dict[str, Column],
     custom_field_titles: List[str],
+    written_counter: Optional[List[int]] = None,
 ) -> Tuple[List[CaseExecution], List[Optional[int]]]:
     """Async counterpart of :func:`_execute_and_persist_cases_sync`."""
     total = len(cases)
@@ -420,17 +462,24 @@ async def _execute_and_persist_cases_async(
                 custom_field_titles=custom_field_titles,
                 tracer_provider=tracer_provider,
             )
+            if written_counter is not None and indices:
+                written_counter[0] += 1
         return index, updated[0], indices[0] if indices else None
 
     _emit_runners_start(total)
     completed = 0
     tasks = [asyncio.create_task(_run_and_persist(index, case)) for index, case in enumerate(cases)]
-    for task in asyncio.as_completed(tasks):
-        index, executed, row_index = await task
-        results[index] = executed
-        row_indices[index] = row_index
-        completed += 1
-        _emit_runner_progress(completed, total)
+    try:
+        for task in asyncio.as_completed(tasks):
+            index, executed, row_index = await task
+            results[index] = executed
+            row_indices[index] = row_index
+            completed += 1
+            _emit_runner_progress(completed, total)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        for task in tasks:
+            task.cancel()
+        raise
 
     return [item for item in results if item is not None], [
         row_indices[i] for i, item in enumerate(results) if item is not None
@@ -1183,6 +1232,189 @@ def _finalize_eval(
     return result
 
 
+def _sheet_row_count_from_payload(payload: Any) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    sheet = payload.get("sheet") if isinstance(payload.get("sheet"), dict) else payload
+    if not isinstance(sheet, dict):
+        return 0
+    raw = sheet.get("row_count")
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _publish_eval_run_abort_sync(
+    *,
+    api_key: str,
+    base_url: str,
+    table_id: ResourceId,
+    sheet_id: ResourceId,
+    known_written: int = 0,
+    source: str = "unknown",
+) -> None:
+    """Best-effort: mark populate aborted and align progress after Ctrl+C."""
+    # #region agent log
+    _debug_log(
+        hypothesis_id="B",
+        location="runner.py:_publish_eval_run_abort_sync:entry",
+        message="publish abort called",
+        data={"source": source, "known_written": known_written, "table_id": str(table_id), "sheet_id": str(sheet_id)},
+    )
+    # #endregion
+    written = max(0, int(known_written or 0))
+    try:
+        payload = tables_api.get_sheet(api_key, base_url, False, table_id, sheet_id)
+        written = max(written, _sheet_row_count_from_payload(payload))
+    except Exception as exc:  # noqa: BLE001 - still PATCH abort below
+        # #region agent log
+        _debug_log(
+            hypothesis_id="B",
+            location="runner.py:_publish_eval_run_abort_sync:get_sheet_failed",
+            message="get_sheet failed before abort patch",
+            data={"source": source, "error": type(exc).__name__, "error_msg": str(exc)[:200]},
+        )
+        # #endregion
+        pass
+    try:
+        tables_api.update_sheet(
+            api_key,
+            base_url,
+            False,
+            table_id,
+            sheet_id,
+            {
+                "eval_run_status": "aborted",
+                "expected_row_count": written,
+            },
+        )
+        # #region agent log
+        _debug_log(
+            hypothesis_id="B",
+            location="runner.py:_publish_eval_run_abort_sync:success",
+            message="abort patch succeeded",
+            data={"source": source, "written": written},
+        )
+        # #endregion
+    except Exception as exc:  # noqa: BLE001 - interrupt path must not mask KeyboardInterrupt
+        # #region agent log
+        _debug_log(
+            hypothesis_id="B",
+            location="runner.py:_publish_eval_run_abort_sync:update_failed",
+            message="abort patch failed",
+            data={"source": source, "written": written, "error": type(exc).__name__, "error_msg": str(exc)[:200]},
+        )
+        # #endregion
+        return
+
+
+async def _publish_eval_run_abort_async(
+    *,
+    api_key: str,
+    base_url: str,
+    table_id: ResourceId,
+    sheet_id: ResourceId,
+    known_written: int = 0,
+) -> None:
+    written = max(0, int(known_written or 0))
+    try:
+        payload = await tables_api.aget_sheet(api_key, base_url, False, table_id, sheet_id)
+        written = max(written, _sheet_row_count_from_payload(payload))
+    except Exception:  # noqa: BLE001 - still PATCH abort below
+        pass
+    try:
+        await tables_api.aupdate_sheet(
+            api_key,
+            base_url,
+            False,
+            table_id,
+            sheet_id,
+            {
+                "eval_run_status": "aborted",
+                "expected_row_count": written,
+            },
+        )
+    except Exception:  # noqa: BLE001 - interrupt path must not mask KeyboardInterrupt
+        return
+
+
+@contextmanager
+def _interrupt_eval_run_abort(
+    *,
+    api_key: str,
+    base_url: str,
+    table_id: ResourceId,
+    sheet_id: ResourceId,
+    written_counter: List[int],
+) -> Iterator[None]:
+    """Publish eval_run_status=aborted on SIGINT even if KeyboardInterrupt is delayed."""
+    previous = signal.getsignal(signal.SIGINT)
+    snapped = {"done": False}
+
+    def _handler(signum: int, frame: Any) -> None:
+        # #region agent log
+        _debug_log(
+            hypothesis_id="C",
+            location="runner.py:_interrupt_eval_run_abort:handler",
+            message="SIGINT handler invoked",
+            data={"signum": signum, "already_done": snapped["done"], "written": written_counter[0]},
+        )
+        # #endregion
+        if not snapped["done"]:
+            snapped["done"] = True
+            _publish_eval_run_abort_sync(
+                api_key=api_key,
+                base_url=base_url,
+                table_id=table_id,
+                sheet_id=sheet_id,
+                known_written=written_counter[0],
+                source="sigint_handler",
+            )
+        if callable(previous):
+            previous(signum, frame)
+        else:
+            raise KeyboardInterrupt
+
+    try:
+        signal.signal(signal.SIGINT, _handler)
+        # #region agent log
+        _debug_log(
+            hypothesis_id="C",
+            location="runner.py:_interrupt_eval_run_abort:installed",
+            message="SIGINT handler installed",
+            data={"previous_handler": repr(previous)},
+        )
+        # #endregion
+    except (ValueError, OSError) as exc:
+        # #region agent log
+        _debug_log(
+            hypothesis_id="C",
+            location="runner.py:_interrupt_eval_run_abort:install_failed",
+            message="SIGINT handler install failed",
+            data={"error": type(exc).__name__, "error_msg": str(exc)},
+        )
+        # #endregion
+        yield
+        return
+
+    try:
+        yield
+    finally:
+        # #region agent log
+        _debug_log(
+            hypothesis_id="A",
+            location="runner.py:_interrupt_eval_run_abort:finally",
+            message="SIGINT handler restored; interrupt guard exited",
+            data={"abort_already_published": snapped["done"]},
+        )
+        # #endregion
+        try:
+            signal.signal(signal.SIGINT, previous)
+        except (ValueError, OSError):
+            pass
+
+
 def run_eval(
     *,
     name: str,
@@ -1223,62 +1455,125 @@ def run_eval(
     prepared = _prepare_eval_sync(context)
     table, sheet, columns, cases = prepared.table, prepared.sheet, prepared.columns, prepared.cases
 
-    # Tell the open dashboard the planned case count so progress shows "N of 10"
-    # instead of "N of N" while rows are still being written.
+    # Tell the open dashboard the planned case count + that populate is active.
     tables_api.update_sheet(
         api_key,
         base_url,
         throw_on_error,
         table["id"],
         sheet["id"],
-        {"expected_row_count": len(cases)},
+        {"expected_row_count": len(cases), "eval_run_status": "running"},
     )
 
     _emit_status(f"Running cases ({len(cases)} case{'s' if len(cases) != 1 else ''}, concurrency={max_concurrency})")
     by_title = columns_by_title(columns)
+    written_counter = [0]
 
-    if context.tracer_provider is not None:
-        # Persist each case as it finishes so the open dashboard sheet fills live
-        # during runners N/M (instead of staying blank until all cases complete).
-        executed, row_indices = _execute_and_persist_cases_sync(
-            name=name,
-            cases=cases,
-            runner=runner,
-            tracer_provider=tracer_provider,
-            max_concurrency=max_concurrency,
-            api_key=api_key,
-            base_url=base_url,
-            throw_on_error=throw_on_error,
-            table_id=table["id"],
-            sheet_id=sheet["id"],
-            eval_name=name,
-            by_title=by_title,
-            custom_field_titles=prepared.custom_field_titles,
-        )
-    else:
-        executed = _execute_cases_sync(
-            name=name,
-            cases=cases,
-            runner=runner,
-            tracer_provider=tracer_provider,
-            max_concurrency=max_concurrency,
-            table_id=table["id"],
-            sheet_id=sheet["id"],
-        )
-        _emit_status("Writing rows")
-        row_indices, _rows = _persist_batch_rows_sync(
-            api_key=api_key,
-            base_url=base_url,
-            throw_on_error=throw_on_error,
-            table_id=table["id"],
-            sheet_id=sheet["id"],
-            executed=executed,
-            by_title=by_title,
-            custom_field_titles=prepared.custom_field_titles,
-        )
+    with _interrupt_eval_run_abort(
+        api_key=api_key,
+        base_url=base_url,
+        table_id=table["id"],
+        sheet_id=sheet["id"],
+        written_counter=written_counter,
+    ):
+        try:
+            if context.tracer_provider is not None:
+                # Persist each case as it finishes so the open dashboard sheet fills live
+                # during runners N/M (instead of staying blank until all cases complete).
+                executed, row_indices = _execute_and_persist_cases_sync(
+                    name=name,
+                    cases=cases,
+                    runner=runner,
+                    tracer_provider=tracer_provider,
+                    max_concurrency=max_concurrency,
+                    api_key=api_key,
+                    base_url=base_url,
+                    throw_on_error=throw_on_error,
+                    table_id=table["id"],
+                    sheet_id=sheet["id"],
+                    eval_name=name,
+                    by_title=by_title,
+                    custom_field_titles=prepared.custom_field_titles,
+                    written_counter=written_counter,
+                )
+            else:
+                executed = _execute_cases_sync(
+                    name=name,
+                    cases=cases,
+                    runner=runner,
+                    tracer_provider=tracer_provider,
+                    max_concurrency=max_concurrency,
+                    table_id=table["id"],
+                    sheet_id=sheet["id"],
+                )
+                _emit_status("Writing rows")
+                row_indices, _rows = _persist_batch_rows_sync(
+                    api_key=api_key,
+                    base_url=base_url,
+                    throw_on_error=throw_on_error,
+                    table_id=table["id"],
+                    sheet_id=sheet["id"],
+                    executed=executed,
+                    by_title=by_title,
+                    custom_field_titles=prepared.custom_field_titles,
+                )
+                written_counter[0] = len([index for index in row_indices if index is not None])
+        except KeyboardInterrupt:
+            # #region agent log
+            _debug_log(
+                hypothesis_id="D",
+                location="runner.py:run_eval:keyboard_interrupt",
+                message="KeyboardInterrupt caught in run_eval case phase",
+                data={"written": written_counter[0]},
+            )
+            # #endregion
+            _publish_eval_run_abort_sync(
+                api_key=api_key,
+                base_url=base_url,
+                table_id=table["id"],
+                sheet_id=sheet["id"],
+                known_written=written_counter[0],
+                source="run_eval_except",
+            )
+            raise
+
+    # #region agent log
+    _debug_log(
+        hypothesis_id="A",
+        location="runner.py:run_eval:post_interrupt_context",
+        message="case phase finished; interrupt guard no longer active",
+        data={"written": written_counter[0]},
+    )
+    # #endregion
+
+    # Case writers finished — hand the Running banner off to scorecard/compute.
+    tables_api.update_sheet(
+        api_key,
+        base_url,
+        False,
+        table["id"],
+        sheet["id"],
+        {"eval_run_status": "completed"},
+    )
+    # #region agent log
+    _debug_log(
+        hypothesis_id="E",
+        location="runner.py:run_eval:set_completed",
+        message="eval_run_status set to completed",
+        data={},
+    )
+    # #endregion
 
     processing_ids = _processing_column_ids(columns, context.columns)
     if processing_ids:
+        # #region agent log
+        _debug_log(
+            hypothesis_id="A",
+            location="runner.py:run_eval:preprocessing_start",
+            message="entering preprocessing phase without interrupt guard",
+            data={"processing_ids": processing_ids},
+        )
+        # #endregion
         _emit_status("Computing preprocessing columns")
         wait_for_sheet_operations(
             api_key,
@@ -1360,57 +1655,85 @@ async def arun_eval(
     prepared = await _prepare_eval_async(context)
     table, sheet, columns, cases = prepared.table, prepared.sheet, prepared.columns, prepared.cases
 
-    # Tell the open dashboard the planned case count so progress shows "N of 10"
-    # instead of "N of N" while rows are still being written.
+    # Tell the open dashboard the planned case count + that populate is active.
     await tables_api.aupdate_sheet(
         api_key,
         base_url,
         throw_on_error,
         table["id"],
         sheet["id"],
-        {"expected_row_count": len(cases)},
+        {"expected_row_count": len(cases), "eval_run_status": "running"},
     )
 
     _emit_status(f"Running cases ({len(cases)} case{'s' if len(cases) != 1 else ''}, concurrency={max_concurrency})")
     by_title = columns_by_title(columns)
+    written_counter = [0]
 
-    if context.tracer_provider is not None:
-        executed, row_indices = await _execute_and_persist_cases_async(
-            name=name,
-            cases=cases,
-            runner=runner,
-            tracer_provider=tracer_provider,
-            max_concurrency=max_concurrency,
-            api_key=api_key,
-            base_url=base_url,
-            throw_on_error=throw_on_error,
-            table_id=table["id"],
-            sheet_id=sheet["id"],
-            eval_name=name,
-            by_title=by_title,
-            custom_field_titles=prepared.custom_field_titles,
-        )
-    else:
-        executed = await _execute_cases_async(
-            name=name,
-            cases=cases,
-            runner=runner,
-            tracer_provider=tracer_provider,
-            max_concurrency=max_concurrency,
-            table_id=table["id"],
-            sheet_id=sheet["id"],
-        )
-        _emit_status("Writing rows")
-        row_indices, _rows = await _persist_batch_rows_async(
-            api_key=api_key,
-            base_url=base_url,
-            throw_on_error=throw_on_error,
-            table_id=table["id"],
-            sheet_id=sheet["id"],
-            executed=executed,
-            by_title=by_title,
-            custom_field_titles=prepared.custom_field_titles,
-        )
+    with _interrupt_eval_run_abort(
+        api_key=api_key,
+        base_url=base_url,
+        table_id=table["id"],
+        sheet_id=sheet["id"],
+        written_counter=written_counter,
+    ):
+        try:
+            if context.tracer_provider is not None:
+                executed, row_indices = await _execute_and_persist_cases_async(
+                    name=name,
+                    cases=cases,
+                    runner=runner,
+                    tracer_provider=tracer_provider,
+                    max_concurrency=max_concurrency,
+                    api_key=api_key,
+                    base_url=base_url,
+                    throw_on_error=throw_on_error,
+                    table_id=table["id"],
+                    sheet_id=sheet["id"],
+                    eval_name=name,
+                    by_title=by_title,
+                    custom_field_titles=prepared.custom_field_titles,
+                    written_counter=written_counter,
+                )
+            else:
+                executed = await _execute_cases_async(
+                    name=name,
+                    cases=cases,
+                    runner=runner,
+                    tracer_provider=tracer_provider,
+                    max_concurrency=max_concurrency,
+                    table_id=table["id"],
+                    sheet_id=sheet["id"],
+                )
+                _emit_status("Writing rows")
+                row_indices, _rows = await _persist_batch_rows_async(
+                    api_key=api_key,
+                    base_url=base_url,
+                    throw_on_error=throw_on_error,
+                    table_id=table["id"],
+                    sheet_id=sheet["id"],
+                    executed=executed,
+                    by_title=by_title,
+                    custom_field_titles=prepared.custom_field_titles,
+                )
+                written_counter[0] = len([index for index in row_indices if index is not None])
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            await _publish_eval_run_abort_async(
+                api_key=api_key,
+                base_url=base_url,
+                table_id=table["id"],
+                sheet_id=sheet["id"],
+                known_written=written_counter[0],
+            )
+            raise
+
+    await tables_api.aupdate_sheet(
+        api_key,
+        base_url,
+        False,
+        table["id"],
+        sheet["id"],
+        {"eval_run_status": "completed"},
+    )
 
     processing_ids = _processing_column_ids(columns, context.columns)
     if processing_ids:

@@ -25,6 +25,33 @@ def _install_double_sigint_handler() -> None:
     def _handler(signum, frame):  # noqa: ARG001
         global _SIGINT_COUNT
         _SIGINT_COUNT += 1
+        # #region agent log
+        try:
+            import json
+            import time
+
+            with open(
+                "/Users/hasaanmajeed/Documents/promptlayer/prompt-layer-library/.cursor/debug-d605b0.log",
+                "a",
+                encoding="utf-8",
+            ) as log_file:
+                log_file.write(
+                    json.dumps(
+                        {
+                            "sessionId": "d605b0",
+                            "runId": "pre-fix",
+                            "hypothesisId": "D",
+                            "location": "eval_cmd.py:_handler",
+                            "message": "CLI SIGINT handler invoked",
+                            "data": {"sigint_count": _SIGINT_COUNT},
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
+                    + "\n"
+                )
+        except Exception:
+            pass
+        # #endregion
         if _SIGINT_COUNT == 1:
             sys.stderr.write("\nAre you sure? Press Ctrl+C again to force quit.\n")
             sys.stderr.flush()

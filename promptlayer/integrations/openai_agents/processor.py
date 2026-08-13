@@ -189,20 +189,28 @@ class PromptLayerOpenAIAgentsProcessor:
         trace_id_hex: str | None = None,
         span_id_hex: str,
     ):
+        # Prefer the active Eval tracer so agent spans nest under `Eval: …`
+        # (and export on the Eval provider). Always restore id_generator —
+        # leaving FixedIdGenerator(trace_id=None) on the Eval tracer breaks the
+        # next case with "Fixed trace ID was not provided".
         tracer = resolve_tracer(self._tracer_provider.get_tracer("promptlayer.integrations.openai_agents"))
+        previous_id_generator = tracer.id_generator
         tracer.id_generator = _FixedIdGenerator(
             trace_id=hex_id_to_int(trace_id_hex) if trace_id_hex is not None else None,
             span_id=hex_id_to_int(span_id_hex),
         )
-        if context is None and trace_id_hex is not None:
-            context = context_api.Context()
-        return tracer.start_span(
-            name=name,
-            context=context,
-            kind=kind,
-            start_time=start_time,
-            attributes=attributes,
-        )
+        try:
+            if context is None and trace_id_hex is not None:
+                context = context_api.Context()
+            return tracer.start_span(
+                name=name,
+                context=context,
+                kind=kind,
+                start_time=start_time,
+                attributes=attributes,
+            )
+        finally:
+            tracer.id_generator = previous_id_generator
 
 
 def _error_json(payload) -> str:

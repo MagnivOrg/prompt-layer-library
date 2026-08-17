@@ -33,14 +33,28 @@ def smart_sheet_channel(sheet_id: Any) -> str:
 def execution_update_to_operation_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Map WS execution status fields onto the public operation status shape."""
     execution_id = str(payload.get("execution_id") or "")
-    return {
+    completed = payload.get("completed", 0)
+    failed = payload.get("failed", 0)
+    total = payload.get("total", 0)
+    mapped = {
         "operation_id": execution_id,
         "execution_id": execution_id,
         "status": payload.get("status"),
-        "completed_count": payload.get("completed", 0),
-        "failed_count": payload.get("failed", 0),
-        "cell_count": payload.get("total", 0),
+        "completed_count": completed,
+        "failed_count": failed,
+        "cell_count": total,
     }
+    # Derive pending when the WS event omits it so count-based terminal
+    # detection matches REST safety-poll payloads.
+    try:
+        completed_n = int(completed)
+        failed_n = int(failed)
+        total_n = int(total)
+    except (TypeError, ValueError):
+        return mapped
+    if completed_n >= 0 and failed_n >= 0 and total_n >= 0:
+        mapped["pending_count"] = max(total_n - completed_n - failed_n, 0)
+    return mapped
 
 
 def _parse_execution_update(data: Any) -> Optional[Dict[str, Any]]:
@@ -64,8 +78,47 @@ def _parse_execution_update(data: Any) -> Optional[Dict[str, Any]]:
     return payload
 
 
-def _is_terminal_status(status: Any) -> bool:
-    return isinstance(status, str) and status.strip().lower() in _TERMINAL_EXECUTION_STATUSES
+def _non_negative_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _normalize_operation_status_payload(payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Unwrap GET /operations/:id which returns ``{"success": true, "operation": {...}}``."""
+    if not isinstance(payload, dict):
+        return payload
+    nested = payload.get("operation")
+    if isinstance(nested, dict):
+        return nested
+    return payload
+
+
+def operation_payload_is_terminal(payload: Optional[Dict[str, Any]]) -> bool:
+    """True when status is terminal, or when cell counts show the operation finished.
+
+    Matches REST polling: Redis status can lag behind finished cells, so treat
+    ``pending_count == 0`` and ``completed + failed >= cell_count`` as done.
+    """
+    payload = _normalize_operation_status_payload(payload)
+    if not isinstance(payload, dict):
+        return False
+    status = payload.get("status")
+    if isinstance(status, str) and status.strip().lower() in _TERMINAL_EXECUTION_STATUSES:
+        return True
+    pending = _non_negative_int(payload.get("pending_count"))
+    completed = _non_negative_int(payload.get("completed_count"))
+    failed = _non_negative_int(payload.get("failed_count"))
+    cell_count = _non_negative_int(payload.get("cell_count"))
+    if pending is None or completed is None or failed is None or cell_count is None:
+        return False
+    if pending > 0:
+        return False
+    return completed + failed >= cell_count
 
 
 async def await_sheet_execution_progress(
@@ -101,7 +154,9 @@ async def await_sheet_execution_progress(
     def _apply_update(execution_id: str, payload: Dict[str, Any]) -> None:
         states[execution_id] = payload
         on_execution_update(payload)
-        if all(_is_terminal_status((states[item] or {}).get("status")) for item in tracked):
+        # Use the same terminal rules as REST polling (status *or* finished counts)
+        # so a safety-poll payload that lags on Redis status still completes the wait.
+        if all(operation_payload_is_terminal(states[item]) for item in tracked):
             done.set()
 
     async def message_listener(message_name: str, data: str) -> None:

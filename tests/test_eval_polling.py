@@ -370,6 +370,7 @@ def test_smart_sheet_channel_and_payload_mapping():
         "completed_count": 2,
         "failed_count": 1,
         "cell_count": 5,
+        "pending_count": 2,
     }
 
 
@@ -399,6 +400,55 @@ def test_operation_is_terminal_when_cell_counts_finish_without_status():
             },
         }
     )
+
+
+@pytest.mark.asyncio
+async def test_live_progress_completes_when_safety_poll_counts_finish_with_stale_status():
+    """Safety poll must finish the wait when counts are done even if status lags."""
+    updates = []
+
+    @asynccontextmanager
+    async def fake_client(*_args, **_kwargs):
+        yield object()
+
+    @asynccontextmanager
+    async def fake_subscription(_client, _topic, _message_listener):
+        yield
+
+    async def safety_poll():
+        return {
+            "exec-1": {
+                "operation_id": "exec-1",
+                "status": "running",
+                "pending_count": 0,
+                "completed_count": 4,
+                "failed_count": 0,
+                "cell_count": 4,
+            }
+        }
+
+    with (
+        patch(
+            "promptlayer.evaluations.live_progress._get_websocket_token",
+            new=AsyncMock(return_value={"token_details": {"token": "tok"}}),
+        ),
+        patch("promptlayer.evaluations.live_progress.centrifugo_client", side_effect=fake_client),
+        patch("promptlayer.evaluations.live_progress.centrifugo_subscription", side_effect=fake_subscription),
+    ):
+        states = await await_sheet_execution_progress(
+            api_key="key",
+            base_url="http://localhost:8000",
+            sheet_id="sheet-1",
+            execution_ids=["exec-1"],
+            on_execution_update=updates.append,
+            safety_poll=safety_poll,
+            safety_poll_interval_seconds=0.01,
+            timeout_seconds=2.0,
+        )
+
+    assert states["exec-1"]["completed_count"] == 4
+    assert updates
+    assert updates[-1]["status"] == "running"
 
 
 def test_scorecard_polling_waits_for_terminal_calculation():

@@ -5,7 +5,10 @@ from typing import Any, Callable, Coroutine, Dict, List, Optional, TypeVar
 
 import nest_asyncio
 
-from promptlayer.evaluations.live_progress import await_sheet_execution_progress
+from promptlayer.evaluations.live_progress import (
+    await_sheet_execution_progress,
+    operation_payload_is_terminal,
+)
 from promptlayer.evaluations.terminal import get_terminal
 from promptlayer.evaluations.utils import (
     _DEFAULT_CELL_WAIT_TIMEOUT_SECONDS,
@@ -18,8 +21,6 @@ from promptlayer.tables import api as tables_api
 from promptlayer.types.table import Column, ResourceId
 
 logger = logging.getLogger(__name__)
-
-_TERMINAL_OPERATION_STATUSES = frozenset({"completed", "failed", "cancelled"})
 
 _T = TypeVar("_T")
 
@@ -292,23 +293,7 @@ def _normalize_operation_status_payload(payload: Optional[Dict[str, Any]]) -> Op
 
 
 def _operation_is_terminal(payload: Optional[Dict[str, Any]]) -> bool:
-    payload = _normalize_operation_status_payload(payload)
-    if not isinstance(payload, dict):
-        return False
-    status = payload.get("status")
-    if isinstance(status, str) and status.lower() in _TERMINAL_OPERATION_STATUSES:
-        return True
-    # Fallback when Redis status lags behind finished cells.
-    pending = _non_negative_int(payload.get("pending_count"))
-    completed = _non_negative_int(payload.get("completed_count"))
-    failed = _non_negative_int(payload.get("failed_count"))
-    cell_count = _non_negative_int(payload.get("cell_count"))
-    if pending is None or completed is None or failed is None or cell_count is None:
-        return False
-    if pending > 0:
-        return False
-    return completed + failed >= cell_count
-
+    return operation_payload_is_terminal(payload)
 
 def _operation_ids_from_create_response(payload: Optional[Dict[str, Any]]) -> List[str]:
     if not isinstance(payload, dict):

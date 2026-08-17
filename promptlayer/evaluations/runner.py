@@ -1,48 +1,12 @@
 import asyncio
-import json
 import signal
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 from opentelemetry.sdk.trace import TracerProvider
-
-# #region agent log
-_DEBUG_LOG_PATH = "/Users/hasaanmajeed/Documents/promptlayer/prompt-layer-library/.cursor/debug-d605b0.log"
-
-
-def _debug_log(
-    *,
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: Optional[Dict[str, Any]] = None,
-    run_id: str = "pre-fix",
-) -> None:
-    try:
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as log_file:
-            log_file.write(
-                json.dumps(
-                    {
-                        "sessionId": "d605b0",
-                        "runId": run_id,
-                        "hypothesisId": hypothesis_id,
-                        "location": location,
-                        "message": message,
-                        "data": data or {},
-                        "timestamp": int(time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-
-
-# #endregion
 
 from promptlayer.evaluations.polling import (
     afill_row_cells,
@@ -1232,19 +1196,6 @@ def _finalize_eval(
     return result
 
 
-def _sheet_row_count_from_payload(payload: Any) -> int:
-    if not isinstance(payload, dict):
-        return 0
-    sheet = payload.get("sheet") if isinstance(payload.get("sheet"), dict) else payload
-    if not isinstance(sheet, dict):
-        return 0
-    raw = sheet.get("row_count")
-    try:
-        return max(0, int(raw))
-    except (TypeError, ValueError):
-        return 0
-
-
 def _publish_eval_run_abort_sync(
     *,
     api_key: str,
@@ -1252,31 +1203,13 @@ def _publish_eval_run_abort_sync(
     table_id: ResourceId,
     sheet_id: ResourceId,
     known_written: int = 0,
-    source: str = "unknown",
 ) -> None:
-    """Best-effort: mark populate aborted and align progress after Ctrl+C."""
-    # #region agent log
-    _debug_log(
-        hypothesis_id="B",
-        location="runner.py:_publish_eval_run_abort_sync:entry",
-        message="publish abort called",
-        data={"source": source, "known_written": known_written, "table_id": str(table_id), "sheet_id": str(sheet_id)},
-    )
-    # #endregion
-    written = max(0, int(known_written or 0))
-    try:
-        payload = tables_api.get_sheet(api_key, base_url, False, table_id, sheet_id)
-        written = max(written, _sheet_row_count_from_payload(payload))
-    except Exception as exc:  # noqa: BLE001 - still PATCH abort below
-        # #region agent log
-        _debug_log(
-            hypothesis_id="B",
-            location="runner.py:_publish_eval_run_abort_sync:get_sheet_failed",
-            message="get_sheet failed before abort patch",
-            data={"source": source, "error": type(exc).__name__, "error_msg": str(exc)[:200]},
-        )
-        # #endregion
-        pass
+    """Best-effort: mark populate aborted after Ctrl+C.
+
+    Keep the original planned ``expected_row_count`` so the dashboard can show
+    ``3 of 10`` (written of planned), not a snapped ``3 of 3``.
+    """
+    del known_written  # retained for call-site compatibility
     try:
         tables_api.update_sheet(
             api_key,
@@ -1284,28 +1217,9 @@ def _publish_eval_run_abort_sync(
             False,
             table_id,
             sheet_id,
-            {
-                "eval_run_status": "aborted",
-                "expected_row_count": written,
-            },
+            {"eval_run_status": "aborted"},
         )
-        # #region agent log
-        _debug_log(
-            hypothesis_id="B",
-            location="runner.py:_publish_eval_run_abort_sync:success",
-            message="abort patch succeeded",
-            data={"source": source, "written": written},
-        )
-        # #endregion
-    except Exception as exc:  # noqa: BLE001 - interrupt path must not mask KeyboardInterrupt
-        # #region agent log
-        _debug_log(
-            hypothesis_id="B",
-            location="runner.py:_publish_eval_run_abort_sync:update_failed",
-            message="abort patch failed",
-            data={"source": source, "written": written, "error": type(exc).__name__, "error_msg": str(exc)[:200]},
-        )
-        # #endregion
+    except Exception:  # noqa: BLE001 - interrupt path must not mask KeyboardInterrupt
         return
 
 
@@ -1317,12 +1231,8 @@ async def _publish_eval_run_abort_async(
     sheet_id: ResourceId,
     known_written: int = 0,
 ) -> None:
-    written = max(0, int(known_written or 0))
-    try:
-        payload = await tables_api.aget_sheet(api_key, base_url, False, table_id, sheet_id)
-        written = max(written, _sheet_row_count_from_payload(payload))
-    except Exception:  # noqa: BLE001 - still PATCH abort below
-        pass
+    """Best-effort: mark populate aborted after Ctrl+C (async)."""
+    del known_written  # retained for call-site compatibility
     try:
         await tables_api.aupdate_sheet(
             api_key,
@@ -1330,10 +1240,7 @@ async def _publish_eval_run_abort_async(
             False,
             table_id,
             sheet_id,
-            {
-                "eval_run_status": "aborted",
-                "expected_row_count": written,
-            },
+            {"eval_run_status": "aborted"},
         )
     except Exception:  # noqa: BLE001 - interrupt path must not mask KeyboardInterrupt
         return
@@ -1353,14 +1260,6 @@ def _interrupt_eval_run_abort(
     snapped = {"done": False}
 
     def _handler(signum: int, frame: Any) -> None:
-        # #region agent log
-        _debug_log(
-            hypothesis_id="C",
-            location="runner.py:_interrupt_eval_run_abort:handler",
-            message="SIGINT handler invoked",
-            data={"signum": signum, "already_done": snapped["done"], "written": written_counter[0]},
-        )
-        # #endregion
         if not snapped["done"]:
             snapped["done"] = True
             _publish_eval_run_abort_sync(
@@ -1369,7 +1268,6 @@ def _interrupt_eval_run_abort(
                 table_id=table_id,
                 sheet_id=sheet_id,
                 known_written=written_counter[0],
-                source="sigint_handler",
             )
         if callable(previous):
             previous(signum, frame)
@@ -1378,37 +1276,13 @@ def _interrupt_eval_run_abort(
 
     try:
         signal.signal(signal.SIGINT, _handler)
-        # #region agent log
-        _debug_log(
-            hypothesis_id="C",
-            location="runner.py:_interrupt_eval_run_abort:installed",
-            message="SIGINT handler installed",
-            data={"previous_handler": repr(previous)},
-        )
-        # #endregion
-    except (ValueError, OSError) as exc:
-        # #region agent log
-        _debug_log(
-            hypothesis_id="C",
-            location="runner.py:_interrupt_eval_run_abort:install_failed",
-            message="SIGINT handler install failed",
-            data={"error": type(exc).__name__, "error_msg": str(exc)},
-        )
-        # #endregion
+    except (ValueError, OSError):
         yield
         return
 
     try:
         yield
     finally:
-        # #region agent log
-        _debug_log(
-            hypothesis_id="A",
-            location="runner.py:_interrupt_eval_run_abort:finally",
-            message="SIGINT handler restored; interrupt guard exited",
-            data={"abort_already_published": snapped["done"]},
-        )
-        # #endregion
         try:
             signal.signal(signal.SIGINT, previous)
         except (ValueError, OSError):
@@ -1519,32 +1393,14 @@ def run_eval(
                 )
                 written_counter[0] = len([index for index in row_indices if index is not None])
         except KeyboardInterrupt:
-            # #region agent log
-            _debug_log(
-                hypothesis_id="D",
-                location="runner.py:run_eval:keyboard_interrupt",
-                message="KeyboardInterrupt caught in run_eval case phase",
-                data={"written": written_counter[0]},
-            )
-            # #endregion
             _publish_eval_run_abort_sync(
                 api_key=api_key,
                 base_url=base_url,
                 table_id=table["id"],
                 sheet_id=sheet["id"],
                 known_written=written_counter[0],
-                source="run_eval_except",
             )
             raise
-
-    # #region agent log
-    _debug_log(
-        hypothesis_id="A",
-        location="runner.py:run_eval:post_interrupt_context",
-        message="case phase finished; interrupt guard no longer active",
-        data={"written": written_counter[0]},
-    )
-    # #endregion
 
     # Case writers finished — hand the Running banner off to scorecard/compute.
     tables_api.update_sheet(
@@ -1555,25 +1411,9 @@ def run_eval(
         sheet["id"],
         {"eval_run_status": "completed"},
     )
-    # #region agent log
-    _debug_log(
-        hypothesis_id="E",
-        location="runner.py:run_eval:set_completed",
-        message="eval_run_status set to completed",
-        data={},
-    )
-    # #endregion
 
     processing_ids = _processing_column_ids(columns, context.columns)
     if processing_ids:
-        # #region agent log
-        _debug_log(
-            hypothesis_id="A",
-            location="runner.py:run_eval:preprocessing_start",
-            message="entering preprocessing phase without interrupt guard",
-            data={"processing_ids": processing_ids},
-        )
-        # #endregion
         _emit_status("Computing preprocessing columns")
         wait_for_sheet_operations(
             api_key,

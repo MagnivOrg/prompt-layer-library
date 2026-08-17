@@ -524,3 +524,48 @@ def test_normalize_response_items_preserves_openai_reasoning_summary():
             "content": "19 times 23 is 437.",
         },
     ]
+
+
+def test_root_span_stamped_with_first_user_message_only(in_memory_tracer_provider):
+    provider, exporter = in_memory_tracer_provider
+    processor = PromptLayerOpenAIAgentsProcessor(tracer_provider=provider)
+    set_trace_processors([processor])
+
+    with trace("Support run"):
+        with generation_span(
+            input=[
+                {"role": "system", "content": "You are a support agent."},
+                {"role": "user", "content": "Where is my order?"},
+            ],
+            output=[{"role": "assistant", "content": "Your order ships tomorrow."}],
+            model="gpt-4.1",
+        ):
+            pass
+        with function_span(name="notify", input="{}", output="ok"):
+            pass
+        with generation_span(
+            input=[{"role": "user", "content": "Thanks!"}],
+            output=[{"role": "assistant", "content": "Happy to help."}],
+            model="gpt-4.1",
+        ):
+            pass
+
+    root, _ = _find_root_and_child(_finished_spans(exporter))
+    root_attrs = dict(root.attributes)
+    # The opening user turn, not the system prompt and not a later turn
+    assert root_attrs["input.value"] == "Where is my order?"
+    # Output is deliberately left to request logs (last LLM reply is not reliably the answer)
+    assert "output.value" not in root_attrs
+
+
+def test_root_span_has_no_input_stamp_without_user_message(in_memory_tracer_provider):
+    provider, exporter = in_memory_tracer_provider
+    processor = PromptLayerOpenAIAgentsProcessor(tracer_provider=provider)
+    set_trace_processors([processor])
+
+    with trace("Tool only run"):
+        with function_span(name="notify", input="{}", output="ok"):
+            pass
+
+    root, _ = _find_root_and_child(_finished_spans(exporter))
+    assert "input.value" not in dict(root.attributes)

@@ -180,6 +180,30 @@ def _custom_attributes(span_data, *, include_raw_payloads: bool) -> dict[str, An
     return attrs
 
 
+def span_user_input(span_data) -> str | None:
+    """Last user message of an LLM span, for the root span's ``input.value`` headline stamp."""
+    span_type = span_data.type
+    if span_type == "generation":
+        return _last_message_content(normalize_messages(span_data.input), role="user")
+    if span_type == "response":
+        response_obj = _jsonable(getattr(span_data, "response", None))
+        response_obj = response_obj if isinstance(response_obj, Mapping) else {}
+        input_items = normalize_response_items(getattr(span_data, "input", None) or response_obj.get("input"))
+        return _last_message_content(input_items, role="user")
+    return None
+
+
+def _last_message_content(messages: list[dict[str, Any]], *, role: str) -> str | None:
+    return next(
+        (
+            str(message["content"])
+            for message in reversed(messages)
+            if message.get("role") == role and message.get("content")
+        ),
+        None,
+    )
+
+
 def normalize_messages(items: Sequence[Mapping[str, Any]] | None) -> list[dict[str, Any]]:
     if not isinstance(items, Sequence):
         return []

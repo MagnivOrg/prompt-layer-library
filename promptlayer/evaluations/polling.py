@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Optional, TypeVar
+
+import nest_asyncio
 
 from promptlayer.evaluations.live_progress import await_sheet_execution_progress
 from promptlayer.evaluations.terminal import get_terminal
@@ -18,6 +20,26 @@ from promptlayer.types.table import Column, ResourceId
 logger = logging.getLogger(__name__)
 
 _TERMINAL_OPERATION_STATUSES = frozenset({"completed", "failed", "cancelled"})
+
+_T = TypeVar("_T")
+
+
+def _run_coro_sync(coro: Coroutine[Any, Any, _T]) -> _T:
+    """Run an async coroutine from sync code, including nested event loops (e.g. Jupyter).
+
+    Matches ``PromptLayer.run_workflow``: ``asyncio.run`` alone raises
+    ``RuntimeError`` when a loop is already running, so apply ``nest_asyncio``
+    in that case.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None and loop.is_running():
+        nest_asyncio.apply()
+
+    return asyncio.run(coro)
 
 
 def _iter_cell_updates(
@@ -480,7 +502,7 @@ def wait_for_sheet_operations(
     - ``[]`` → no status filter (recalculate all matching cells)
     - explicit list → only those cell statuses
     """
-    return asyncio.run(
+    return _run_coro_sync(
         await_for_sheet_operations(
             api_key,
             base_url,

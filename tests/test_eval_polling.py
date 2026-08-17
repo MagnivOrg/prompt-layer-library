@@ -125,6 +125,49 @@ def test_preprocessing_operation_polls_operation_status():
     get_counts.assert_not_called()
 
 
+def test_wait_for_sheet_operations_works_inside_running_event_loop():
+    """Sync wait wraps asyncio.run; Jupyter-style nested loops need nest_asyncio."""
+    terminal = {
+        "operation_id": "operation-1",
+        "status": "completed",
+        "completed_count": 4,
+        "failed_count": 0,
+        "pending_count": 0,
+        "cell_count": 4,
+    }
+
+    async def call_from_running_loop():
+        with (
+            patch(
+                "promptlayer.tables.api.acreate_sheet_operation",
+                new=AsyncMock(
+                    return_value={"cell_count": 4, "operation_id": "operation-1", "operation": "recalculate"}
+                ),
+            ),
+            patch(
+                "promptlayer.evaluations.polling._listen_sheet_operations_live_progress",
+                new=AsyncMock(side_effect=RuntimeError("ws unavailable")),
+            ),
+            patch(
+                "promptlayer.tables.api.aget_sheet_operation",
+                new=AsyncMock(return_value={"success": True, "operation": terminal}),
+            ),
+        ):
+            return wait_for_sheet_operations(
+                "key",
+                "url",
+                True,
+                "table",
+                "sheet",
+                column_ids=["column"],
+            )
+
+    import asyncio
+
+    result = asyncio.run(call_from_running_loop())
+    assert result == terminal
+
+
 @pytest.mark.asyncio
 async def test_async_preprocessing_operation_polls_operation_status():
     terminal = {

@@ -16,7 +16,7 @@ from promptlayer.evaluations.polling import (
     await_for_sheet_operations,
     wait_for_sheet_operations,
 )
-from promptlayer.evaluations.runner import _map_batch_row_indices
+from promptlayer.evaluations.runner import _interrupt_eval_run_abort, _map_batch_row_indices
 from promptlayer.evaluations.scorecard import recalculate_and_wait_scorecard
 from promptlayer.evaluations.tracing import flush_traces, maybe_await
 from promptlayer.tables import api as tables_api
@@ -400,6 +400,39 @@ def test_operation_is_terminal_when_cell_counts_finish_without_status():
             },
         }
     )
+
+
+def test_interrupt_eval_run_abort_publishes_on_populate_failure():
+    with patch("promptlayer.evaluations.runner._publish_eval_run_abort_sync") as publish:
+        with pytest.raises(RuntimeError, match="runner blew up"):
+            with _interrupt_eval_run_abort(
+                api_key="key",
+                base_url="http://localhost:8000",
+                table_id="table",
+                sheet_id="sheet",
+                written_counter=[3],
+            ):
+                raise RuntimeError("runner blew up")
+    publish.assert_called_once_with(
+        api_key="key",
+        base_url="http://localhost:8000",
+        table_id="table",
+        sheet_id="sheet",
+        known_written=3,
+    )
+
+
+def test_interrupt_eval_run_abort_skips_publish_on_success():
+    with patch("promptlayer.evaluations.runner._publish_eval_run_abort_sync") as publish:
+        with _interrupt_eval_run_abort(
+            api_key="key",
+            base_url="http://localhost:8000",
+            table_id="table",
+            sheet_id="sheet",
+            written_counter=[2],
+        ):
+            pass
+    publish.assert_not_called()
 
 
 @pytest.mark.asyncio

@@ -295,6 +295,7 @@ def _normalize_operation_status_payload(payload: Optional[Dict[str, Any]]) -> Op
 def _operation_is_terminal(payload: Optional[Dict[str, Any]]) -> bool:
     return operation_payload_is_terminal(payload)
 
+
 def _operation_ids_from_create_response(payload: Optional[Dict[str, Any]]) -> List[str]:
     if not isinstance(payload, dict):
         return []

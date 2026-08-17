@@ -1255,38 +1255,52 @@ def _interrupt_eval_run_abort(
     sheet_id: ResourceId,
     written_counter: List[int],
 ) -> Iterator[None]:
-    """Publish eval_run_status=aborted on SIGINT even if KeyboardInterrupt is delayed."""
+    """Publish eval_run_status=aborted on SIGINT or any populate failure.
+
+    Success exits the context normally; callers then PATCH ``completed``.
+    Unexpected exceptions (runner errors, API failures, CancelledError) must
+    clear the dashboard Running banner the same way Ctrl+C does.
+    """
     previous = signal.getsignal(signal.SIGINT)
     snapped = {"done": False}
 
+    def _publish_once() -> None:
+        if snapped["done"]:
+            return
+        snapped["done"] = True
+        _publish_eval_run_abort_sync(
+            api_key=api_key,
+            base_url=base_url,
+            table_id=table_id,
+            sheet_id=sheet_id,
+            known_written=written_counter[0],
+        )
+
     def _handler(signum: int, frame: Any) -> None:
-        if not snapped["done"]:
-            snapped["done"] = True
-            _publish_eval_run_abort_sync(
-                api_key=api_key,
-                base_url=base_url,
-                table_id=table_id,
-                sheet_id=sheet_id,
-                known_written=written_counter[0],
-            )
+        _publish_once()
         if callable(previous):
             previous(signum, frame)
         else:
             raise KeyboardInterrupt
 
+    registered = False
     try:
         signal.signal(signal.SIGINT, _handler)
+        registered = True
     except (ValueError, OSError):
-        yield
-        return
+        pass
 
     try:
         yield
+    except BaseException:
+        _publish_once()
+        raise
     finally:
-        try:
-            signal.signal(signal.SIGINT, previous)
-        except (ValueError, OSError):
-            pass
+        if registered:
+            try:
+                signal.signal(signal.SIGINT, previous)
+            except (ValueError, OSError):
+                pass
 
 
 def run_eval(
@@ -1350,57 +1364,47 @@ def run_eval(
         sheet_id=sheet["id"],
         written_counter=written_counter,
     ):
-        try:
-            if context.tracer_provider is not None:
-                # Persist each case as it finishes so the open dashboard sheet fills live
-                # during runners N/M (instead of staying blank until all cases complete).
-                executed, row_indices = _execute_and_persist_cases_sync(
-                    name=name,
-                    cases=cases,
-                    runner=runner,
-                    tracer_provider=tracer_provider,
-                    max_concurrency=max_concurrency,
-                    api_key=api_key,
-                    base_url=base_url,
-                    throw_on_error=throw_on_error,
-                    table_id=table["id"],
-                    sheet_id=sheet["id"],
-                    eval_name=name,
-                    by_title=by_title,
-                    custom_field_titles=prepared.custom_field_titles,
-                    written_counter=written_counter,
-                )
-            else:
-                executed = _execute_cases_sync(
-                    name=name,
-                    cases=cases,
-                    runner=runner,
-                    tracer_provider=tracer_provider,
-                    max_concurrency=max_concurrency,
-                    table_id=table["id"],
-                    sheet_id=sheet["id"],
-                )
-                _emit_status("Writing rows")
-                row_indices, _rows = _persist_batch_rows_sync(
-                    api_key=api_key,
-                    base_url=base_url,
-                    throw_on_error=throw_on_error,
-                    table_id=table["id"],
-                    sheet_id=sheet["id"],
-                    executed=executed,
-                    by_title=by_title,
-                    custom_field_titles=prepared.custom_field_titles,
-                )
-                written_counter[0] = len([index for index in row_indices if index is not None])
-        except KeyboardInterrupt:
-            _publish_eval_run_abort_sync(
+        if context.tracer_provider is not None:
+            # Persist each case as it finishes so the open dashboard sheet fills live
+            # during runners N/M (instead of staying blank until all cases complete).
+            executed, row_indices = _execute_and_persist_cases_sync(
+                name=name,
+                cases=cases,
+                runner=runner,
+                tracer_provider=tracer_provider,
+                max_concurrency=max_concurrency,
                 api_key=api_key,
                 base_url=base_url,
+                throw_on_error=throw_on_error,
                 table_id=table["id"],
                 sheet_id=sheet["id"],
-                known_written=written_counter[0],
+                eval_name=name,
+                by_title=by_title,
+                custom_field_titles=prepared.custom_field_titles,
+                written_counter=written_counter,
             )
-            raise
+        else:
+            executed = _execute_cases_sync(
+                name=name,
+                cases=cases,
+                runner=runner,
+                tracer_provider=tracer_provider,
+                max_concurrency=max_concurrency,
+                table_id=table["id"],
+                sheet_id=sheet["id"],
+            )
+            _emit_status("Writing rows")
+            row_indices, _rows = _persist_batch_rows_sync(
+                api_key=api_key,
+                base_url=base_url,
+                throw_on_error=throw_on_error,
+                table_id=table["id"],
+                sheet_id=sheet["id"],
+                executed=executed,
+                by_title=by_title,
+                custom_field_titles=prepared.custom_field_titles,
+            )
+            written_counter[0] = len([index for index in row_indices if index is not None])
 
     # Case writers finished — hand the Running banner off to scorecard/compute.
     tables_api.update_sheet(
@@ -1516,55 +1520,45 @@ async def arun_eval(
         sheet_id=sheet["id"],
         written_counter=written_counter,
     ):
-        try:
-            if context.tracer_provider is not None:
-                executed, row_indices = await _execute_and_persist_cases_async(
-                    name=name,
-                    cases=cases,
-                    runner=runner,
-                    tracer_provider=tracer_provider,
-                    max_concurrency=max_concurrency,
-                    api_key=api_key,
-                    base_url=base_url,
-                    throw_on_error=throw_on_error,
-                    table_id=table["id"],
-                    sheet_id=sheet["id"],
-                    eval_name=name,
-                    by_title=by_title,
-                    custom_field_titles=prepared.custom_field_titles,
-                    written_counter=written_counter,
-                )
-            else:
-                executed = await _execute_cases_async(
-                    name=name,
-                    cases=cases,
-                    runner=runner,
-                    tracer_provider=tracer_provider,
-                    max_concurrency=max_concurrency,
-                    table_id=table["id"],
-                    sheet_id=sheet["id"],
-                )
-                _emit_status("Writing rows")
-                row_indices, _rows = await _persist_batch_rows_async(
-                    api_key=api_key,
-                    base_url=base_url,
-                    throw_on_error=throw_on_error,
-                    table_id=table["id"],
-                    sheet_id=sheet["id"],
-                    executed=executed,
-                    by_title=by_title,
-                    custom_field_titles=prepared.custom_field_titles,
-                )
-                written_counter[0] = len([index for index in row_indices if index is not None])
-        except (KeyboardInterrupt, asyncio.CancelledError):
-            await _publish_eval_run_abort_async(
+        if context.tracer_provider is not None:
+            executed, row_indices = await _execute_and_persist_cases_async(
+                name=name,
+                cases=cases,
+                runner=runner,
+                tracer_provider=tracer_provider,
+                max_concurrency=max_concurrency,
                 api_key=api_key,
                 base_url=base_url,
+                throw_on_error=throw_on_error,
                 table_id=table["id"],
                 sheet_id=sheet["id"],
-                known_written=written_counter[0],
+                eval_name=name,
+                by_title=by_title,
+                custom_field_titles=prepared.custom_field_titles,
+                written_counter=written_counter,
             )
-            raise
+        else:
+            executed = await _execute_cases_async(
+                name=name,
+                cases=cases,
+                runner=runner,
+                tracer_provider=tracer_provider,
+                max_concurrency=max_concurrency,
+                table_id=table["id"],
+                sheet_id=sheet["id"],
+            )
+            _emit_status("Writing rows")
+            row_indices, _rows = await _persist_batch_rows_async(
+                api_key=api_key,
+                base_url=base_url,
+                throw_on_error=throw_on_error,
+                table_id=table["id"],
+                sheet_id=sheet["id"],
+                executed=executed,
+                by_title=by_title,
+                custom_field_titles=prepared.custom_field_titles,
+            )
+            written_counter[0] = len([index for index in row_indices if index is not None])
 
     await tables_api.aupdate_sheet(
         api_key,

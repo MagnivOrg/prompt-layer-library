@@ -277,6 +277,50 @@ async def test_live_progress_advances_cell_progress_for_matching_execution_id():
 
 
 @pytest.mark.asyncio
+async def test_live_progress_status_only_running_does_not_end_wait():
+    updates = []
+
+    @asynccontextmanager
+    async def fake_client(*_args, **_kwargs):
+        yield object()
+
+    @asynccontextmanager
+    async def fake_subscription(_client, _topic, message_listener):
+        # Status-only "running" must not invent 0/0/0 and trip count-based terminal.
+        await message_listener(
+            SMART_TABLE_EXECUTION_STATUS_UPDATE,
+            '{"execution_id":"exec-1","status":"running"}',
+        )
+        await message_listener(
+            SMART_TABLE_EXECUTION_STATUS_UPDATE,
+            '{"execution_id":"exec-1","status":"completed","total":2,"completed":2,"failed":0}',
+        )
+        yield
+
+    with (
+        patch(
+            "promptlayer.evaluations.live_progress._get_websocket_token",
+            new=AsyncMock(return_value={"token_details": {"token": "tok"}}),
+        ),
+        patch("promptlayer.evaluations.live_progress.centrifugo_client", side_effect=fake_client),
+        patch("promptlayer.evaluations.live_progress.centrifugo_subscription", side_effect=fake_subscription),
+    ):
+        states = await await_sheet_execution_progress(
+            api_key="key",
+            base_url="http://localhost:8000",
+            sheet_id="sheet-1",
+            execution_ids=["exec-1"],
+            on_execution_update=updates.append,
+            timeout_seconds=2.0,
+        )
+
+    assert [u.get("status") for u in updates] == ["running", "completed"]
+    assert "pending_count" not in updates[0]
+    assert states["exec-1"]["status"] == "completed"
+    assert states["exec-1"]["cell_count"] == 2
+
+
+@pytest.mark.asyncio
 async def test_live_progress_ignores_unrelated_execution_ids():
     updates = []
 
@@ -374,6 +418,29 @@ def test_smart_sheet_channel_and_payload_mapping():
     }
 
 
+def test_status_only_execution_update_does_not_invent_zero_counters():
+    from promptlayer.evaluations.live_progress import operation_payload_is_terminal
+
+    mapped = execution_update_to_operation_payload({"execution_id": "e1", "status": "running"})
+    assert mapped == {
+        "operation_id": "e1",
+        "execution_id": "e1",
+        "status": "running",
+    }
+    assert "pending_count" not in mapped
+    assert not operation_payload_is_terminal(mapped)
+    # Explicit zeros without a terminal status must also not end the wait.
+    assert not operation_payload_is_terminal(
+        {
+            "status": "running",
+            "pending_count": 0,
+            "completed_count": 0,
+            "failed_count": 0,
+            "cell_count": 0,
+        }
+    )
+
+
 def test_operation_is_terminal_when_cell_counts_finish_without_status():
     from promptlayer.evaluations.polling import _operation_is_terminal
 
@@ -397,6 +464,18 @@ def test_operation_is_terminal_when_cell_counts_finish_without_status():
                 "completed_count": 6,
                 "failed_count": 0,
                 "cell_count": 8,
+            },
+        }
+    )
+    assert not _operation_is_terminal(
+        {
+            "success": True,
+            "operation": {
+                "status": "running",
+                "pending_count": 0,
+                "completed_count": 0,
+                "failed_count": 0,
+                "cell_count": 0,
             },
         }
     )

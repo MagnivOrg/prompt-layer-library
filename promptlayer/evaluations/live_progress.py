@@ -31,25 +31,32 @@ def smart_sheet_channel(sheet_id: Any) -> str:
 
 
 def execution_update_to_operation_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Map WS execution status fields onto the public operation status shape."""
+    """Map WS execution status fields onto the public operation status shape.
+
+    Only copy counters that are present on the event. Status-only updates must not
+    invent ``completed/failed/total = 0``, or count-based terminal detection can
+    treat ``0 + 0 >= 0`` as done while the operation is still ``running``.
+    """
     execution_id = str(payload.get("execution_id") or "")
-    completed = payload.get("completed", 0)
-    failed = payload.get("failed", 0)
-    total = payload.get("total", 0)
-    mapped = {
+    mapped: Dict[str, Any] = {
         "operation_id": execution_id,
         "execution_id": execution_id,
         "status": payload.get("status"),
-        "completed_count": completed,
-        "failed_count": failed,
-        "cell_count": total,
     }
-    # Derive pending when the WS event omits it so count-based terminal
-    # detection matches REST safety-poll payloads.
+    if "completed" in payload:
+        mapped["completed_count"] = payload["completed"]
+    if "failed" in payload:
+        mapped["failed_count"] = payload["failed"]
+    if "total" in payload:
+        mapped["cell_count"] = payload["total"]
+    # Derive pending only when all three counters are present so count-based
+    # terminal detection matches REST safety-poll payloads.
+    if not all(key in mapped for key in ("completed_count", "failed_count", "cell_count")):
+        return mapped
     try:
-        completed_n = int(completed)
-        failed_n = int(failed)
-        total_n = int(total)
+        completed_n = int(mapped["completed_count"])
+        failed_n = int(mapped["failed_count"])
+        total_n = int(mapped["cell_count"])
     except (TypeError, ValueError):
         return mapped
     if completed_n >= 0 and failed_n >= 0 and total_n >= 0:
@@ -102,7 +109,9 @@ def operation_payload_is_terminal(payload: Optional[Dict[str, Any]]) -> bool:
     """True when status is terminal, or when cell counts show the operation finished.
 
     Matches REST polling: Redis status can lag behind finished cells, so treat
-    ``pending_count == 0`` and ``completed + failed >= cell_count`` as done.
+    ``pending_count == 0`` and ``completed + failed >= cell_count`` as done when
+    ``cell_count > 0``. A zero/missing total alone must not end the wait (status-only
+    WS events used to invent zeros and falsely trip this path).
     """
     payload = _normalize_operation_status_payload(payload)
     if not isinstance(payload, dict):
@@ -116,7 +125,7 @@ def operation_payload_is_terminal(payload: Optional[Dict[str, Any]]) -> bool:
     cell_count = _non_negative_int(payload.get("cell_count"))
     if pending is None or completed is None or failed is None or cell_count is None:
         return False
-    if pending > 0:
+    if pending > 0 or cell_count == 0:
         return False
     return completed + failed >= cell_count
 

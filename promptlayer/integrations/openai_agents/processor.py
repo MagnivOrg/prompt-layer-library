@@ -12,8 +12,18 @@ from opentelemetry.trace.status import Status, StatusCode
 from promptlayer.tracing_context import resolve_tracer
 
 from .ids import hex_id_to_int, map_span_id, map_trace_id, synthetic_root_span_id
-from .mapping import base_span_attributes, base_trace_attributes, span_data_attributes, span_kind_for, span_name_for
+from .mapping import (
+    base_span_attributes,
+    base_trace_attributes,
+    span_data_attributes,
+    span_kind_for,
+    span_name_for,
+    span_user_input,
+)
 from .time import iso_to_unix_nano
+
+TRACE_INPUT_ATTRIBUTE = "input.value"
+_INPUT_VALUE_MAX_CHARS = 4000
 
 
 class _FixedIdGenerator(IdGenerator):
@@ -43,6 +53,7 @@ class PromptLayerOpenAIAgentsProcessor:
         self._root_spans: dict[str, trace_api.Span] = {}
         self._agent_spans: dict[str, trace_api.Span] = {}
         self._trace_members: dict[str, set[str]] = {}
+        self._trace_inputs: dict[str, str] = {}
 
     def on_trace_start(self, trace) -> None:
         parent_context = self._resolve_upstream_context(trace)
@@ -66,11 +77,14 @@ class PromptLayerOpenAIAgentsProcessor:
     def on_trace_end(self, trace) -> None:
         with self._lock:
             root_span = self._root_spans.pop(trace.trace_id, None)
+            trace_input = self._trace_inputs.pop(trace.trace_id, None)
             member_ids = self._trace_members.pop(trace.trace_id, set())
             for member_id in member_ids:
                 self._agent_spans.pop(member_id, None)
 
         if root_span is not None:
+            if trace_input:
+                root_span.set_attribute(TRACE_INPUT_ATTRIBUTE, trace_input[:_INPUT_VALUE_MAX_CHARS])
             root_span.end()
 
     def on_span_start(self, span) -> None:
@@ -104,6 +118,8 @@ class PromptLayerOpenAIAgentsProcessor:
         for key, value in span_data_attributes(span.span_data, include_raw_payloads=self._include_raw_payloads).items():
             otel_span.set_attribute(key, value)
 
+        self._record_trace_input(span)
+
         if span.error:
             message = span.error.get("message", "OpenAI Agents span error")
             otel_span.set_status(Status(StatusCode.ERROR, message))
@@ -125,6 +141,17 @@ class PromptLayerOpenAIAgentsProcessor:
 
     def force_flush(self) -> None:
         self._tracer_provider.force_flush()
+
+    def _record_trace_input(self, span) -> None:
+        """Keep the first user message seen in the trace as its input."""
+        with self._lock:
+            if span.trace_id in self._trace_inputs:
+                return
+        input_value = span_user_input(span.span_data)
+        if not input_value:
+            return
+        with self._lock:
+            self._trace_inputs.setdefault(span.trace_id, input_value)
 
     def _ensure_root_span(self, span):
         with self._lock:

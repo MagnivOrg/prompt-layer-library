@@ -21,7 +21,7 @@ from state import (
     save_session_state,
     session_lock_path,
 )
-from stop_parser import build_stop_hook_span_specs, parse_transcript
+from stop_parser import build_stop_hook_span_specs, parse_transcript, session_input_attrs, session_input_from_parsed
 from traceparent import parse_traceparent
 
 
@@ -148,15 +148,16 @@ def handle_session_end(ctx, raw_input: str) -> str:
                 trace_id=state.trace_id,
                 span_id=state.session_span_id,
                 parent_span_id=state.session_parent_span_id,
-                name="LLM Session",
+                name="Claude Code session",
                 kind="1",
                 start_ns=state.session_start_ns or str(time.time_ns()),
                 end_ns=str(time.time_ns()),
                 attrs={
                     "source": "claude-code",
                     "hook": "SessionEnd",
-                    "node_type": "LLM_SESSION",
+                    "node_type": "WORKFLOW",
                     "session.lifecycle": "complete",
+                    **session_input_attrs(state.session_input),
                 },
             )
         )
@@ -222,6 +223,19 @@ def handle_stop_hook(ctx, raw_input: str) -> str:
         attempts += 1
         time.sleep(0.2)
 
+    if not state.session_input:
+        turn_input = session_input_from_parsed(parsed)
+        if turn_input:
+            state.session_input = turn_input
+            if acquire_lock(lock_path):
+                try:
+                    persisted, path = load_session_state(ctx.session_state_dir, str(session_id))
+                    if persisted.trace_id and not persisted.session_input:
+                        persisted.session_input = turn_input
+                        save_session_state(path, persisted)
+                finally:
+                    release_lock(lock_path)
+
     span_specs = build_stop_hook_span_specs(
         parsed=parsed,
         trace_id=state.trace_id,
@@ -230,6 +244,7 @@ def handle_stop_hook(ctx, raw_input: str) -> str:
         session_start_ns=state.session_start_ns or str(time.time_ns()),
         session_init_source=state.session_init_source,
         generate_span_id=generate_span_id,
+        session_input=state.session_input,
     )
     spans = [build_span(span_spec) for span_spec in span_specs]
     if spans:

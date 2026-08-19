@@ -225,14 +225,16 @@ def handle_stop_hook(ctx, raw_input: str) -> str:
 
     if not state.session_input:
         turn_input = session_input_from_parsed(parsed)
-        if turn_input and acquire_lock(lock_path):
-            try:
-                state, path = load_session_state(ctx.session_state_dir, str(session_id))
-                if not state.session_input:
-                    state.session_input = turn_input
-                    save_session_state(path, state)
-            finally:
-                release_lock(lock_path)
+        if turn_input:
+            state.session_input = turn_input
+            if acquire_lock(lock_path):
+                try:
+                    persisted, path = load_session_state(ctx.session_state_dir, str(session_id))
+                    if persisted.trace_id and not persisted.session_input:
+                        persisted.session_input = turn_input
+                        save_session_state(path, persisted)
+                finally:
+                    release_lock(lock_path)
 
     span_specs = build_stop_hook_span_specs(
         parsed=parsed,

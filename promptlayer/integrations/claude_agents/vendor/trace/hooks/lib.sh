@@ -15,7 +15,7 @@ export PL_OTLP_ENDPOINT="${PROMPTLAYER_OTLP_ENDPOINT:-https://api.promptlayer.co
 export PL_QUEUE_DRAIN_LIMIT="${PROMPTLAYER_QUEUE_DRAIN_LIMIT:-10}"
 export PL_OTLP_CONNECT_TIMEOUT="${PROMPTLAYER_OTLP_CONNECT_TIMEOUT:-5}"
 export PL_OTLP_MAX_TIME="${PROMPTLAYER_OTLP_MAX_TIME:-12}"
-export PL_PLUGIN_VERSION="1.0.0"
+export PL_PLUGIN_VERSION="1.1.1"
 PL_CC_VERSION="$(claude --version 2>/dev/null || echo 'unknown')"
 export PL_CC_VERSION
 export PL_USER_AGENT="promptlayer-claude-plugin/${PL_PLUGIN_VERSION} claude-code/${PL_CC_VERSION}"

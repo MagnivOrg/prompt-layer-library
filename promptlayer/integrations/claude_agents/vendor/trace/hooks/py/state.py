@@ -19,6 +19,7 @@ class SessionState:
     session_traceparent_version: str = ""
     session_trace_flags: str = ""
     trace_context_source: str = ""
+    session_input: str = ""
 
     @classmethod
     def from_dict(cls, data):

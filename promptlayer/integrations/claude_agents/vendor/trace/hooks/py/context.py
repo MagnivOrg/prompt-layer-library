@@ -3,7 +3,7 @@ import os
 import subprocess
 
 
-PLUGIN_VERSION = "1.0.0"
+PLUGIN_VERSION = "1.1.1"
 
 
 def env_int(name: str, default: int) -> int:

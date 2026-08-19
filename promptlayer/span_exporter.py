@@ -83,6 +83,9 @@ def _mark_genai_request_span(
 class GenAIPromptTemplateSpanProcessor(SpanProcessor):
     """Enrich supported GenAI spans and correlate PromptLayer-managed requests."""
 
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
+
     def on_start(self, span: Any, parent_context: Any = None) -> None:
         try:
             self._on_start(span, parent_context)

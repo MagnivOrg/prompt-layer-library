@@ -157,6 +157,8 @@ class CreateSheet(TypedDict, total=False):
 
 class UpdateSheet(TypedDict, total=False):
     title: Optional[str]
+    expected_row_count: Optional[int]
+    eval_run_status: Optional[str]  # running | completed | aborted
 
 
 class ColumnDependency(TypedDict, total=False):

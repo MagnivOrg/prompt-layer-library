@@ -10,6 +10,7 @@ class GetPromptTemplate(TypedDict, total=False):
     model: str
     input_variables: Dict[str, Any]
     metadata_filters: Dict[str, str]
+    model_parameter_overrides: Dict[str, Any]
     skip_input_variable_rendering: bool
 
 
@@ -249,8 +250,132 @@ class Tool(TypedDict, total=False):
     function: Function
 
 
+class OpenAIWebSearchToolConfig(TypedDict, total=False):
+    type: Literal["web_search", "web_search_2025_08_26"]
+    filters: Dict[str, Any]
+    search_context_size: Literal["low", "medium", "high"]
+    user_location: Dict[str, Any]
+
+
+class FileSearchToolConfig(TypedDict, total=False):
+    type: Literal["file_search"]
+    vector_store_ids: List[str]
+    filters: Dict[str, Any]
+    max_num_results: int
+    ranking_options: Dict[str, Any]
+
+
+class CodeInterpreterToolConfig(TypedDict, total=False):
+    type: Literal["code_interpreter"]
+    container: Dict[str, Any]
+
+
+class ImageGenerationToolConfig(TypedDict, total=False):
+    type: Literal["image_generation"]
+    action: Literal["generate", "edit", "auto"]
+    background: Literal["transparent", "opaque", "auto"]
+    input_fidelity: Optional[Literal["high", "low"]]
+    input_image_mask: Dict[str, str]
+    model: str
+    moderation: Literal["auto", "low"]
+    output_compression: int
+    output_format: Literal["png", "webp", "jpeg"]
+    partial_images: int
+    quality: Literal["low", "medium", "high", "auto"]
+    size: Literal["1024x1024", "1024x1536", "1536x1024", "auto"]
+
+
+class McpToolApprovalFilter(TypedDict, total=False):
+    tool_names: List[str]
+
+
+class McpToolApproval(TypedDict, total=False):
+    never: McpToolApprovalFilter
+    always: McpToolApprovalFilter
+
+
+class OpenAINativeMcpToolConfig(TypedDict, total=False):
+    type: Literal["mcp"]
+    server_label: str
+    server_url: str
+    server_description: str
+    connector_id: str
+    authorization: str
+    headers: Dict[str, str]
+    allowed_tools: List[str]
+    require_approval: Union[Literal["always", "never"], McpToolApproval]
+
+
+class ShellToolConfig(TypedDict, total=False):
+    type: Literal["shell"]
+    environment: Dict[str, Any]
+
+
+class ApplyPatchToolConfig(TypedDict, total=False):
+    type: Literal["apply_patch"]
+
+
+class OpenRouterWebSearchToolConfig(TypedDict, total=False):
+    id: Literal["web"]
+    engine: Literal["native", "exa", "firecrawl", "parallel", "perplexity"]
+    max_results: int
+    search_prompt: str
+    include_domains: List[str]
+    exclude_domains: List[str]
+
+
+class OpenRouterServerToolConfig(TypedDict, total=False):
+    openrouter_server_tool: str
+    parameters: Dict[str, Any]
+
+
+BuiltInToolConfig = Union[
+    OpenAIWebSearchToolConfig,
+    FileSearchToolConfig,
+    CodeInterpreterToolConfig,
+    ImageGenerationToolConfig,
+    OpenAINativeMcpToolConfig,
+    ShellToolConfig,
+    ApplyPatchToolConfig,
+    OpenRouterWebSearchToolConfig,
+    OpenRouterServerToolConfig,
+    Dict[str, Any],
+]
+
+
 class BuiltInTool(TypedDict, total=False):
+    id: str
     type: str
+    name: str
+    description: str
+    provider: str
+    config: BuiltInToolConfig
+
+
+class McpTool(TypedDict, total=False):
+    type: Literal["mcp"]
+    mcp_server_id: int
+
+
+class LegacyOpenAINativeMcpToolConfig(OpenAINativeMcpToolConfig, total=False):
+    """Legacy OpenAI-native MCP config accepted and normalized by the backend."""
+
+    execution_mode: Literal["provider"]
+
+
+class LegacyOpenAINativeMcpTool(TypedDict, total=False):
+    """Deprecated legacy shape. Use BuiltInTool with type ``openai_mcp``."""
+
+    id: str
+    name: str
+    description: str
+    provider: Literal["openai", "openai.azure"]
+    type: Literal["mcp"]
+    config: LegacyOpenAINativeMcpToolConfig
+
+
+class ToolVariable(TypedDict, total=False):
+    type: Literal["variable"]
     name: str
 
 
@@ -259,6 +384,9 @@ class RegistryTool(TypedDict, total=False):
     tool_registry_id: int
     label: Optional[str]
     version_number: Optional[int]
+
+
+PromptTool = Union[Tool, McpTool, BuiltInTool, LegacyOpenAINativeMcpTool, ToolVariable, RegistryTool]
 
 
 class FunctionCall(TypedDict, total=False):
@@ -364,7 +492,7 @@ class ChatPromptTemplate(TypedDict, total=False):
     functions: Sequence[Function]
     function_call: Union[Literal["auto", "none"], ChatFunctionCall]
     input_variables: List[str]
-    tools: Sequence[Union[Tool, BuiltInTool, RegistryTool]]
+    tools: Sequence[PromptTool]
     tool_choice: ToolChoice
 
 
@@ -394,6 +522,7 @@ class PromptBlueprint(TypedDict, total=False):
 
 class PublishPromptTemplate(BasePromptTemplate, PromptBlueprint, total=False):
     release_labels: Optional[List[str]] = None
+    parent_version_id: int
 
 
 class BaseProviderBaseURL(TypedDict):

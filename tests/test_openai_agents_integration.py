@@ -386,6 +386,35 @@ def test_openai_agents_trace_nests_under_eval_span(in_memory_tracer_provider):
     agent_provider.shutdown()
 
 
+def test_openai_agents_under_shared_provider_allows_second_eval_case(in_memory_tracer_provider):
+    """Regression: FixedIdGenerator must not stick on the Eval tracer mid-run."""
+    provider, exporter = in_memory_tracer_provider
+    processor = PromptLayerOpenAIAgentsProcessor(tracer_provider=provider)
+    set_trace_processors([processor])
+
+    def runner(case_input):
+        with trace(f"workflow-{case_input}", trace_id="trace_" + ("e" * 32)):
+            with generation_span(
+                input=[{"role": "user", "content": case_input}],
+                output=[{"role": "assistant", "content": "ok"}],
+                model="gpt-4.1",
+            ):
+                pass
+        return "ok"
+
+    first = run_case_in_span("case-1", runner, "a", provider)
+    # Previously failed here: Eval tracer.id_generator was left as FixedIdGenerator(trace_id=None).
+    second = run_case_in_span("case-2", runner, "b", provider)
+
+    assert first[0] == "ok"
+    assert second[0] == "ok"
+    assert first[1] != second[1]
+
+    spans = _finished_spans(exporter)
+    eval_names = {span.name for span in spans if span.name.startswith("Eval:")}
+    assert eval_names == {"Eval: case-1", "Eval: case-2"}
+
+
 def test_create_openai_agents_tracer_provider_targets_public_v1_traces(monkeypatch):
     seen = {}
 

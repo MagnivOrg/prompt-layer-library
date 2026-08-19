@@ -77,7 +77,7 @@ def build_create_sheet_body(body: CreateSheet) -> Dict[str, Any]:
 
 
 def empty_csv_sheet_source(file_name: str = "empty.csv") -> Dict[str, str]:
-    """Minimal file source used to create an empty experiment sheet."""
+    """Minimal file source for callers that explicitly want a CSV-backed sheet create."""
     # Header-only CSV so the import succeeds without seeding eval rows.
     content = base64.b64encode(b"input\n").decode("ascii")
     safe_name = file_name if file_name.endswith((".csv", ".json")) else f"{file_name}.csv"
@@ -89,11 +89,15 @@ def empty_csv_sheet_source(file_name: str = "empty.csv") -> Dict[str, str]:
 
 
 def with_default_empty_sheet_source(body: Optional[CreateSheet] = None) -> CreateSheet:
-    """Ensure a create-sheet body has a source (required by the public API)."""
+    """Return a create-sheet body for an empty sheet (no file/CSV source).
+
+    The public API supports source-less creates. Avoid defaulting to a CSV
+    bootstrap: evals add columns immediately after create, which races the
+    import job and fails with header mismatches.
+    """
     payload: CreateSheet = dict(body or {})  # type: ignore[assignment]
-    if payload.get("source") is None:
-        title = payload.get("title") or "Sheet 1"
-        payload["source"] = empty_csv_sheet_source(f"{title}.csv")  # type: ignore[typeddict-item]
+    if not payload.get("title"):
+        payload["title"] = "Sheet 1"
     return payload
 
 
@@ -102,7 +106,7 @@ def empty_sheet_create_body(title: str) -> CreateSheet:
 
 
 def build_update_sheet_body(body: UpdateSheet) -> Dict[str, Any]:
-    return _defined_fields(body, "title")
+    return _defined_fields(body, "title", "expected_row_count", "eval_run_status")
 
 
 def build_add_rows_body(body: AddTableRows) -> Dict[str, Any]:

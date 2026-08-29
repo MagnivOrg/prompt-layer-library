@@ -163,9 +163,8 @@ def _scorecard_is_done(payload: Any, calculation_id: str) -> bool:
         return False
     latest = payload.get("latest_calculation") or {}
     latest_id = latest.get("id")
-    # Ignore stale payloads from a previous calculation until the new one appears
-    # or the response is already terminal.
-    if latest_id is not None and str(latest_id) != calculation_id and not _is_terminal_scorecard_response(payload):
+    # Ignore stale payloads from a previous calculation until the new one appears.
+    if latest_id is not None and str(latest_id) != calculation_id:
         return False
     return _is_terminal_scorecard_response(payload)
 

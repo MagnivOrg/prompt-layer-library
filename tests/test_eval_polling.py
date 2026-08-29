@@ -566,6 +566,10 @@ async def test_live_progress_completes_when_safety_poll_counts_finish_with_stale
 def test_scorecard_polling_waits_for_terminal_calculation():
     responses = [
         {
+            "latest_calculation": {"id": "calc-old", "status": "completed"},
+            "scorecard": {"status": "completed"},
+        },
+        {
             "latest_calculation": {"id": "calc-1", "status": "running"},
             "progress": {"scored_rows": 1, "total_rows": 2},
         },
@@ -590,7 +594,7 @@ def test_scorecard_polling_waits_for_terminal_calculation():
         result = recalculate_and_wait_scorecard("key", "url", True, "table", "sheet")
 
     assert result == responses[-1]
-    assert get_scorecard.call_count == 2
+    assert get_scorecard.call_count == 3
     terminal.return_value.scoring_progress.assert_any_call(1, 2, 0)
     terminal.return_value.scoring_progress.assert_any_call(2, 2, 0)
 

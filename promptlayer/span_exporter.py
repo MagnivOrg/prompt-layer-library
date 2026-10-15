@@ -327,20 +327,20 @@ def set_prompt_span_attributes(
 
         entries = _prompt_span_attributes(prompt_blueprint, prompt_name, label=label)
 
-        # Release what a previous call attached, so repeated prompt fetches
-        # replace the active prompt identity instead of stacking a new context
-        # layer for each one. Without this the tokens are unreachable and the
-        # baggage of the last fetch stays visible to every later span.
+        # Detaching restores the entire context from before the previous fetch.
+        # Preserve the current context first: a caller may have started a new
+        # span or added unrelated baggage since that fetch. Reattach that context
+        # below with only the prompt identity replaced.
+        ctx = context.get_current()
+        span = trace.get_current_span(ctx)
         _release_prompt_baggage()
 
         template_token = _active_prompt_template.set(entries)
 
-        span = trace.get_current_span()
         if span.is_recording():
             for key, value in entries.items():
                 span.set_attribute(key, value)
 
-        ctx = context.get_current()
         for key in _BAGGAGE_KEYS:
             if key in entries:
                 ctx = baggage.set_baggage(key, entries[key], ctx)

@@ -1,7 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
-
 import pytest
 
 from promptlayer.promptlayer_mixins import PromptLayerMixin

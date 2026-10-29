@@ -1891,6 +1891,20 @@ MAP_TYPE_TO_OPENAI_FUNCTION = {
 }
 
 
+def _openai_decisions_create(client, function_kwargs: dict):
+    # Older openai-python releases have no `decisions` resource; fall back to a raw POST.
+    if hasattr(client, "decisions"):
+        return client.decisions.create(**function_kwargs)
+    return client.post("/decisions", body=function_kwargs, cast_to=httpx.Response).json()
+
+
+async def _aopenai_decisions_create(client, function_kwargs: dict):
+    if hasattr(client, "decisions"):
+        return await client.decisions.create(**function_kwargs)
+    response = await client.post("/decisions", body=function_kwargs, cast_to=httpx.Response)
+    return response.json()
+
+
 def openai_request(
     prompt_blueprint: GetPromptTemplateResponse,
     client_kwargs: dict,
@@ -1910,6 +1924,8 @@ def openai_request(
         return request_to_make(client, **function_kwargs)
     elif api_type == "images":
         return client.images.generate(**function_kwargs)
+    elif api_type == "decisions":
+        return _openai_decisions_create(client, function_kwargs)
     else:
         return client.responses.create(**function_kwargs)
 
@@ -1944,6 +1960,8 @@ async def aopenai_request(
         return await request_to_make(client, **function_kwargs)
     elif api_type == "images":
         return await client.images.generate(**function_kwargs)
+    elif api_type == "decisions":
+        return await _aopenai_decisions_create(client, function_kwargs)
     else:
         return await client.responses.create(**function_kwargs)
 
@@ -2195,6 +2213,38 @@ async def _arun_openrouter_speech_request(client, generate_kwargs: dict) -> dict
     return _openrouter_speech_result(audio_bytes, generate_kwargs.get("response_format"))
 
 
+OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
+
+
+def _openrouter_decisions_http_kwargs(client_kwargs: dict, function_kwargs: dict) -> dict:
+    """Build the ``POST /api/alpha/decisions`` call for an OpenRouter decision prompt.
+
+    The OpenRouter SDK has no decisions resource and decisions live under their own base
+    path, so only the API key carries over from the client kwargs (matching the backend).
+    """
+    api_key = client_kwargs.get("api_key") or os.environ.get("OPENROUTER_API_KEY")
+    body = {k: v for k, v in function_kwargs.items() if k != "stream"}
+    return {
+        "url": OPENROUTER_DECISIONS_URL,
+        "json": body,
+        "headers": {"Authorization": f"Bearer {api_key}"},
+        "timeout": int(os.environ.get("OPENROUTER_TIMEOUT_MS", 600_000)) / 1000,
+    }
+
+
+def openrouter_decisions_request(client_kwargs: dict, function_kwargs: dict) -> dict:
+    response = httpx.post(**_openrouter_decisions_http_kwargs(client_kwargs, function_kwargs))
+    response.raise_for_status()
+    return response.json()
+
+
+async def aopenrouter_decisions_request(client_kwargs: dict, function_kwargs: dict) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(**_openrouter_decisions_http_kwargs(client_kwargs, function_kwargs))
+    response.raise_for_status()
+    return response.json()
+
+
 def openrouter_request(
     prompt_blueprint: GetPromptTemplateResponse,
     client_kwargs: dict,
@@ -2205,10 +2255,13 @@ def openrouter_request(
     Chat routes through ``chat.send`` (streaming or not); image, video and
     speech generation route through the dedicated ``images.generate``,
     ``video_generation.generate`` (async polling job) and ``tts.create_speech``
-    endpoints.
+    endpoints. Decisions are a plain ``POST /api/alpha/decisions``.
     """
-    client = _get_openrouter_client(client_kwargs)
     api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat"
+    if api_type == "decisions":
+        return openrouter_decisions_request(client_kwargs, function_kwargs)
+
+    client = _get_openrouter_client(client_kwargs)
 
     if api_type == "images":
         function_kwargs.pop("stream", None)
@@ -2232,8 +2285,11 @@ async def aopenrouter_request(
     client_kwargs: dict,
     function_kwargs: dict,
 ):
-    client = _get_openrouter_client(client_kwargs, is_async=True)
     api_type = prompt_blueprint["metadata"]["model"].get("api_type") or "chat"
+    if api_type == "decisions":
+        return await aopenrouter_decisions_request(client_kwargs, function_kwargs)
+
+    client = _get_openrouter_client(client_kwargs, is_async=True)
 
     if api_type == "images":
         function_kwargs.pop("stream", None)

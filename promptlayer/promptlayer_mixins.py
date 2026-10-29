@@ -79,6 +79,10 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": openai_images_stream,
         },
     },
+    "openai:decisions": {
+        "chat": {"function_name": "openai.decisions.create", "stream_function": None},
+        "completion": {"function_name": "openai.decisions.create", "stream_function": None},
+    },
     "anthropic": {
         "chat": {
             "function_name": "anthropic.messages.create",
@@ -154,6 +158,10 @@ MAP_PROVIDER_TO_FUNCTION_NAME = {
             "function_name": "openrouter.video_generation.generate",
             "stream_function": None,
         },
+    },
+    "openrouter:decisions": {
+        "chat": {"function_name": "openrouter.decisions.create", "stream_function": None},
+        "completion": {"function_name": "openrouter.decisions.create", "stream_function": None},
     },
     "openrouter:speech": {
         "chat": {
@@ -237,6 +245,10 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "stream_function": aopenai_images_stream,
         },
     },
+    "openai:decisions": {
+        "chat": {"function_name": "openai.decisions.create", "stream_function": None},
+        "completion": {"function_name": "openai.decisions.create", "stream_function": None},
+    },
     "anthropic": {
         "chat": {
             "function_name": "anthropic.messages.create",
@@ -312,6 +324,10 @@ AMAP_PROVIDER_TO_FUNCTION_NAME = {
             "function_name": "openrouter.video_generation.generate",
             "stream_function": None,
         },
+    },
+    "openrouter:decisions": {
+        "chat": {"function_name": "openrouter.decisions.create", "stream_function": None},
+        "completion": {"function_name": "openrouter.decisions.create", "stream_function": None},
     },
     "openrouter:speech": {
         "chat": {
@@ -458,7 +474,7 @@ class PromptLayerMixin:
         function_kwargs["stream"] = stream
         provider = prompt_blueprint_model["provider"]
         api_type = prompt_blueprint_model.get("api_type", "chat-completions")
-        if provider == "openrouter" and api_type not in ("images", "video", "speech"):
+        if provider == "openrouter" and api_type not in ("images", "video", "speech", "decisions"):
             api_type = "chat"
 
         if custom_provider := prompt_blueprint.get("custom_provider"):
@@ -469,6 +485,11 @@ class PromptLayerMixin:
             }
         elif provider_base_url := prompt_blueprint.get("provider_base_url"):
             client_kwargs["base_url"] = provider_base_url["url"]
+
+        if api_type == "decisions":
+            if stream:
+                raise ValueError("The Decisions API does not support streaming.")
+            function_kwargs.pop("stream", None)
 
         if stream and (
             (provider in ["openai", "openai.azure"] and api_type == "chat-completions")
@@ -487,7 +508,7 @@ class PromptLayerMixin:
             api = api_type if api_type is not None else "chat-completions"
             provider_function_name = f"{provider_function_name}:{api}"
 
-        if provider_function_name == "openrouter" and api_type in ("chat", "images", "video", "speech"):
+        if provider_function_name == "openrouter" and api_type in ("chat", "images", "video", "speech", "decisions"):
             provider_function_name = f"openrouter:{api_type}"
 
         if is_async:

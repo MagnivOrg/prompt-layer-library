@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `pl.run()` now supports decision prompts (`api_type: "decisions"`): OpenAI-direct prompts call the OpenAI Decisions API (`openai.decisions.create`) and OpenRouter prompts call `POST https://openrouter.ai/api/alpha/decisions` (`openrouter.decisions.create`). Decisions do not support streaming.
 - Added prompt schema types for centralized MCP server references, OpenAI-native MCP tools, tool variables, OpenRouter server tools, expanded OpenAI built-ins, and parent prompt version lineage.
 - Added official OpenTelemetry auto-instrumentation for OpenAI, Anthropic Messages, Google GenAI in Gemini and Vertex AI modes, and AWS Bedrock through Botocore. Message content capture defaults to `SPAN_ONLY` and can be disabled with `NO_CONTENT`.
 - Added public table scorecard APIs under `client.tables.sheets.scorecards`.

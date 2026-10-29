@@ -2216,33 +2216,53 @@ async def _arun_openrouter_speech_request(client, generate_kwargs: dict) -> dict
 OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions"
 
 
+class OpenRouterDecisionsError(Exception):
+    """Non-2xx response from OpenRouter decisions; ``status_code`` drives error categorization."""
+
+    def __init__(self, status_code: int, body: str):
+        super().__init__(f"OpenRouter decisions request failed with status {status_code}: {body[:1000]}")
+        self.status_code = status_code
+
+
 def _openrouter_decisions_http_kwargs(client_kwargs: dict, function_kwargs: dict) -> dict:
     """Build the ``POST /api/alpha/decisions`` call for an OpenRouter decision prompt.
 
     The OpenRouter SDK has no decisions resource and decisions live under their own base
-    path, so only the API key carries over from the client kwargs (matching the backend).
+    path, so only the API key carries over from the client kwargs (matching the backend);
+    a custom provider's base URL is not used.
     """
     api_key = client_kwargs.get("api_key") or os.environ.get("OPENROUTER_API_KEY")
-    body = {k: v for k, v in function_kwargs.items() if k != "stream"}
+    if not api_key:
+        raise ValueError("OpenRouter API key missing: set OPENROUTER_API_KEY or configure an OpenRouter provider.")
     return {
         "url": OPENROUTER_DECISIONS_URL,
-        "json": body,
+        "json": function_kwargs,
         "headers": {"Authorization": f"Bearer {api_key}"},
         "timeout": int(os.environ.get("OPENROUTER_TIMEOUT_MS", 600_000)) / 1000,
     }
 
 
-def openrouter_decisions_request(client_kwargs: dict, function_kwargs: dict) -> dict:
-    response = httpx.post(**_openrouter_decisions_http_kwargs(client_kwargs, function_kwargs))
-    response.raise_for_status()
+def _openrouter_decisions_result(response: httpx.Response) -> dict:
+    if response.is_error:
+        raise OpenRouterDecisionsError(response.status_code, response.text)
     return response.json()
+
+
+def openrouter_decisions_request(client_kwargs: dict, function_kwargs: dict) -> dict:
+    try:
+        response = httpx.post(**_openrouter_decisions_http_kwargs(client_kwargs, function_kwargs))
+    except httpx.TimeoutException as e:
+        raise TimeoutError(f"OpenRouter decisions request timed out: {e}") from e
+    return _openrouter_decisions_result(response)
 
 
 async def aopenrouter_decisions_request(client_kwargs: dict, function_kwargs: dict) -> dict:
-    async with httpx.AsyncClient() as client:
-        response = await client.post(**_openrouter_decisions_http_kwargs(client_kwargs, function_kwargs))
-    response.raise_for_status()
-    return response.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(**_openrouter_decisions_http_kwargs(client_kwargs, function_kwargs))
+    except httpx.TimeoutException as e:
+        raise TimeoutError(f"OpenRouter decisions request timed out: {e}") from e
+    return _openrouter_decisions_result(response)
 
 
 def openrouter_request(

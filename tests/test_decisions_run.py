@@ -1,8 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
+
 import pytest
 
 from promptlayer.promptlayer_mixins import PromptLayerMixin
+from promptlayer.track.error_tracking import categorize_error
 from promptlayer.utils import aopenai_request, aopenrouter_request, openai_request, openrouter_request
 
 DECISION_KWARGS = {
@@ -88,8 +91,8 @@ OPENROUTER_DECISION_RESPONSE = {
 }
 
 
-def _mock_response(json_body):
-    response = MagicMock()
+def _mock_response(json_body, status_code=200, text=""):
+    response = MagicMock(status_code=status_code, is_error=status_code >= 400, text=text)
     response.json.return_value = json_body
     return response
 
@@ -126,16 +129,13 @@ def test_openrouter_request_posts_decisions(monkeypatch):
     monkeypatch.setattr("promptlayer.utils.httpx.post", post)
     monkeypatch.setattr("promptlayer.utils._get_openrouter_client", MagicMock(side_effect=AssertionError))
 
-    result = openrouter_request(
-        OPENROUTER_BLUEPRINT, {"api_key": "sk-or-test"}, {**OPENROUTER_DECISION_KWARGS, "stream": False}
-    )
+    result = openrouter_request(OPENROUTER_BLUEPRINT, {"api_key": "sk-or-test"}, dict(OPENROUTER_DECISION_KWARGS))
 
     assert result == OPENROUTER_DECISION_RESPONSE
     kwargs = post.call_args.kwargs
     assert kwargs["url"] == "https://openrouter.ai/api/alpha/decisions"
     assert kwargs["json"] == OPENROUTER_DECISION_KWARGS
     assert kwargs["headers"] == {"Authorization": "Bearer sk-or-test"}
-    post.return_value.raise_for_status.assert_called_once()
 
 
 def test_openrouter_decisions_key_falls_back_to_env(monkeypatch):
@@ -166,3 +166,37 @@ async def test_aopenrouter_request_posts_decisions(monkeypatch):
     assert kwargs["url"] == "https://openrouter.ai/api/alpha/decisions"
     assert kwargs["json"] == OPENROUTER_DECISION_KWARGS
     assert kwargs["headers"] == {"Authorization": "Bearer sk-or-test"}
+
+
+@pytest.mark.parametrize(
+    "status_code, category",
+    [(401, "PROVIDER_AUTH_ERROR"), (402, "PROVIDER_QUOTA_LIMIT"), (429, "PROVIDER_RATE_LIMIT")],
+)
+def test_openrouter_decisions_errors_keep_status_and_body(monkeypatch, status_code, category):
+    response = _mock_response(None, status_code=status_code, text="provider says no")
+    monkeypatch.setattr("promptlayer.utils.httpx.post", MagicMock(return_value=response))
+
+    with pytest.raises(Exception) as error:
+        openrouter_request(OPENROUTER_BLUEPRINT, {"api_key": "sk-or-test"}, dict(OPENROUTER_DECISION_KWARGS))
+
+    assert "provider says no" in str(error.value)
+    assert categorize_error(error.value) == category
+
+
+def test_openrouter_decisions_timeout_is_categorized(monkeypatch):
+    monkeypatch.setattr("promptlayer.utils.httpx.post", MagicMock(side_effect=httpx.ReadTimeout("slow")))
+
+    with pytest.raises(TimeoutError) as error:
+        openrouter_request(OPENROUTER_BLUEPRINT, {"api_key": "sk-or-test"}, dict(OPENROUTER_DECISION_KWARGS))
+
+    assert categorize_error(error.value) == "PROVIDER_TIMEOUT"
+
+
+def test_openrouter_decisions_require_an_api_key(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    post = MagicMock()
+    monkeypatch.setattr("promptlayer.utils.httpx.post", post)
+
+    with pytest.raises(ValueError, match="OpenRouter API key missing"):
+        openrouter_request(OPENROUTER_BLUEPRINT, {}, dict(OPENROUTER_DECISION_KWARGS))
+    post.assert_not_called()

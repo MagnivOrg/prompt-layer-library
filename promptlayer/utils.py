@@ -135,19 +135,32 @@ def _get_requests_session() -> requests.Session:
     return _requests_session
 
 
+# --- LLM client caching helpers ---
 # Generic LLM client cache - prevents connection pool exhaustion under high concurrency
 # Uses LRUCache to limit memory growth in long-running systems
 _llm_client_cache: LRUCache = LRUCache(maxsize=100)
 _llm_client_cache_lock = threading.Lock()
+_llm_client_cache_access_lock = threading.Lock()
 
 
 def _get_cached_client(cache_key: str, factory: Callable[[], Any]) -> Any:
-    """Generic client caching with thread-safe double-checked locking."""
-    if cache_key not in _llm_client_cache:
-        with _llm_client_cache_lock:
-            if cache_key not in _llm_client_cache:
-                _llm_client_cache[cache_key] = factory()
-    return _llm_client_cache[cache_key]
+    """Retain LRU clients atomically without blocking cache hits on construction."""
+    with _llm_client_cache_access_lock:
+        if cache_key in _llm_client_cache:
+            return _llm_client_cache[cache_key]
+
+    with _llm_client_cache_lock:
+        with _llm_client_cache_access_lock:
+            if cache_key in _llm_client_cache:
+                return _llm_client_cache[cache_key]
+
+        client = factory()
+        with _llm_client_cache_access_lock:
+            _llm_client_cache[cache_key] = client
+        return client
+
+
+# --- End LLM client caching helpers ---
 
 
 class FinalOutputCode(Enum):

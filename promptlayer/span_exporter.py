@@ -38,6 +38,10 @@ _active_prompt_template: ContextVar[Optional[Dict[str, str]]] = ContextVar(
     "promptlayer_active_prompt_template",
     default=None,
 )
+_prompt_baggage_tokens: ContextVar[Optional[tuple]] = ContextVar(
+    "promptlayer_prompt_baggage_tokens",
+    default=None,
+)
 _defer_prompt_span_attributes: ContextVar[bool] = ContextVar(
     "promptlayer_defer_prompt_span_attributes",
     default=False,
@@ -273,6 +277,36 @@ def _set_prompt_fetch_cache_hit(cache_hit: bool) -> None:
         logger.debug("PromptLayer could not annotate prompt cache status", exc_info=True)
 
 
+def _release_prompt_baggage() -> None:
+    """Undo what a previous :func:`set_prompt_span_attributes` attached.
+
+    The baggage has to outlive the call that sets it so child spans inherit the
+    prompt identity, which means it cannot be scoped to a context manager here.
+    Keeping the tokens lets the next call detach the previous context instead of
+    layering a new one on top of it.
+    """
+
+    tokens = _prompt_baggage_tokens.get()
+    if not tokens:
+        return
+    template_token, baggage_token = tokens
+    _prompt_baggage_tokens.set(None)
+    if baggage_token is not None:
+        try:
+            context.detach(baggage_token)
+        except Exception:
+            logger.debug(
+                "PromptLayer could not detach previous prompt baggage", exc_info=True
+            )
+    if template_token is not None:
+        try:
+            _active_prompt_template.reset(template_token)
+        except Exception:
+            logger.debug(
+                "PromptLayer could not reset previous prompt template", exc_info=True
+            )
+
+
 def set_prompt_span_attributes(
     prompt_blueprint: Dict[str, Any],
     prompt_name: str,
@@ -293,19 +327,26 @@ def set_prompt_span_attributes(
 
         entries = _prompt_span_attributes(prompt_blueprint, prompt_name, label=label)
 
-        _active_prompt_template.set(entries)
+        # Detaching restores the entire context from before the previous fetch.
+        # Preserve the current context first: a caller may have started a new
+        # span or added unrelated baggage since that fetch. Reattach that context
+        # below with only the prompt identity replaced.
+        ctx = context.get_current()
+        span = trace.get_current_span(ctx)
+        _release_prompt_baggage()
 
-        span = trace.get_current_span()
+        template_token = _active_prompt_template.set(entries)
+
         if span.is_recording():
             for key, value in entries.items():
                 span.set_attribute(key, value)
 
-        ctx = context.get_current()
         for key in _BAGGAGE_KEYS:
             if key in entries:
                 ctx = baggage.set_baggage(key, entries[key], ctx)
             else:
                 ctx = baggage.remove_baggage(key, ctx)
-        context.attach(ctx)
+        baggage_token = context.attach(ctx)
+        _prompt_baggage_tokens.set((template_token, baggage_token))
     except Exception:
         logger.debug("PromptLayer could not attach prompt tracing attributes", exc_info=True)

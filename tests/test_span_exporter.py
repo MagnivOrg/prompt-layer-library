@@ -1,9 +1,10 @@
 """Tests for set_prompt_span_attributes in promptlayer.span_exporter."""
 
+from contextvars import Context
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from opentelemetry import trace
+from opentelemetry import baggage, context, trace
 from opentelemetry.sdk.trace import TracerProvider
 
 from promptlayer.span_exporter import (
@@ -165,3 +166,60 @@ def test_genai_request_context_failure_does_not_skip_operation():
             operation()
 
     operation.assert_called_once_with()
+
+
+class TestRepeatedPromptFetchContext:
+    def test_preserves_nested_span_and_unrelated_context(self):
+        def scenario():
+            tracer = TracerProvider().get_tracer("test")
+            with tracer.start_as_current_span("outer"):
+                set_prompt_span_attributes({"id": 1}, "prompt-a", label="prod")
+                with tracer.start_as_current_span("inner") as inner:
+                    ctx = baggage.set_baggage("tenant", "acme")
+                    ctx = context.set_value("request-marker", "inner-request", ctx)
+                    token = context.attach(ctx)
+                    try:
+                        set_prompt_span_attributes({"id": 2}, "prompt-b")
+
+                        assert trace.get_current_span() is inner
+                        assert inner.attributes["promptlayer.prompt.name"] == "prompt-b"
+                        assert baggage.get_baggage("tenant") == "acme"
+                        assert context.get_value("request-marker") == "inner-request"
+                        assert baggage.get_baggage("promptlayer.prompt.name") == "prompt-b"
+                        assert baggage.get_baggage("promptlayer.prompt.label") is None
+                        with tracer.start_as_current_span("llm") as llm:
+                            assert llm.parent.span_id == inner.get_span_context().span_id
+                    finally:
+                        context.detach(token)
+
+        Context().run(scenario)
+
+    def test_preserves_sequential_request_spans(self):
+        def scenario():
+            tracer = TracerProvider().get_tracer("test")
+            with tracer.start_as_current_span("request-1"):
+                set_prompt_span_attributes({}, "prompt-a")
+            with tracer.start_as_current_span("request-2") as second:
+                set_prompt_span_attributes({}, "prompt-b")
+
+                assert trace.get_current_span() is second
+                assert second.attributes["promptlayer.prompt.name"] == "prompt-b"
+                with tracer.start_as_current_span("llm") as llm:
+                    assert llm.parent.span_id == second.get_span_context().span_id
+
+        Context().run(scenario)
+
+    def test_repeated_fetches_still_release_to_baseline(self):
+        from promptlayer.span_exporter import _active_prompt_template, _release_prompt_baggage
+
+        def scenario():
+            baseline = context.get_current()
+            for index in range(3):
+                set_prompt_span_attributes({"id": index}, f"prompt-{index}")
+
+            _release_prompt_baggage()
+
+            assert context.get_current() == baseline
+            assert _active_prompt_template.get() is None
+
+        Context().run(scenario)
